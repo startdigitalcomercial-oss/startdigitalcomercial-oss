@@ -130,14 +130,17 @@ function embed(url) {
   return { tipo: 'iframe', src: u };
 }
 
+function svgIco(p) {
+  return '<svg width="16" height="16" viewBox="0 0 24 24" style="stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round">' + p + '</svg>';
+}
 function iconeMaterial(url) {
   const u = String(url || '').toLowerCase();
-  if (u.indexOf('.pdf') >= 0) return '📄';
-  if (u.match(/\.(xlsx?|csv)/)) return '📊';
-  if (u.match(/\.(docx?|txt)/)) return '📝';
-  if (u.match(/\.(zip|rar)/)) return '🗂️';
-  if (u.match(/\.(png|jpe?g|svg)/)) return '🖼️';
-  return '🔗';
+  const doc = '<path d="M13.5 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5z"/><path d="M13.5 3.5v5h5"/>';
+  if (u.indexOf('.pdf') >= 0 || u.match(/\.(docx?|txt)/)) return svgIco(doc + '<path d="M9 13h6M9 16.4h6"/>');
+  if (u.match(/\.(xlsx?|csv)/)) return svgIco(doc + '<path d="M9 13.4h6M9 16.6h6M12 13.4v3.2"/>');
+  if (u.match(/\.(zip|rar)/)) return svgIco('<rect x="4.5" y="6.5" width="15" height="13" rx="2"/><path d="M4.5 10.5h15M12 6.5V4.8"/>');
+  if (u.match(/\.(png|jpe?g|svg)/)) return svgIco('<rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m5.5 17.5 4.5-4.5 3 3 2.5-2.5 3 3"/>');
+  return svgIco('<path d="M10 14a4 4 0 0 0 6 .4l2.5-2.5a4 4 0 0 0-5.6-5.6L11.5 7.7"/><path d="M14 10a4 4 0 0 0-6-.4L5.5 12.1a4 4 0 0 0 5.6 5.6l1.4-1.4"/>');
 }
 
 function desenhaLista() {
@@ -167,7 +170,7 @@ function desenhaLista() {
   const resumo = document.getElementById('resumo');
   if (pct === 100 && AULAS.length) {
     resumo.style.display = 'flex';
-    resumo.innerHTML = '<span class="num">🎉</span><div><strong>Integração concluída!</strong>' +
+    resumo.innerHTML = '<span class="num" style="color:var(--accent)"><svg width="26" height="26" viewBox="0 0 24 24" style="stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><circle cx="12" cy="12" r="8.8"/><path d="m8.4 12.3 2.4 2.4 4.8-5.4"/></svg></span><div><strong>Integração concluída!</strong>' +
       '<div class="small muted">Você assistiu todas as aulas. Qualquer dúvida, fale com a sua liderança.</div></div>';
   } else {
     resumo.style.display = 'none';

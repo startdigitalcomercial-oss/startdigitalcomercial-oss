@@ -93,6 +93,55 @@
   .mod-titulo { font-weight: 600 !important; font-size: 17px !important; letter-spacing: -.016em; border-color: transparent !important; background: transparent !important; padding: 4px 6px !important; }
   .mod-desc { font-size: 13.5px !important; color: var(--label-3) !important; border-color: transparent !important; background: transparent !important; padding: 4px 6px !important; }
   .mod-titulo:hover, .mod-desc:hover, .mod-titulo:focus, .mod-desc:focus { background: var(--fill-1) !important; }
+
+  /* ---------- casca com barra lateral ---------- */
+  .app-shell { display: flex; min-height: 100vh; }
+  .sidebar { width: 218px; flex: none; background: #101828; display: flex; flex-direction: column; padding: 20px 12px 16px; position: sticky; top: 0; height: 100vh; }
+  .logo { display: flex; align-items: center; gap: 9px; color: #fff; font-weight: 600; font-size: 15px; letter-spacing: -.014em; padding: 2px 10px 14px; }
+  .logo .dot { width: 8px; height: 8px; border-radius: 50%; background: #1fbf6e; display: block; }
+  .logo small { color: #667085; font-weight: 400; font-size: 12px; }
+  .nav-sec { font-size: 10.5px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: #475467; padding: 16px 10px 7px; }
+  #abas { display: block; }
+  #abas button, .sidebar .fim button {
+    display: flex; align-items: center; gap: 10px; width: 100%; height: 36px; padding: 0 10px;
+    background: transparent; border: 0; border-radius: 9px; color: #98a2b3;
+    font-family: inherit; font-size: 13.5px; font-weight: 500; letter-spacing: -.008em;
+    cursor: pointer; text-align: left; margin-bottom: 2px;
+    transition: background .16s ease, color .16s ease;
+  }
+  #abas button .ico, .sidebar .fim button .ico { opacity: .7; transition: opacity .16s, color .16s; }
+  #abas button:hover, .sidebar .fim button:hover { background: rgba(255,255,255,.05); color: #e4e7ec; }
+  #abas button.on { background: rgba(255,255,255,.09); color: #fff; }
+  #abas button.on .ico { opacity: 1; color: #1fbf6e; }
+  .sidebar .fim { margin-top: auto; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }
+  .conteudo { flex: 1; min-width: 0; padding: 0 30px 44px; }
+  .pagina-cab { display: flex; align-items: center; gap: 14px; padding: 24px 0 2px; }
+  .pagina-cab h1 { margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -.022em; }
+  @media (max-width: 900px) {
+    .app-shell { flex-direction: column; }
+    .sidebar { width: 100%; height: auto; position: static; flex-direction: row; align-items: center; gap: 4px; padding: 10px 12px; overflow-x: auto; }
+    .logo { padding: 0 8px 0 2px; }
+    #abas { display: flex; gap: 2px; }
+    #abas button, .sidebar .fim button { width: auto; white-space: nowrap; }
+    #abas button span { display: none; }
+    .nav-sec { display: none; }
+    .sidebar .fim { margin: 0 0 0 auto; padding: 0; border: 0; }
+    .conteudo { padding: 0 18px 40px; }
+  }
+
+  /* ---------- transicao suave entre paginas ---------- */
+  section[data-painel].enter { animation: pagina .24s cubic-bezier(.3, 0, .2, 1); }
+  @keyframes pagina { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .gaveta.aberta { animation: gaveta-in .26s cubic-bezier(.3, 0, .2, 1); }
+  @keyframes gaveta-in { from { transform: translateX(24px); opacity: .4; } to { transform: none; opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { section[data-painel].enter, .gaveta.aberta { animation: none; } }
+
+  /* ---------- icones de linha ---------- */
+  .ico { stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; vertical-align: -3px; }
+
+  /* ---------- cartoes de indicadores ---------- */
+  .stat { display: flex; align-items: center; gap: 14px; }
+  .stat-ico { width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center; flex: none; }
 </style>
 </head>
 <body>
@@ -125,23 +174,28 @@
 
 <!-- ==================== APP ==================== -->
 <div id="app" style="display:none">
-  <div class="topbar">
-    <div class="container-wide topbar-inner">
-      <div class="brand"><span class="dot"></span> StartDigital <small>Recrutamento</small></div>
-      <div class="abas" id="abas">
-        <button data-aba="quadro" class="on">Quadro</button>
-        <button data-aba="boasvindas">Boas-vindas</button>
-        <button data-aba="conteudo">Aulas</button>
-        <button data-aba="quiz">Quiz</button>
-        <button data-aba="mensagens">Mensagens</button>
-        <button data-aba="ajustes">Ajustes</button>
-      </div>
-      <div class="spacer"></div>
-      <button class="btn btn-sm btn-ghost" id="btn-sair">Sair</button>
-    </div>
-  </div>
+  <div class="app-shell">
 
-  <div class="container-wide">
+  <aside class="sidebar">
+    <div class="logo"><span class="dot"></span>StartDigital <small>RH</small></div>
+    <nav id="abas">
+      <div class="nav-sec">Principal</div>
+      <button data-aba="quadro" class="on"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="16" rx="1.8"/><rect x="13.5" y="4" width="6.5" height="10" rx="1.8"/></svg><span>Quadro</span></button>
+      <button data-aba="boasvindas"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M21 3 10.6 13.4"/><path d="M21 3l-6.6 18-3.8-8.6L2 8.6z"/></svg><span>Boas-vindas</span></button>
+      <div class="nav-sec">Conteúdo</div>
+      <button data-aba="conteudo"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M10.3 9.1v5.8l4.8-2.9z"/></svg><span>Aulas</span></button>
+      <button data-aba="quiz"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="5.5" y="4.2" width="13" height="16.6" rx="2"/><path d="M9.3 4.2V3.2h5.4v1"/><path d="m9.3 13.6 2 2 3.8-4.4"/></svg><span>Quiz</span></button>
+      <button data-aba="mensagens"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3.6" y="5.4" width="16.8" height="13.2" rx="2"/><path d="m4.6 7 7.4 5.8L19.4 7"/></svg><span>Mensagens</span></button>
+      <div class="nav-sec">Administração</div>
+      <button data-aba="ajustes"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M4.5 8.2h7.7M16.8 8.2h2.7M4.5 15.8h2.7M12 15.8h7.5"/><circle cx="14.6" cy="8.2" r="2.1"/><circle cx="9.3" cy="15.8" r="2.1"/></svg><span>Ajustes</span></button>
+    </nav>
+    <div class="fim">
+      <button id="btn-sair"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M13.8 4.4h4A1.7 1.7 0 0 1 19.5 6.1v11.8a1.7 1.7 0 0 1-1.7 1.7h-4"/><path d="M9.8 8.2 6 12l3.8 3.8M6 12h9.5"/></svg><span>Sair</span></button>
+    </div>
+  </aside>
+
+  <main class="conteudo">
+    <header class="pagina-cab"><h1 id="titulo-pagina">Quadro</h1></header>
 
     <!-- ---------- QUADRO ---------- -->
     <section data-painel="quadro">
@@ -234,6 +288,7 @@
       <div style="padding:22px 0 40px" id="painel-ajustes"></div>
     </section>
 
+  </main>
   </div>
 </div>
 
@@ -272,6 +327,22 @@ function toast(msg, erro) {
   t.className = 'toast on' + (erro ? ' erro' : '');
   setTimeout(function () { t.className = 'toast' + (erro ? ' erro' : ''); }, 3000);
 }
+const ICO = (function () {
+  function s(p, sz) {
+    return '<svg class="ico" width="' + (sz || 15) + '" height="' + (sz || 15) + '" viewBox="0 0 24 24">' + p + '</svg>';
+  }
+  return {
+    mail: function (sz) { return s('<rect x="3.6" y="5.4" width="16.8" height="13.2" rx="2"/><path d="m4.6 7 7.4 5.8L19.4 7"/>', sz); },
+    chat: function (sz) { return s('<path d="M20.4 11.6a8.4 8.4 0 0 1-8.4 8.4c-1.5 0-2.9-.4-4.1-1L3.4 20l1.1-4.4a8.4 8.4 0 1 1 15.9-4z"/>', sz); },
+    fone: function (sz) { return s('<rect x="7.4" y="2.8" width="9.2" height="18.4" rx="2.2"/><path d="M11 17.8h2"/>', sz); },
+    lixo: function (sz) { return s('<path d="M4.6 7h14.8M9.6 7V5.2A1.6 1.6 0 0 1 11.2 3.6h1.6a1.6 1.6 0 0 1 1.6 1.6V7M6.6 7l.8 11.7a1.7 1.7 0 0 0 1.7 1.6h5.8a1.7 1.7 0 0 0 1.7-1.6L17.4 7"/>', sz); },
+    alerta: function (sz) { return s('<path d="M12 4.4 3.2 18.8h17.6z"/><path d="M12 10.2v3.6M12 16.6v.2"/>', sz); },
+    pessoas: function (sz) { return s('<circle cx="9" cy="8.6" r="3.4"/><path d="M3.6 19.4c.6-3 2.9-4.5 5.4-4.5s4.8 1.5 5.4 4.5"/><path d="M15.4 5.7a3.4 3.4 0 0 1 0 6M16.9 15.2c1.9.6 3.1 2 3.5 4.2"/>', sz); },
+    grafico: function (sz) { return s('<path d="M4 19.6h16"/><path d="M7.2 19.6v-7.2M12 19.6V7.2M16.8 19.6v-9.6"/>', sz); },
+    check: function (sz) { return s('<circle cx="12" cy="12" r="8.8"/><path d="m8.4 12.3 2.4 2.4 4.8-5.4"/>', sz); }
+  };
+})();
+
 function dataBr(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -327,12 +398,17 @@ document.getElementById('form-login').addEventListener('submit', async function 
 /* ============================================================
    abas
    ============================================================ */
+const TITULOS = { quadro: 'Quadro', boasvindas: 'Boas-vindas', conteudo: 'Aulas da integração', quiz: 'Quiz de seleção', mensagens: 'Modelos de mensagem', ajustes: 'Ajustes' };
 document.getElementById('abas').addEventListener('click', function (ev) {
   const b = ev.target.closest('button[data-aba]');
   if (!b) return;
   document.querySelectorAll('#abas button').forEach(function (x) { x.classList.toggle('on', x === b); });
+  document.getElementById('titulo-pagina').textContent = TITULOS[b.dataset.aba] || '';
   document.querySelectorAll('section[data-painel]').forEach(function (s) {
-    s.style.display = s.dataset.painel === b.dataset.aba ? 'block' : 'none';
+    const ativa = s.dataset.painel === b.dataset.aba;
+    s.style.display = ativa ? 'block' : 'none';
+    s.classList.remove('enter');
+    if (ativa) { void s.offsetWidth; s.classList.add('enter'); }
   });
   const carregar = { conteudo: carregaConteudo, quiz: carregaQuiz, mensagens: carregaTemplates, ajustes: carregaAjustes, boasvindas: carregaBoasVindas };
   if (carregar[b.dataset.aba]) carregar[b.dataset.aba]();
@@ -358,10 +434,14 @@ async function carregaBoard() {
   const total = d.candidates.length;
   const contratados = d.candidates.filter(function (c) { return c.stage_key === 'contratado'; }).length;
   const comDisc = d.candidates.filter(function (c) { return c.disc; }).length;
+  function statCard(icone, tinta, cor, n, l) {
+    return '<div class="stat"><span class="stat-ico" style="background:' + tinta + ';color:' + cor + '">' + icone + '</span>' +
+      '<span><span class="n" style="display:block">' + n + '</span><span class="l">' + l + '</span></span></div>';
+  }
   document.getElementById('stats').innerHTML =
-    '<div class="stat"><div class="n">' + total + '</div><div class="l">candidatos ativos</div></div>' +
-    '<div class="stat"><div class="n">' + comDisc + '</div><div class="l">com teste DISC respondido</div></div>' +
-    '<div class="stat"><div class="n">' + contratados + '</div><div class="l">contratados</div></div>';
+    statCard(ICO.pessoas(19), 'var(--accent-tint)', 'var(--accent)', total, 'candidatos ativos') +
+    statCard(ICO.grafico(19), 'var(--purple-tint)', 'var(--purple)', comDisc, 'com teste DISC respondido') +
+    statCard(ICO.check(19), 'var(--blue-tint)', 'var(--blue)', contratados, 'contratados');
 
   desenhaBoard();
 }
@@ -395,7 +475,7 @@ function cartao(c) {
   if (c.quiz_percent !== null && c.quiz_percent !== undefined) {
     tags.push('<span class="tag ' + (c.quiz_passed ? 'tag-verde' : 'tag-vermelho') + '">Quiz ' + c.quiz_percent + '%</span>');
   }
-  if (c.quiz_flags) tags.push('<span class="tag tag-ambar">⚠ ' + c.quiz_flags + '</span>');
+  if (c.quiz_flags) tags.push('<span class="tag tag-ambar">' + ICO.alerta(11) + ' ' + c.quiz_flags + '</span>');
   if (c.member_access) tags.push('<span class="tag tag-azul">Integração</span>');
   const estrelas = c.rating ? '<div class="estrelas">' + '★'.repeat(c.rating) + '<span style="color:var(--fill-3)">' + '★'.repeat(5 - c.rating) + '</span></div>' : '';
   return '<div class="cartao" draggable="true" data-id="' + c.id + '">' +
@@ -459,7 +539,9 @@ document.getElementById('fundo').addEventListener('click', fechaGaveta);
 
 async function abreCandidato(id) {
   document.getElementById('fundo').style.display = 'block';
-  document.getElementById('gaveta').style.display = 'flex';
+  const gv = document.getElementById('gaveta');
+  gv.style.display = 'flex';
+  gv.classList.remove('aberta'); void gv.offsetWidth; gv.classList.add('aberta');
   document.getElementById('g-corpo').innerHTML = '<div class="loading-page">Carregando…</div>';
   try {
     atualCand = await api('candidate', { params: { id: id } });
@@ -759,7 +841,7 @@ async function carregaPreview() {
   try {
     const d = await api('preview', { body: { candidate_id: id, set: set } });
     bvItens = d.items;
-    const rotulo = { email: '📧 E-mail', whatsapp: '💬 WhatsApp', sms: '📱 SMS' };
+    const rotulo = { email: ICO.mail() + ' E-mail', whatsapp: ICO.chat() + ' WhatsApp', sms: ICO.fone() + ' SMS' };
     const destino = { email: d.candidate.email, whatsapp: d.candidate.phone, sms: d.candidate.phone };
     box.innerHTML = d.items.map(function (it, i) {
       return '<div class="caixa-msg"><div class="cab-msg">' +
@@ -829,7 +911,7 @@ async function carregaConteudo() {
       '<input type="text" class="mod-desc" data-id="' + m.id + '" value="' + esc(m.description || '') + '" placeholder="descrição do módulo" style="font-size:13px;color:var(--cinza);border-color:transparent;background:transparent;padding:4px 6px">' +
       '</div>' +
       '<button class="btn btn-sm btn-ghost salvar-mod" data-id="' + m.id + '">Salvar</button>' +
-      '<button class="btn btn-sm btn-ghost del-mod" data-id="' + m.id + '" title="excluir módulo">🗑</button>' +
+      '<button class="btn btn-sm btn-ghost del-mod" data-id="' + m.id + '" title="excluir módulo">' + ICO.lixo(14) + '</button>' +
       '</div><hr class="sep" style="margin:14px 0">' +
       (m.lessons.length ? m.lessons.map(aulaHtml).join('') : '<p class="small muted" style="margin:0 0 12px">Nenhuma aula neste módulo ainda.</p>') +
       '<button class="btn btn-sm nova-aula" data-mod="' + m.id + '">+ Adicionar aula</button>' +
@@ -1056,7 +1138,7 @@ async function carregaTemplates() {
   const box = document.getElementById('lista-templates');
   box.innerHTML = '<div class="loading-page">Carregando…</div>';
   const d = await api('templates');
-  const ico = { email: '📧', whatsapp: '💬', sms: '📱' };
+  const ico = { email: ICO.mail(14), whatsapp: ICO.chat(14), sms: ICO.fone(14) };
   box.innerHTML = d.templates.map(function (t) {
     return '<div class="card" data-tpl="' + t.key + '">' +
       '<h2 style="font-size:15px">' + (ico[t.channel] || '') + ' ' + esc(t.name) + '</h2>' +
