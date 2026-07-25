@@ -1,0 +1,18 @@
+{
+  "rewrites": [
+    { "source": "/vaga", "destination": "/index.html" },
+    { "source": "/candidatura", "destination": "/index.html" },
+    { "source": "/admin", "destination": "/admin.html" },
+    { "source": "/disc", "destination": "/disc.html" },
+    { "source": "/teste", "destination": "/disc.html" },
+    { "source": "/prova", "destination": "/prova.html" },
+    { "source": "/portal", "destination": "/portal.html" },
+    { "source": "/integracao", "destination": "/portal.html" }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+    }
+  ]
+}
