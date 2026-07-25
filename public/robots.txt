@@ -1,7 +1,3 @@
 User-agent: *
-Allow: /
 Allow: /vaga
-Disallow: /admin
-Disallow: /disc
-Disallow: /prova
-Disallow: /portal
+Disallow: /

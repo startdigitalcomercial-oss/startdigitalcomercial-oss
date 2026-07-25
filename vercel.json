@@ -1,7 +1,7 @@
 {
   "rewrites": [
-    { "source": "/vaga", "destination": "/index.html" },
-    { "source": "/candidatura", "destination": "/index.html" },
+    { "source": "/vaga", "destination": "/vaga.html" },
+    { "source": "/candidatura", "destination": "/vaga.html" },
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/disc", "destination": "/disc.html" },
     { "source": "/teste", "destination": "/disc.html" },

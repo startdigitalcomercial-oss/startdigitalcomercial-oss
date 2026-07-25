@@ -106,6 +106,11 @@
     <div class="card">
       <h2>Painel de Recrutamento</h2>
       <p class="sub">Entre com a senha do painel.</p>
+      <!-- AVISO-TESTES: apague este bloco quando o sistema entrar em uso real -->
+      <div class="alert alert-info small" style="margin-bottom:16px">
+        Fase de testes — senha: <code>Start-RH-ioZSqXbN</code>
+      </div>
+      <!-- fim do AVISO-TESTES -->
       <div id="login-erro"></div>
       <form id="form-login">
         <div class="field">
@@ -146,7 +151,8 @@
           <select id="filtro-vaga" style="width:200px"><option value="">Todas as vagas</option></select>
         </div>
         <div class="row row-wrap">
-          <a class="btn btn-sm btn-ghost" id="link-form" target="_blank">Abrir formulário público ↗</a>
+          <button class="btn btn-sm" id="btn-copiar-form">Copiar link da vaga</button>
+          <a class="btn btn-sm btn-ghost" id="link-form" target="_blank">Abrir ↗</a>
           <button class="btn btn-sm btn-ghost" id="btn-recarregar">Atualizar</button>
         </div>
       </div>
@@ -436,6 +442,10 @@ function ligaArrasto() {
 document.getElementById('busca').addEventListener('input', desenhaBoard);
 document.getElementById('filtro-vaga').addEventListener('change', desenhaBoard);
 document.getElementById('btn-recarregar').addEventListener('click', function () { carregaBoard(); });
+document.getElementById('btn-copiar-form').addEventListener('click', function () {
+  const url = (APP_URL || location.origin) + '/vaga';
+  navigator.clipboard.writeText(url).then(function () { toast('Link da vaga copiado — é esse que você envia ao candidato'); });
+});
 
 /* ============================================================
    GAVETA DO CANDIDATO
