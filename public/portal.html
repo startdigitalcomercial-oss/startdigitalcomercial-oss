@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Área de Integração — StartDigital</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+  .layout { display: grid; grid-template-columns: 320px 1fr; gap: 22px; align-items: start; padding: 22px 0 48px; }
+  @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } .lateral { order: 2; } }
+  .lateral { background: var(--surface); border-radius: var(--r-card); box-shadow: var(--shadow-1); overflow: hidden; position: sticky; top: 74px; }
+  @media (max-width: 980px) { .lateral { position: static; } }
+  .lateral .cab { padding: 20px 20px 18px; border-bottom: 1px solid var(--hairline); }
+  .lateral .cab h3 { margin: 0 0 4px; font-size: 15px; font-weight: 600; letter-spacing: -.014em; }
+  .mod-tit { padding: 18px 20px 8px; font-size: 12px; font-weight: 500; color: var(--label-3); letter-spacing: -.004em; }
+  .aula { display: flex; gap: 12px; align-items: flex-start; padding: 12px 20px; cursor: pointer; transition: background .14s; }
+  .aula:hover { background: var(--fill-1); }
+  .aula.ativa { background: var(--accent-tint); }
+  .aula .bola { flex: none; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--hairline-strong); display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--label-3); background: var(--surface); margin-top: 2px; font-weight: 700; }
+  .aula.feita .bola { background: var(--accent); border-color: var(--accent); color: var(--accent-on); }
+  .aula .info { min-width: 0; }
+  .aula .nome { font-size: 14.5px; font-weight: 500; line-height: 1.38; display: block; letter-spacing: -.01em; }
+  .aula.ativa .nome { font-weight: 600; }
+  .aula .dur { font-size: 12.5px; color: var(--label-3); margin-top: 3px; display: block; font-variant-numeric: tabular-nums; }
+  .player { background: #000; border-radius: 14px; overflow: hidden; aspect-ratio: 16/9; margin-bottom: 24px; }
+  .player iframe, .player video { width: 100%; height: 100%; border: 0; display: block; }
+  .player.vazio { display: flex; align-items: center; justify-content: center; color: var(--label-3); font-size: 14px; text-align: center; padding: 24px; background: var(--fill-1); }
+  .aula-titulo { font-size: 26px; font-weight: 600; letter-spacing: -.022em; margin: 0 0 6px; }
+  .materiais a { display: flex; align-items: center; gap: 13px; padding: 14px 16px; border: 1px solid var(--hairline-strong); border-radius: var(--r-ctl); text-decoration: none; color: var(--label); margin-bottom: 9px; transition: all .14s; background: var(--surface); }
+  .materiais a:hover { border-color: var(--accent); background: var(--accent-tint); text-decoration: none; }
+  .materiais .ico { width: 32px; height: 32px; border-radius: 9px; background: var(--fill-1); display: flex; align-items: center; justify-content: center; font-size: 15px; flex: none; }
+  .resumo { display: flex; gap: 14px; align-items: center; padding: 18px 20px; background: var(--surface); border-radius: var(--r-card); box-shadow: var(--shadow-1); margin-bottom: 16px; }
+  .resumo .num { font-size: 24px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="container-wide topbar-inner">
+    <div class="brand"><span class="dot"></span> StartDigital <small>Integração</small></div>
+    <div class="spacer"></div>
+    <div class="small" id="ola" style="opacity:.75"></div>
+  </div>
+</div>
+
+<div class="container-wide">
+  <div id="carregando" class="loading-page">Carregando a sua área…</div>
+
+  <div id="tela-erro" style="display:none;max-width:640px;margin:40px auto">
+    <div class="card"><div class="alert alert-aviso" id="msg-erro" style="margin:0"></div></div>
+  </div>
+
+  <div id="app" style="display:none">
+    <div class="hero" style="padding:32px 0 6px">
+      <h1 id="titulo">Bem-vindo(a) à StartDigital!</h1>
+      <p id="subtitulo">Este é o seu ponto de partida. Assista as aulas no seu ritmo — elas foram feitas para te deixar pronto(a) para começar bem.</p>
+    </div>
+
+    <div class="layout">
+      <aside class="lateral">
+        <div class="cab">
+          <h3>Sua trilha de integração</h3>
+          <div class="small muted" id="progresso-txt">—</div>
+          <div class="progress" style="margin-top:9px"><i id="progresso-barra" style="width:0%"></i></div>
+        </div>
+        <div id="lista"></div>
+      </aside>
+
+      <main>
+        <div class="resumo" id="resumo" style="display:none"></div>
+        <div class="card">
+          <div id="player" class="player vazio">Selecione uma aula na lista ao lado.</div>
+          <h2 id="aula-titulo" class="aula-titulo">—</h2>
+          <p class="sub" id="aula-desc"></p>
+
+          <div id="bloco-materiais" style="display:none">
+            <hr class="sep">
+            <h3 style="font-size:14px;margin:0 0 12px">Material complementar</h3>
+            <div class="materiais" id="materiais"></div>
+          </div>
+
+          <hr class="sep">
+          <div class="row row-wrap" style="justify-content:space-between">
+            <span class="small muted" id="status-aula"></span>
+            <div class="row">
+              <button class="btn btn-ghost btn-sm" id="btn-anterior">← Aula anterior</button>
+              <button class="btn" id="btn-concluir">Marcar como concluída ✓</button>
+              <button class="btn btn-ghost btn-sm" id="btn-proxima">Próxima aula →</button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <footer class="rodape">StartDigital · Área de integração</footer>
+</div>
+
+<script>
+const TOKEN = new URLSearchParams(location.search).get('t') || '';
+let MODULOS = [], AULAS = [], atual = null;
+
+function api(action, opts) {
+  opts = opts || {};
+  const url = '/api/public?action=' + action + (opts.method ? '' : '&t=' + encodeURIComponent(TOKEN));
+  return fetch(url, {
+    method: opts.method || 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    body: opts.body ? JSON.stringify(Object.assign({ t: TOKEN }, opts.body)) : undefined
+  }).then(function (r) { return r.json(); });
+}
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// transforma o link do video em algo que da pra assistir aqui dentro
+function embed(url) {
+  if (!url) return null;
+  const u = String(url).trim();
+  let m = u.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|live\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/);
+  if (m) return { tipo: 'iframe', src: 'https://www.youtube.com/embed/' + m[1] + '?rel=0&modestbranding=1' };
+  m = u.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (m) return { tipo: 'iframe', src: 'https://player.vimeo.com/video/' + m[1] };
+  m = u.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+  if (m) return { tipo: 'iframe', src: 'https://drive.google.com/file/d/' + m[1] + '/preview' };
+  if (/loom\.com\/share\/([A-Za-z0-9]+)/.test(u)) return { tipo: 'iframe', src: u.replace('/share/', '/embed/') };
+  if (/\.(mp4|webm|ogg|mov)(\?|$)/i.test(u)) return { tipo: 'video', src: u };
+  return { tipo: 'iframe', src: u };
+}
+
+function iconeMaterial(url) {
+  const u = String(url || '').toLowerCase();
+  if (u.indexOf('.pdf') >= 0) return '📄';
+  if (u.match(/\.(xlsx?|csv)/)) return '📊';
+  if (u.match(/\.(docx?|txt)/)) return '📝';
+  if (u.match(/\.(zip|rar)/)) return '🗂️';
+  if (u.match(/\.(png|jpe?g|svg)/)) return '🖼️';
+  return '🔗';
+}
+
+function desenhaLista() {
+  document.getElementById('lista').innerHTML = MODULOS.map(function (m) {
+    return '<div class="mod"><div class="mod-tit">' + esc(m.title) + '</div>' +
+      m.lessons.map(function (l) {
+        const at = atual && atual.id === l.id ? ' ativa' : '';
+        const fe = l.done ? ' feita' : '';
+        return '<div class="aula' + at + fe + '" data-id="' + l.id + '">' +
+          '<span class="bola">' + (l.done ? '✓' : '') + '</span>' +
+          '<span class="info"><span class="nome">' + esc(l.title) + '</span>' +
+          (l.duration ? '<span class="dur">' + esc(l.duration) + '</span>' : '') + '</span></div>';
+      }).join('') + '</div>';
+  }).join('');
+
+  document.getElementById('lista').querySelectorAll('.aula').forEach(function (el) {
+    el.addEventListener('click', function () {
+      abrir(AULAS.find(function (a) { return a.id === el.dataset.id; }));
+    });
+  });
+
+  const feitas = AULAS.filter(function (a) { return a.done; }).length;
+  const pct = AULAS.length ? Math.round((feitas / AULAS.length) * 100) : 0;
+  document.getElementById('progresso-txt').textContent = feitas + ' de ' + AULAS.length + ' aulas concluídas';
+  document.getElementById('progresso-barra').style.width = pct + '%';
+
+  const resumo = document.getElementById('resumo');
+  if (pct === 100 && AULAS.length) {
+    resumo.style.display = 'flex';
+    resumo.innerHTML = '<span class="num">🎉</span><div><strong>Integração concluída!</strong>' +
+      '<div class="small muted">Você assistiu todas as aulas. Qualquer dúvida, fale com a sua liderança.</div></div>';
+  } else {
+    resumo.style.display = 'none';
+  }
+}
+
+function abrir(aula) {
+  if (!aula) return;
+  atual = aula;
+  const player = document.getElementById('player');
+  const e = embed(aula.video_url);
+  if (!e) {
+    player.className = 'player vazio';
+    player.innerHTML = 'O vídeo desta aula ainda vai ser publicado. Volte em breve.';
+  } else if (e.tipo === 'video') {
+    player.className = 'player';
+    player.innerHTML = '<video src="' + esc(e.src) + '" controls playsinline></video>';
+  } else {
+    player.className = 'player';
+    player.innerHTML = '<iframe src="' + esc(e.src) + '" allow="accelerometer; autoplay; clipboard-write; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>';
+  }
+  document.getElementById('aula-titulo').textContent = aula.title;
+  document.getElementById('aula-desc').textContent = aula.description || '';
+
+  const mats = Array.isArray(aula.materials) ? aula.materials : [];
+  document.getElementById('bloco-materiais').style.display = mats.length ? 'block' : 'none';
+  document.getElementById('materiais').innerHTML = mats.map(function (mt) {
+    return '<a href="' + esc(mt.url) + '" target="_blank" rel="noopener">' +
+      '<span class="ico">' + iconeMaterial(mt.url) + '</span>' +
+      '<span><strong style="font-size:14px">' + esc(mt.label || 'Material') + '</strong>' +
+      '<br><span class="small muted">Clique para abrir ou baixar</span></span></a>';
+  }).join('');
+
+  const btn = document.getElementById('btn-concluir');
+  btn.textContent = aula.done ? 'Concluída ✓ (desmarcar)' : 'Marcar como concluída ✓';
+  btn.className = aula.done ? 'btn btn-ghost' : 'btn';
+  document.getElementById('status-aula').textContent = aula.done ? 'Você concluiu esta aula.' : '';
+
+  const i = AULAS.findIndex(function (a) { return a.id === aula.id; });
+  document.getElementById('btn-anterior').style.visibility = i <= 0 ? 'hidden' : 'visible';
+  document.getElementById('btn-proxima').style.visibility = i >= AULAS.length - 1 ? 'hidden' : 'visible';
+
+  desenhaLista();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+document.getElementById('btn-concluir').addEventListener('click', async function () {
+  if (!atual) return;
+  const novo = !atual.done;
+  this.disabled = true;
+  const r = await api('lesson_done', { method: 'POST', body: { lesson_id: atual.id, completed: novo } });
+  this.disabled = false;
+  if (!r.ok) return alert(r.error || 'Não foi possível salvar.');
+  atual.done = novo;
+  abrir(atual);
+  if (novo) {
+    const i = AULAS.findIndex(function (a) { return a.id === atual.id; });
+    if (i >= 0 && i < AULAS.length - 1) setTimeout(function () { abrir(AULAS[i + 1]); }, 550);
+  }
+});
+document.getElementById('btn-anterior').addEventListener('click', function () {
+  const i = AULAS.findIndex(function (a) { return a.id === atual.id; });
+  if (i > 0) abrir(AULAS[i - 1]);
+});
+document.getElementById('btn-proxima').addEventListener('click', function () {
+  const i = AULAS.findIndex(function (a) { return a.id === atual.id; });
+  if (i < AULAS.length - 1) abrir(AULAS[i + 1]);
+});
+
+(async function init() {
+  if (!TOKEN) {
+    document.getElementById('carregando').style.display = 'none';
+    document.getElementById('msg-erro').textContent = 'Link inválido. Use o link pessoal que a nossa equipe enviou para você por e-mail ou WhatsApp.';
+    return document.getElementById('tela-erro').style.display = 'block';
+  }
+  const r = await api('portal');
+  document.getElementById('carregando').style.display = 'none';
+  if (!r.ok) {
+    document.getElementById('msg-erro').textContent = r.error || 'Não foi possível abrir a sua área.';
+    return document.getElementById('tela-erro').style.display = 'block';
+  }
+  MODULOS = r.modules || [];
+  AULAS = MODULOS.reduce(function (acc, m) { return acc.concat(m.lessons); }, []);
+  document.getElementById('titulo').textContent = 'Bem-vindo(a), ' + r.candidate.first_name + '!';
+  document.getElementById('ola').textContent = r.candidate.name;
+  if (r.candidate.role_applied) {
+    document.getElementById('subtitulo').textContent =
+      'Que bom ter você no time como ' + r.candidate.role_applied + '. Este é o seu ponto de partida — assista as aulas no seu ritmo.';
+  }
+  document.getElementById('app').style.display = 'block';
+  if (!AULAS.length) {
+    document.getElementById('player').innerHTML = 'As aulas estão sendo preparadas. Volte em breve!';
+  } else {
+    abrir(AULAS.find(function (a) { return !a.done; }) || AULAS[0]);
+  }
+})();
+</script>
+</body>
+</html>

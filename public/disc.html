@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Teste de Perfil Comportamental — StartDigital</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+  .barra-topo { position: sticky; top: 52px; z-index: 30; background: var(--canvas); margin: 0 -22px 4px; padding: 16px 22px 12px; }
+  .barra-info { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--label-3); margin-bottom: 8px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .grupo-cab, .linha-palavra { display: grid; grid-template-columns: 1fr 72px 72px; align-items: center; }
+  .grupo-cab { padding-bottom: 10px; border-bottom: 1px solid var(--hairline); }
+  .grupo-cab > div { font-size: 12px; font-weight: 500; color: var(--label-3); text-align: center; letter-spacing: -.004em; }
+  .grupo-cab > div:first-child { text-align: left; }
+  .linha-palavra { border-bottom: 1px solid var(--hairline); }
+  .linha-palavra:last-child { border-bottom: 0; }
+  .linha-palavra > .palavra { padding: 16px 2px; font-size: 17px; font-weight: 500; letter-spacing: -.016em; }
+  .celula { display: flex; align-items: center; justify-content: center; padding: 12px 0; }
+  .bolha { width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--hairline-strong); background: var(--surface); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .14s ease; }
+  .bolha:hover { border-color: var(--label-3); transform: scale(1.08); }
+  .bolha.on-mais { border-color: var(--accent); background: var(--accent); }
+  .bolha.on-menos { border-color: var(--red); background: var(--red); }
+  .bolha.on-mais::after, .bolha.on-menos::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-on); }
+  .bolha.on-menos::after { background: #fff; }
+  .nav-btns { display: flex; justify-content: space-between; gap: 12px; margin-top: 26px; }
+  .passos { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 20px; }
+  .passos i { width: 7px; height: 7px; border-radius: 50%; background: var(--fill-3); display: block; transition: all .2s; }
+  .passos i.feito { background: var(--accent); }
+  .passos i.atual { background: var(--label); transform: scale(1.45); }
+  .regras { margin: 0; padding: 0; list-style: none; }
+  .regras li { padding: 14px 0; border-bottom: 1px solid var(--hairline); color: var(--label-2); font-size: 14.5px; line-height: 1.5; }
+  .regras li:last-child { border-bottom: 0; padding-bottom: 0; }
+  .regras li strong { color: var(--label); font-weight: 600; }
+  .resultado .check { width: 56px; height: 56px; border-radius: 50%; background: var(--accent-tint); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 22px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="container topbar-inner">
+    <div class="brand"><span class="dot"></span> StartDigital <small>Perfil comportamental</small></div>
+  </div>
+</div>
+
+<div class="container">
+
+  <div id="carregando" class="loading-page">Carregando o seu teste…</div>
+
+  <!-- instrucoes -->
+  <div id="tela-intro" style="display:none">
+    <div class="hero">
+      <h1>Olá, <span id="nome-intro"></span>! Vamos conhecer o seu perfil.</h1>
+      <p>Este é um teste de perfil comportamental (DISC). Ele não tem resposta certa nem errada — serve para entendermos como você trabalha melhor.</p>
+    </div>
+    <div class="card">
+      <h2>Como funciona</h2>
+      <p class="sub">Leia com calma antes de começar. Leva de 8 a 12 minutos.</p>
+      <ul class="regras">
+        <li>Você vai ver <strong id="qtd-grupos"></strong> grupos com 4 palavras cada.</li>
+        <li>Em cada grupo, marque a palavra que <strong>MAIS</strong> combina com você e a que <strong>MENOS</strong> combina.</li>
+        <li>Responda pensando em como você <em>realmente é</em>, não em como acha que deveria ser.</li>
+        <li>Vá pelo primeiro impulso. Pensar demais costuma distorcer o resultado.</li>
+        <li>Só é possível enviar uma vez, então faça em um momento tranquilo.</li>
+      </ul>
+      <hr class="sep">
+      <button class="btn btn-lg" id="btn-comecar">Começar o teste</button>
+    </div>
+  </div>
+
+  <!-- teste -->
+  <div id="tela-teste" style="display:none">
+    <div class="barra-topo">
+      <div class="barra-info">
+        <span id="passo-label">Grupo 1 de 24</span>
+        <span id="pct-label">0%</span>
+      </div>
+      <div class="progress"><i id="progresso" style="width:0%"></i></div>
+    </div>
+
+    <div class="card">
+      <h2>Qual palavra combina mais e qual combina menos com você?</h2>
+      <p class="sub">Marque exatamente uma opção em cada coluna.</p>
+      <div>
+        <div class="grupo-cab">
+          <div>Palavra</div><div>Mais</div><div>Menos</div>
+        </div>
+        <div id="linhas"></div>
+      </div>
+      <div id="aviso-grupo"></div>
+      <div class="nav-btns">
+        <button class="btn btn-ghost" id="btn-voltar">← Voltar</button>
+        <button class="btn" id="btn-proximo">Próximo →</button>
+      </div>
+      <div class="passos" id="passos"></div>
+    </div>
+  </div>
+
+  <!-- fim -->
+  <div id="tela-fim" style="display:none">
+    <div class="card resultado center" style="margin-top:40px">
+      <div class="check">✓</div>
+      <h2 style="font-size:22px">Teste enviado com sucesso!</h2>
+      <p class="muted" style="max-width:520px;margin:12px auto 0;line-height:1.65">
+        Obrigado por responder com sinceridade. O resultado já chegou para a nossa equipe
+        e será usado como parte da avaliação — sempre junto com as conversas e os testes práticos,
+        nunca isoladamente.<br><br>
+        A gente entra em contato com você pelos próximos passos. Pode fechar esta página.
+      </p>
+    </div>
+  </div>
+
+  <div id="tela-erro" style="display:none">
+    <div class="card" style="margin-top:40px">
+      <div class="alert alert-erro" id="msg-erro" style="margin:0"></div>
+    </div>
+  </div>
+
+  <footer class="rodape">StartDigital · Processo seletivo</footer>
+</div>
+
+<script>
+const TOKEN = new URLSearchParams(location.search).get('t') || '';
+let QUESTOES = [];
+let RESPOSTAS = {};
+let indice = 0;
+
+function api(action, opts) {
+  opts = opts || {};
+  const url = '/api/public?action=' + action + (opts.method ? '' : '&t=' + encodeURIComponent(TOKEN));
+  return fetch(url, {
+    method: opts.method || 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    body: opts.body ? JSON.stringify(Object.assign({ t: TOKEN }, opts.body)) : undefined
+  }).then(function (r) { return r.json(); });
+}
+
+function mostrar(id) {
+  ['carregando', 'tela-intro', 'tela-teste', 'tela-fim', 'tela-erro'].forEach(function (t) {
+    document.getElementById(t).style.display = t === id ? 'block' : 'none';
+  });
+}
+
+function erroFatal(msg) {
+  document.getElementById('msg-erro').textContent = msg;
+  mostrar('tela-erro');
+}
+
+function desenhaGrupo() {
+  const q = QUESTOES[indice];
+  const resp = RESPOSTAS[q.position] || {};
+  document.getElementById('linhas').innerHTML = q.words.map(function (w) {
+    const mais = resp.more === w.t ? ' on-mais' : '';
+    const menos = resp.less === w.t ? ' on-menos' : '';
+    return '<div class="linha-palavra">' +
+      '<div class="palavra">' + w.w + '</div>' +
+      '<div class="celula"><div class="bolha' + mais + '" data-tipo="more" data-letra="' + w.t + '"></div></div>' +
+      '<div class="celula"><div class="bolha' + menos + '" data-tipo="less" data-letra="' + w.t + '"></div></div>' +
+      '</div>';
+  }).join('');
+
+  document.querySelectorAll('.bolha').forEach(function (b) {
+    b.addEventListener('click', function () {
+      const tipo = b.dataset.tipo, letra = b.dataset.letra;
+      const r = RESPOSTAS[q.position] || {};
+      const outro = tipo === 'more' ? 'less' : 'more';
+      if (r[outro] === letra) r[outro] = null;      // nao pode ser mais e menos ao mesmo tempo
+      r[tipo] = r[tipo] === letra ? null : letra;
+      RESPOSTAS[q.position] = r;
+      document.getElementById('aviso-grupo').innerHTML = '';
+      desenhaGrupo();
+    });
+  });
+
+  document.getElementById('passo-label').textContent = 'Grupo ' + (indice + 1) + ' de ' + QUESTOES.length;
+  const completos = Object.keys(RESPOSTAS).filter(function (k) {
+    return RESPOSTAS[k] && RESPOSTAS[k].more && RESPOSTAS[k].less;
+  }).length;
+  const pct = Math.round((completos / QUESTOES.length) * 100);
+  document.getElementById('pct-label').textContent = pct + '% respondido';
+  document.getElementById('progresso').style.width = pct + '%';
+  document.getElementById('btn-voltar').style.visibility = indice === 0 ? 'hidden' : 'visible';
+  document.getElementById('btn-proximo').textContent = indice === QUESTOES.length - 1 ? 'Enviar teste ✓' : 'Próximo →';
+
+  document.getElementById('passos').innerHTML = QUESTOES.map(function (qq, i) {
+    const r = RESPOSTAS[qq.position];
+    const cls = i === indice ? 'atual' : (r && r.more && r.less ? 'feito' : '');
+    return '<i class="' + cls + '"></i>';
+  }).join('');
+}
+
+document.getElementById('btn-voltar').addEventListener('click', function () {
+  if (indice > 0) { indice--; desenhaGrupo(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+});
+
+document.getElementById('btn-proximo').addEventListener('click', async function () {
+  const q = QUESTOES[indice];
+  const r = RESPOSTAS[q.position] || {};
+  if (!r.more || !r.less) {
+    document.getElementById('aviso-grupo').innerHTML =
+      '<div class="alert alert-aviso" style="margin:16px 0 0">Marque uma palavra na coluna <strong>MAIS</strong> e outra na coluna <strong>MENOS</strong> para continuar.</div>';
+    return;
+  }
+  if (indice < QUESTOES.length - 1) {
+    indice++; desenhaGrupo(); window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+  // enviar
+  const btn = this;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Enviando…';
+  const limpas = {};
+  Object.keys(RESPOSTAS).forEach(function (k) {
+    const v = RESPOSTAS[k];
+    if (v && v.more && v.less) limpas[k] = { more: v.more, less: v.less };
+  });
+  const res = await api('disc_submit', { method: 'POST', body: { answers: limpas } });
+  if (!res.ok) {
+    btn.disabled = false; btn.textContent = 'Enviar teste ✓';
+    document.getElementById('aviso-grupo').innerHTML =
+      '<div class="alert alert-erro" style="margin:16px 0 0">' + (res.error || 'Erro ao enviar.') + '</div>';
+    return;
+  }
+  mostrar('tela-fim');
+  window.scrollTo({ top: 0 });
+});
+
+document.getElementById('btn-comecar').addEventListener('click', function () {
+  mostrar('tela-teste');
+  desenhaGrupo();
+  window.scrollTo({ top: 0 });
+});
+
+(async function init() {
+  if (!TOKEN) return erroFatal('Link inválido. Use o link pessoal que enviamos para você por e-mail ou WhatsApp.');
+  const r = await api('disc_questions');
+  if (!r.ok) return erroFatal(r.error || 'Não foi possível carregar o teste.');
+  if (r.already_done) {
+    return erroFatal('Você já respondeu este teste. Se precisar responder novamente, fale com a nossa equipe.');
+  }
+  QUESTOES = r.questions || [];
+  if (!QUESTOES.length) return erroFatal('Nenhuma pergunta configurada. Avise a nossa equipe.');
+  document.getElementById('nome-intro').textContent = r.candidate.first_name;
+  document.getElementById('qtd-grupos').textContent = QUESTOES.length;
+  mostrar('tela-intro');
+})();
+</script>
+</body>
+</html>

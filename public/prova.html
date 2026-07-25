@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Quiz de Seleção — StartDigital</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+  .barra-topo { position: sticky; top: 52px; z-index: 30; background: var(--canvas); margin: 0 -22px; padding: 16px 22px 12px; }
+  .barra-info { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: var(--label-3); margin-bottom: 8px; font-weight: 500; }
+  .cronometro { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 14px; color: var(--label); background: var(--fill-1); padding: 4px 12px; border-radius: var(--r-pill); letter-spacing: 0; }
+  .cronometro.alerta { color: var(--red); background: var(--red-tint); }
+  .pergunta { font-size: 19px; font-weight: 600; line-height: 1.42; letter-spacing: -.019em; margin: 0 0 22px; }
+  .opcao { display: flex; gap: 13px; align-items: flex-start; border: 1px solid var(--hairline-strong); border-radius: var(--r-ctl); padding: 14px 16px; cursor: pointer; margin-bottom: 9px; transition: all .14s ease; background: var(--surface); }
+  .opcao:hover { border-color: var(--label-3); }
+  .opcao.sel { border-color: var(--accent); background: var(--accent-tint); }
+  .opcao .marca { width: 20px; height: 20px; flex: none; border: 1.5px solid var(--hairline-strong); background: var(--surface); display: flex; align-items: center; justify-content: center; margin-top: 1px; transition: all .14s; }
+  .opcao.radio .marca { border-radius: 50%; }
+  .opcao.check .marca { border-radius: 6px; }
+  .opcao.sel .marca { border-color: var(--accent); background: var(--accent); }
+  .opcao.sel .marca::after { content: ''; width: 8px; height: 8px; background: var(--accent-on); border-radius: 2px; }
+  .opcao.radio.sel .marca::after { border-radius: 50%; }
+  .opcao .txt { font-size: 15px; line-height: 1.47; }
+  .nav-btns { display: flex; justify-content: space-between; gap: 12px; margin-top: 26px; }
+  .vigia { position: fixed; inset: 0; background: rgba(0, 0, 0, .55); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); z-index: 100; display: none; align-items: center; justify-content: center; padding: 24px; }
+  .vigia .box { max-width: 420px; text-align: center; background: var(--surface); border-radius: 22px; padding: 34px 30px; box-shadow: var(--shadow-3); }
+  .vigia h3 { font-size: 22px; margin: 0 0 10px; font-weight: 600; letter-spacing: -.02em; }
+  .vigia p { margin: 0; line-height: 1.5; color: var(--label-2); font-size: 14.5px; }
+  .regra { display: flex; gap: 13px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid var(--hairline); line-height: 1.5; color: var(--label-2); font-size: 14.5px; }
+  .regra:last-of-type { border-bottom: 0; }
+  .regra strong { color: var(--label); font-weight: 600; }
+  .regra .ico { flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--red-tint); color: var(--red); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; margin-top: 2px; }
+  .regra.ok .ico { background: var(--accent-tint); color: var(--accent); }
+  .aceite { display: flex; gap: 12px; align-items: flex-start; background: var(--fill-1); border-radius: var(--r-ctl); padding: 16px; font-size: 14px; line-height: 1.5; color: var(--label-2); }
+  .passos { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 22px; }
+  .passos b { min-width: 28px; height: 28px; border-radius: 8px; background: var(--fill-1); color: var(--label-3); font-size: 12.5px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: 500; font-variant-numeric: tabular-nums; transition: all .14s; }
+  .passos b:hover { background: var(--fill-2); }
+  .passos b.feito { background: var(--accent-tint); color: var(--accent); font-weight: 600; }
+  .passos b.atual { background: var(--label); color: var(--canvas); font-weight: 600; }
+  .no-select { user-select: none; -webkit-user-select: none; }
+  .fim-check { width: 56px; height: 56px; border-radius: 50%; background: var(--accent-tint); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 22px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="container topbar-inner">
+    <div class="brand"><span class="dot"></span> StartDigital <small>Quiz de seleção</small></div>
+  </div>
+</div>
+
+<div class="container">
+
+  <div id="carregando" class="loading-page">Carregando…</div>
+
+  <!-- instrucoes -->
+  <div id="tela-intro" style="display:none">
+    <div class="hero">
+      <h1 id="titulo-quiz">Quiz de Seleção</h1>
+      <p id="desc-quiz"></p>
+    </div>
+    <div class="card">
+      <h2>Regras deste quiz</h2>
+      <p class="sub">Leia antes de começar. Este quiz é acompanhado por um avaliador ao vivo.</p>
+
+      <div class="regra"><span class="ico">✕</span><div><strong>Sem inteligência artificial.</strong> Não use ChatGPT, Gemini, Copilot ou qualquer assistente. Queremos conhecer o seu raciocínio, não o de uma ferramenta.</div></div>
+      <div class="regra"><span class="ico">✕</span><div><strong>Sem consulta.</strong> Nada de buscar no Google, abrir anotações, apostilas ou pedir ajuda a outra pessoa.</div></div>
+      <div class="regra"><span class="ico">✕</span><div><strong>Não saia desta aba.</strong> O sistema registra cada vez que a janela perde o foco e o avaliador é informado.</div></div>
+      <div class="regra"><span class="ico">✕</span><div><strong>Colar texto está bloqueado.</strong> Escreva as respostas com as suas próprias palavras.</div></div>
+      <div class="regra ok"><span class="ico">✓</span><div><strong>Você tem <span id="tempo-intro"></span> para responder <span id="qtd-intro"></span> questões.</strong> O cronômetro começa quando você clicar em começar e não pode ser pausado.</div></div>
+      <div class="regra ok"><span class="ico">✓</span><div><strong>Não existe pegadinha.</strong> Se não souber algo, responda o que você acha e siga. Sinceridade conta mais do que acertar tudo.</div></div>
+
+      <label class="aceite" style="margin-top:22px">
+        <input type="checkbox" id="aceito">
+        <span>Estou com o avaliador na chamada, li as regras e me comprometo a responder sozinho(a), sem consulta e sem usar inteligência artificial.</span>
+      </label>
+      <div style="margin-top:18px">
+        <button class="btn btn-lg" id="btn-comecar" disabled>Começar o quiz</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- quiz -->
+  <div id="tela-quiz" style="display:none" class="no-select">
+    <div class="barra-topo">
+      <div class="barra-info">
+        <span id="passo-label"></span>
+        <span class="cronometro" id="cronometro">--:--</span>
+      </div>
+      <div class="progress"><i id="progresso" style="width:0%"></i></div>
+    </div>
+    <div id="avisos"></div>
+    <div class="card">
+      <p class="pergunta" id="pergunta"></p>
+      <div id="opcoes"></div>
+      <div id="aviso-q"></div>
+      <div class="nav-btns">
+        <button class="btn btn-ghost" id="btn-voltar">← Voltar</button>
+        <button class="btn" id="btn-proximo">Próxima →</button>
+      </div>
+      <div class="passos" id="passos"></div>
+    </div>
+  </div>
+
+  <!-- fim -->
+  <div id="tela-fim" style="display:none">
+    <div class="card center" style="margin-top:40px">
+      <div class="fim-check">✓</div>
+      <h2 style="font-size:22px">Respostas enviadas!</h2>
+      <p class="muted" style="max-width:520px;margin:12px auto 0;line-height:1.65">
+        Prontinho. A nossa equipe já recebeu as suas respostas e vai conversar com você sobre elas.
+        Pode fechar esta página.
+      </p>
+    </div>
+  </div>
+
+  <div id="tela-erro" style="display:none">
+    <div class="card" style="margin-top:40px">
+      <div class="alert alert-erro" id="msg-erro" style="margin:0"></div>
+    </div>
+  </div>
+
+  <footer class="rodape">StartDigital · Processo seletivo</footer>
+</div>
+
+<!-- avisos de integridade -->
+<div class="vigia" id="vigia">
+  <div class="box">
+    <h3>Você saiu da prova</h3>
+    <p style="line-height:1.65;opacity:.85">Esta saída foi registrada e o avaliador foi informado. Volte a responder normalmente — mas evite sair da aba de novo.</p>
+    <button class="btn" id="btn-vigia" style="margin-top:16px">Voltar para a prova</button>
+  </div>
+</div>
+
+<script>
+const TOKEN = new URLSearchParams(location.search).get('t') || '';
+let QUIZ = null, QUESTOES = [], RESPOSTAS = {}, attemptId = null;
+let indice = 0, fimEm = null, timer = null, enviando = false, emProva = false;
+let focusLost = 0, pasteBlocked = 0;
+
+function api(action, opts) {
+  opts = opts || {};
+  const url = '/api/public?action=' + action + (opts.method ? '' : '&t=' + encodeURIComponent(TOKEN));
+  return fetch(url, {
+    method: opts.method || 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    body: opts.body ? JSON.stringify(Object.assign({ t: TOKEN }, opts.body)) : undefined
+  }).then(function (r) { return r.json(); });
+}
+
+function mostrar(id) {
+  ['carregando', 'tela-intro', 'tela-quiz', 'tela-fim', 'tela-erro'].forEach(function (t) {
+    document.getElementById(t).style.display = t === id ? 'block' : 'none';
+  });
+}
+function erroFatal(msg) {
+  emProva = false;
+  document.getElementById('msg-erro').textContent = msg;
+  mostrar('tela-erro');
+}
+
+/* ---------------- integridade ---------------- */
+function registraAviso() {
+  const box = document.getElementById('avisos');
+  const partes = [];
+  if (focusLost) partes.push('saída da aba: ' + focusLost + 'x');
+  if (pasteBlocked) partes.push('tentativa de colar: ' + pasteBlocked + 'x');
+  box.innerHTML = partes.length
+    ? '<div class="alert alert-aviso">Registrado pelo sistema — ' + partes.join(' · ') + '. O avaliador recebe esta informação junto com as suas respostas.</div>'
+    : '';
+}
+
+document.addEventListener('visibilitychange', function () {
+  if (!emProva) return;
+  if (document.hidden) {
+    focusLost++;
+    registraAviso();
+    document.getElementById('vigia').style.display = 'flex';
+  }
+});
+window.addEventListener('blur', function () {
+  if (!emProva || document.hidden) return;
+  focusLost++;
+  registraAviso();
+});
+document.getElementById('btn-vigia').addEventListener('click', function () {
+  document.getElementById('vigia').style.display = 'none';
+});
+['paste', 'copy', 'cut'].forEach(function (ev) {
+  document.addEventListener(ev, function (e) {
+    if (!emProva) return;
+    e.preventDefault();
+    if (ev === 'paste') { pasteBlocked++; registraAviso(); }
+  });
+});
+document.addEventListener('contextmenu', function (e) { if (emProva) e.preventDefault(); });
+document.addEventListener('keydown', function (e) {
+  if (!emProva) return;
+  const k = (e.key || '').toLowerCase();
+  if ((e.ctrlKey || e.metaKey) && ['c', 'v', 'x', 'p', 'u', 's', 'f'].indexOf(k) >= 0) e.preventDefault();
+  if (k === 'f12') e.preventDefault();
+});
+window.addEventListener('beforeunload', function (e) {
+  if (emProva && !enviando) { e.preventDefault(); e.returnValue = ''; return ''; }
+});
+
+/* ---------------- cronometro ---------------- */
+function tick() {
+  if (!fimEm) return;
+  const resta = Math.max(0, Math.floor((fimEm - Date.now()) / 1000));
+  const m = String(Math.floor(resta / 60)).padStart(2, '0');
+  const s = String(resta % 60).padStart(2, '0');
+  const el = document.getElementById('cronometro');
+  el.textContent = m + ':' + s;
+  el.classList.toggle('alerta', resta <= 120);
+  if (resta <= 0) { clearInterval(timer); enviar(true); }
+}
+
+/* ---------------- render ---------------- */
+function desenha() {
+  const q = QUESTOES[indice];
+  document.getElementById('pergunta').textContent = (indice + 1) + '. ' + q.prompt;
+  const dado = RESPOSTAS[q.id];
+  const box = document.getElementById('opcoes');
+
+  if (q.kind === 'text') {
+    box.innerHTML = '<div class="field"><label>Sua resposta</label>' +
+      '<textarea id="resp-texto" style="min-height:150px" placeholder="Escreva com as suas palavras…"></textarea></div>';
+    const ta = document.getElementById('resp-texto');
+    ta.value = typeof dado === 'string' ? dado : (Array.isArray(dado) ? dado[0] || '' : '');
+    ta.addEventListener('input', function () { RESPOSTAS[q.id] = ta.value; atualizaPassos(); });
+  } else {
+    const multi = q.kind === 'multiple';
+    const sel = Array.isArray(dado) ? dado : (dado ? [dado] : []);
+    box.innerHTML = (q.options || []).map(function (o) {
+      const on = sel.indexOf(o.id) >= 0;
+      return '<div class="opcao ' + (multi ? 'check' : 'radio') + (on ? ' sel' : '') + '" data-id="' + o.id + '">' +
+        '<span class="marca"></span><span class="txt">' + o.text + '</span></div>';
+    }).join('') + (multi ? '<p class="small muted" style="margin:4px 0 0">Pode marcar mais de uma opção.</p>' : '');
+
+    box.querySelectorAll('.opcao').forEach(function (el) {
+      el.addEventListener('click', function () {
+        const id = el.dataset.id;
+        let atual = Array.isArray(RESPOSTAS[q.id]) ? RESPOSTAS[q.id].slice() : (RESPOSTAS[q.id] ? [RESPOSTAS[q.id]] : []);
+        if (multi) {
+          const i = atual.indexOf(id);
+          if (i >= 0) atual.splice(i, 1); else atual.push(id);
+        } else {
+          atual = atual[0] === id ? [] : [id];
+        }
+        RESPOSTAS[q.id] = atual;
+        document.getElementById('aviso-q').innerHTML = '';
+        desenha();
+      });
+    });
+  }
+
+  document.getElementById('passo-label').textContent = 'Questão ' + (indice + 1) + ' de ' + QUESTOES.length;
+  document.getElementById('btn-voltar').style.visibility = indice === 0 ? 'hidden' : 'visible';
+  document.getElementById('btn-proximo').textContent = indice === QUESTOES.length - 1 ? 'Enviar respostas ✓' : 'Próxima →';
+  atualizaPassos();
+}
+
+function respondida(q) {
+  const v = RESPOSTAS[q.id];
+  if (q.kind === 'text') return typeof v === 'string' && v.trim().length > 0;
+  return Array.isArray(v) ? v.length > 0 : !!v;
+}
+
+function atualizaPassos() {
+  const feitas = QUESTOES.filter(respondida).length;
+  const pct = Math.round((feitas / QUESTOES.length) * 100);
+  document.getElementById('progresso').style.width = pct + '%';
+  document.getElementById('passos').innerHTML = QUESTOES.map(function (q, i) {
+    const cls = i === indice ? 'atual' : (respondida(q) ? 'feito' : '');
+    return '<b class="' + cls + '" data-i="' + i + '">' + (i + 1) + '</b>';
+  }).join('');
+  document.getElementById('passos').querySelectorAll('b').forEach(function (b) {
+    b.addEventListener('click', function () { indice = parseInt(b.dataset.i, 10); desenha(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+  });
+}
+
+document.getElementById('btn-voltar').addEventListener('click', function () {
+  if (indice > 0) { indice--; desenha(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+});
+
+document.getElementById('btn-proximo').addEventListener('click', function () {
+  const q = QUESTOES[indice];
+  if (!respondida(q)) {
+    document.getElementById('aviso-q').innerHTML =
+      '<div class="alert alert-aviso" style="margin:16px 0 0">Responda esta questão para continuar. Se não souber, escolha o que parecer mais próximo.</div>';
+    return;
+  }
+  if (indice < QUESTOES.length - 1) { indice++; desenha(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  enviar(false);
+});
+
+async function enviar(porTempo) {
+  if (enviando) return;
+  const naoRespondidas = QUESTOES.filter(function (q) { return !respondida(q); });
+  if (!porTempo && naoRespondidas.length) {
+    document.getElementById('aviso-q').innerHTML =
+      '<div class="alert alert-aviso" style="margin:16px 0 0">Ainda falta responder ' + naoRespondidas.length + ' questão(ões). Use os números abaixo para voltar até elas.</div>';
+    return;
+  }
+  enviando = true;
+  clearInterval(timer);
+  const btn = document.getElementById('btn-proximo');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Enviando…';
+
+  const payload = { answers: RESPOSTAS, attempt_id: attemptId, focus_lost: focusLost, paste_blocked: pasteBlocked };
+  const r = await api('quiz_submit', { method: 'POST', body: payload });
+  emProva = false;
+  if (!r.ok) {
+    enviando = false;
+    btn.disabled = false; btn.textContent = 'Enviar respostas ✓';
+    document.getElementById('aviso-q').innerHTML = '<div class="alert alert-erro" style="margin:16px 0 0">' + (r.error || 'Erro ao enviar.') + '</div>';
+    return;
+  }
+  mostrar('tela-fim');
+  window.scrollTo({ top: 0 });
+}
+
+document.getElementById('aceito').addEventListener('change', function () {
+  document.getElementById('btn-comecar').disabled = !this.checked;
+});
+
+document.getElementById('btn-comecar').addEventListener('click', async function () {
+  this.disabled = true;
+  this.innerHTML = '<span class="spinner"></span> Iniciando…';
+  const r = await api('quiz_start', { method: 'POST', body: {} });
+  if (!r.ok) return erroFatal(r.error || 'Não foi possível iniciar.');
+  attemptId = r.attempt_id;
+  emProva = true;
+  fimEm = Date.now() + (QUIZ.time_limit_min || 20) * 60 * 1000;
+  timer = setInterval(tick, 500); tick();
+  mostrar('tela-quiz');
+  desenha();
+  window.scrollTo({ top: 0 });
+});
+
+(async function init() {
+  if (!TOKEN) return erroFatal('Link inválido. Use o link pessoal que a nossa equipe enviou para você.');
+  const r = await api('quiz_get');
+  if (!r.ok) return erroFatal(r.error || 'Não foi possível carregar o quiz.');
+  if (r.already_done) return erroFatal('Este quiz já foi respondido. Fale com a nossa equipe se precisar refazer.');
+  QUIZ = r.quiz;
+  QUESTOES = r.questions || [];
+  if (!QUESTOES.length) return erroFatal('Nenhuma questão configurada. Avise a nossa equipe.');
+  document.getElementById('titulo-quiz').textContent = QUIZ.title;
+  document.getElementById('desc-quiz').textContent = QUIZ.description || '';
+  document.getElementById('tempo-intro').textContent = (QUIZ.time_limit_min || 20) + ' minutos';
+  document.getElementById('qtd-intro').textContent = QUESTOES.length;
+  mostrar('tela-intro');
+})();
+</script>
+</body>
+</html>

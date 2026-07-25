@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trabalhe na StartDigital — Formulário de candidatura</title>
+<meta name="description" content="Formulário de candidatura para as vagas da StartDigital.">
+<link rel="stylesheet" href="/ui.css">
+<style>
+  .secao { padding-top: 32px; margin-top: 32px; border-top: 1px solid var(--hairline); }
+  .secao.primeira { padding-top: 0; margin-top: 0; border-top: 0; }
+  .secao-titulo { display: flex; align-items: baseline; gap: 10px; margin: 0 0 5px; font-size: 17px; font-weight: 600; letter-spacing: -.016em; }
+  .secao-titulo .num { font-size: 13px; font-weight: 500; color: var(--label-3); font-variant-numeric: tabular-nums; }
+  .secao-desc { margin: 0 0 22px; color: var(--label-2); font-size: 14px; letter-spacing: -.006em; }
+  .obrig-nota { font-size: 12.5px; color: var(--label-3); }
+  .acoes-fim { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .sucesso { text-align: center; padding: 28px 0 14px; }
+  .sucesso .check { width: 56px; height: 56px; border-radius: 50%; background: var(--accent-tint); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 22px; }
+  .sucesso h2 { font-size: 28px; letter-spacing: -.022em; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="container topbar-inner">
+    <div class="brand"><span class="dot"></span> StartDigital <small>Recrutamento</small></div>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="hero">
+    <h1 id="headline">Trabalhe na StartDigital</h1>
+    <p id="subhead">Carregando…</p>
+  </div>
+
+  <div id="tela-form">
+    <form id="form" class="card" novalidate>
+      <div id="erro-box"></div>
+
+      <!-- 1. Dados pessoais -->
+      <div class="secao primeira">
+        <h3 class="secao-titulo"><span class="num">1</span> Seus dados</h3>
+        <p class="secao-desc">Precisamos saber quem você é e como falar com você.</p>
+        <div class="grid grid-2">
+          <div class="field">
+            <label>Nome completo <span class="req">*</span></label>
+            <input type="text" name="name" autocomplete="name" required>
+          </div>
+          <div class="field">
+            <label>E-mail <span class="req">*</span></label>
+            <span class="hint">É por aqui que enviamos o resultado. Confira com atenção.</span>
+            <input type="email" name="email" autocomplete="email" required>
+          </div>
+          <div class="field">
+            <label>WhatsApp com DDD <span class="req">*</span></label>
+            <span class="hint">Exemplo: (11) 91234-5678</span>
+            <input type="tel" name="phone" autocomplete="tel" required>
+          </div>
+          <div class="field">
+            <label>Data de nascimento</label>
+            <input type="date" name="birth_date">
+          </div>
+          <div class="field">
+            <label>Cidade</label>
+            <input type="text" name="city">
+          </div>
+          <div class="field">
+            <label>Estado</label>
+            <select name="state">
+              <option value="">Selecione…</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Vaga -->
+      <div class="secao">
+        <h3 class="secao-titulo"><span class="num">2</span> A vaga</h3>
+        <p class="secao-desc">Para qual posição você está se candidatando.</p>
+        <div class="grid grid-2">
+          <div class="field">
+            <label>Vaga desejada <span class="req">*</span></label>
+            <select name="role_applied" id="role" required>
+              <option value="">Selecione…</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Pretensão salarial</label>
+            <span class="hint">Um valor ou faixa em reais.</span>
+            <input type="text" name="salary_expectation" placeholder="Ex: R$ 2.500">
+          </div>
+          <div class="field">
+            <label>Disponibilidade</label>
+            <select name="availability">
+              <option value="">Selecione…</option>
+              <option>Imediata</option>
+              <option>Em até 15 dias</option>
+              <option>Em até 30 dias</option>
+              <option>Mais de 30 dias</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Onde nos conheceu?</label>
+            <input type="text" name="__source" placeholder="Instagram, indicação, site…">
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Estrutura para trabalho remoto -->
+      <div class="secao">
+        <h3 class="secao-titulo"><span class="num">3</span> Estrutura para o remoto</h3>
+        <p class="secao-desc">Nosso trabalho é 100% online, então isso importa de verdade.</p>
+        <div class="grid grid-2">
+          <div class="field">
+            <label>Tem computador próprio?</label>
+            <select name="has_computer">
+              <option value="">Selecione…</option>
+              <option>Sim, notebook</option>
+              <option>Sim, desktop</option>
+              <option>Sim, mas compartilhado</option>
+              <option>Não tenho</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Sua internet</label>
+            <select name="internet_speed">
+              <option value="">Selecione…</option>
+              <option>Fibra estável, acima de 100 Mbps</option>
+              <option>Fibra estável, até 100 Mbps</option>
+              <option>Internet instável</option>
+              <option>Só dados do celular</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Experiencia -->
+      <div class="secao">
+        <h3 class="secao-titulo"><span class="num">4</span> Sua experiência</h3>
+        <p class="secao-desc">Conte o que você já fez. Seja específico: números e resultados ajudam muito.</p>
+        <div class="grid">
+          <div class="field">
+            <label>Experiência profissional <span class="req">*</span></label>
+            <span class="hint">Últimas experiências, tempo em cada uma e o que você fazia no dia a dia.</span>
+            <textarea name="experience" required style="min-height:130px"></textarea>
+          </div>
+          <div class="grid grid-2">
+            <div class="field">
+              <label>Formação</label>
+              <input type="text" name="education" placeholder="Curso e instituição">
+            </div>
+            <div class="field">
+              <label>Nível de inglês</label>
+              <select name="english_level">
+                <option value="">Selecione…</option>
+                <option>Não tenho</option>
+                <option>Básico</option>
+                <option>Intermediário</option>
+                <option>Avançado</option>
+                <option>Fluente</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label>Ferramentas que você domina</label>
+            <span class="hint">Ex: Meta Ads, Google Ads, Canva, CapCut, Notion, Excel, RD Station…</span>
+            <input type="text" name="tools">
+          </div>
+          <div class="grid grid-2">
+            <div class="field">
+              <label>LinkedIn</label>
+              <input type="text" name="linkedin" placeholder="linkedin.com/in/…">
+            </div>
+            <div class="field">
+              <label>Instagram ou portfólio</label>
+              <input type="text" name="instagram" placeholder="@seuperfil ou link">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Sobre voce -->
+      <div class="secao">
+        <h3 class="secao-titulo"><span class="num">5</span> Sobre você</h3>
+        <p class="secao-desc">Aqui não existe resposta certa. Queremos entender como você pensa.</p>
+        <div class="grid">
+          <div class="field">
+            <label>Por que você quer trabalhar na StartDigital? <span class="req">*</span></label>
+            <textarea name="why_start" required></textarea>
+          </div>
+          <div class="grid grid-2">
+            <div class="field">
+              <label>Seus três pontos fortes</label>
+              <textarea name="strengths"></textarea>
+            </div>
+            <div class="field">
+              <label>Algo que você ainda precisa melhorar</label>
+              <textarea name="weaknesses"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="sep">
+      <div class="row row-wrap" style="justify-content:space-between">
+        <span class="obrig-nota">Os campos com <span class="req">*</span> são obrigatórios.</span>
+        <button type="submit" class="btn btn-lg" id="btn-enviar">Enviar candidatura</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="tela-sucesso" class="card" style="display:none">
+    <div class="sucesso">
+      <div class="check">✓</div>
+      <h2 style="font-size:22px">Candidatura enviada!</h2>
+      <p class="muted" style="max-width:520px;margin:10px auto 0;line-height:1.6">
+        Obrigado pelo seu tempo, <strong id="nome-ok"></strong>. Já enviamos um e-mail de confirmação
+        para você — olhe também a caixa de spam.<br><br>
+        A partir de agora nossa equipe analisa o seu perfil. Se fizer sentido para a vaga,
+        entramos em contato pelo <strong>e-mail</strong> e pelo <strong>WhatsApp</strong> que você informou.
+      </p>
+    </div>
+  </div>
+
+  <footer class="rodape">StartDigital · Processo seletivo</footer>
+</div>
+
+<script>
+const UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
+
+function api(action, opts) {
+  opts = opts || {};
+  return fetch('/api/public?action=' + action, {
+    method: opts.method || 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  }).then(function (r) { return r.json(); });
+}
+
+function erro(msg) {
+  const box = document.getElementById('erro-box');
+  box.innerHTML = msg ? '<div class="alert alert-erro">' + msg + '</div>' : '';
+  if (msg) window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// mascara simples de telefone
+function mascaraTel(v) {
+  const d = v.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 2) return d;
+  if (d.length <= 6) return '(' + d.slice(0, 2) + ') ' + d.slice(2);
+  if (d.length <= 10) return '(' + d.slice(0, 2) + ') ' + d.slice(2, 6) + '-' + d.slice(6);
+  return '(' + d.slice(0, 2) + ') ' + d.slice(2, 7) + '-' + d.slice(7);
+}
+
+(function init() {
+  const sel = document.querySelector('select[name=state]');
+  UFS.forEach(function (uf) {
+    const o = document.createElement('option'); o.value = uf; o.textContent = uf; sel.appendChild(o);
+  });
+
+  const tel = document.querySelector('input[name=phone]');
+  tel.addEventListener('input', function () { tel.value = mascaraTel(tel.value); });
+
+  api('config').then(function (r) {
+    if (!r.ok) { document.getElementById('subhead').textContent = 'Não foi possível carregar o formulário.'; return; }
+    const f = r.form || {};
+    if (f.headline) document.getElementById('headline').textContent = f.headline;
+    document.getElementById('subhead').textContent = f.subhead || 'Preencha o formulário abaixo com atenção.';
+    const role = document.getElementById('role');
+    (f.roles || ['Outra']).forEach(function (v) {
+      const o = document.createElement('option'); o.value = v; o.textContent = v; role.appendChild(o);
+    });
+    if (f.open === false) {
+      document.getElementById('tela-form').innerHTML =
+        '<div class="card"><div class="alert alert-aviso" style="margin:0">As inscrições estão encerradas neste momento. Obrigado pelo interesse!</div></div>';
+    }
+    const q = new URLSearchParams(location.search);
+    if (q.get('vaga')) role.value = q.get('vaga');
+  });
+})();
+
+document.getElementById('form').addEventListener('submit', async function (ev) {
+  ev.preventDefault();
+  erro('');
+  const btn = document.getElementById('btn-enviar');
+  const fd = new FormData(ev.target);
+  const dados = {};
+  fd.forEach(function (v, k) { if (!k.startsWith('__')) dados[k] = String(v).trim(); });
+  const origem = fd.get('__source');
+  if (origem) dados.extra = { onde_conheceu: String(origem).trim() };
+
+  const faltando = [];
+  if (!dados.name || dados.name.length < 3) faltando.push('nome completo');
+  if (!dados.email) faltando.push('e-mail');
+  if (!dados.phone) faltando.push('WhatsApp');
+  if (!dados.role_applied) faltando.push('vaga desejada');
+  if (!dados.experience) faltando.push('experiência profissional');
+  if (!dados.why_start) faltando.push('por que quer trabalhar na StartDigital');
+  if (faltando.length) return erro('Faltou preencher: ' + faltando.join(', ') + '.');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Enviando…';
+  try {
+    const r = await api('apply', { method: 'POST', body: dados });
+    if (!r.ok) throw new Error(r.error || 'Não foi possível enviar.');
+    document.getElementById('nome-ok').textContent = dados.name.split(' ')[0];
+    document.getElementById('tela-form').style.display = 'none';
+    document.getElementById('tela-sucesso').style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (e) {
+    erro(e.message);
+    btn.disabled = false;
+    btn.textContent = 'Enviar candidatura';
+  }
+});
+</script>
+</body>
+</html>

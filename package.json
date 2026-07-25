@@ -1,0 +1,12 @@
+{
+  "name": "start-rh",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sistema de Recrutamento e Selecao da StartDigital - zero dependencias npm",
+  "scripts": {
+    "dev": "node dev-server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
