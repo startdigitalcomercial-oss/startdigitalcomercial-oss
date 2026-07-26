@@ -192,6 +192,21 @@
   .qr-passos h4 { margin: 0 0 10px; font-size: 15px; font-weight: 600; letter-spacing: -.014em; }
   .qr-passos ol { margin: 0 0 14px; padding-left: 20px; line-height: 1.9; font-size: 14px; color: var(--label-2); }
   .qr-passos p { margin: 0 0 8px; }
+  .qr-box img { transition: opacity .2s; }
+
+  /* ---------- módulos em sanfona ---------- */
+  .mod-toggle { flex: none; width: 30px; height: 30px; margin: 2px 4px 0 0; padding: 0; border: 0; border-radius: 8px;
+    background: transparent; color: var(--label-3); cursor: pointer; display: flex; align-items: center;
+    justify-content: center; transition: background .14s, color .14s; }
+  .mod-toggle:hover { background: var(--fill-1); color: var(--label); }
+  .mod-toggle .seta { transition: transform .24s cubic-bezier(.32,.72,0,1); }
+  .sanfona.aberto .mod-toggle .seta { transform: rotate(90deg); }
+  .mod-corpo { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .26s cubic-bezier(.32,.72,0,1); }
+  .sanfona.aberto .mod-corpo { grid-template-rows: 1fr; }
+  .mod-corpo > div { overflow: hidden; }
+  @media (prefers-reduced-motion: reduce) {
+    .mod-corpo, .mod-toggle .seta, .qr-box img { transition: none; }
+  }
 </style>
 </head>
 <body>
@@ -986,20 +1001,33 @@ document.getElementById('btn-enviar-msgs').addEventListener('click', async funct
 /* ============================================================
    CONTEUDO (modulos e aulas)
    ============================================================ */
+// lembra quais módulos estão abertos na sanfona
+const ABERTOS_MOD = {};
+
 async function carregaConteudo() {
   const box = document.getElementById('lista-conteudo');
   box.innerHTML = '<div class="loading-page">Carregando…</div>';
   const d = await api('content');
   box.innerHTML = d.modules.map(function (m) {
-    return '<div class="card"><div class="row" style="align-items:flex-start">' +
+    const aberto = ABERTOS_MOD[m.id] === true;
+    const n = m.lessons.length;
+    return '<div class="card sanfona' + (aberto ? ' aberto' : '') + '" data-mod="' + esc(m.id) + '">' +
+      '<div class="row" style="align-items:flex-start">' +
+      '<button type="button" class="mod-toggle" aria-expanded="' + (aberto ? 'true' : 'false') + '" title="abrir/fechar módulo">' +
+        '<svg class="seta" viewBox="0 0 24 24" width="16" height="16" style="stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="m9 6 6 6-6 6"/></svg>' +
+      '</button>' +
       '<div style="flex:1"><input type="text" class="mod-titulo" data-id="' + m.id + '" value="' + esc(m.title) + '" style="font-weight:700;font-size:15px;border-color:transparent;background:transparent;padding:4px 6px">' +
       '<input type="text" class="mod-desc" data-id="' + m.id + '" value="' + esc(m.description || '') + '" placeholder="descrição do módulo" style="font-size:13px;color:var(--cinza);border-color:transparent;background:transparent;padding:4px 6px">' +
       '</div>' +
+      '<span class="tag" style="align-self:center">' + n + (n === 1 ? ' aula' : ' aulas') + '</span>' +
       '<button class="btn btn-sm btn-ghost salvar-mod" data-id="' + m.id + '">Salvar</button>' +
       '<button class="btn btn-sm btn-ghost del-mod" data-id="' + m.id + '" title="excluir módulo">' + ICO.lixo(14) + '</button>' +
-      '</div><hr class="sep" style="margin:14px 0">' +
-      (m.lessons.length ? m.lessons.map(aulaHtml).join('') : '<p class="small muted" style="margin:0 0 12px">Nenhuma aula neste módulo ainda.</p>') +
-      '<button class="btn btn-sm nova-aula" data-mod="' + m.id + '">+ Adicionar aula</button>' +
+      '</div>' +
+      '<div class="mod-corpo"><div>' +
+        '<hr class="sep" style="margin:14px 0">' +
+        (n ? m.lessons.map(aulaHtml).join('') : '<p class="small muted" style="margin:0 0 12px">Nenhuma aula neste módulo ainda.</p>') +
+        '<button class="btn btn-sm nova-aula" data-mod="' + m.id + '">+ Adicionar aula</button>' +
+      '</div></div>' +
       '</div>';
   }).join('') || '<div class="card"><p class="sub" style="margin:0">Nenhum módulo criado. Clique em “Novo módulo”.</p></div>';
   ligaConteudo();
@@ -1038,6 +1066,16 @@ function leMateriais(txt) {
 }
 
 function ligaConteudo() {
+  document.querySelectorAll('.mod-toggle').forEach(function (bt) {
+    bt.addEventListener('click', function () {
+      const caixa = bt.closest('.sanfona');
+      const vaiAbrir = !caixa.classList.contains('aberto');
+      caixa.classList.toggle('aberto', vaiAbrir);
+      bt.setAttribute('aria-expanded', vaiAbrir ? 'true' : 'false');
+      ABERTOS_MOD[caixa.dataset.mod] = vaiAbrir;
+    });
+  });
+
   document.querySelectorAll('.salvar-mod').forEach(function (b) {
     b.addEventListener('click', async function () {
       const id = b.dataset.id;
@@ -1064,6 +1102,7 @@ function ligaConteudo() {
     b.addEventListener('click', async function () {
       const t = prompt('Título da nova aula:');
       if (!t) return;
+      ABERTOS_MOD[b.dataset.mod] = true; // deixa o módulo aberto para ver a aula nova
       try { await api('lesson_save', { body: { module_id: b.dataset.mod, title: t } }); carregaConteudo(); }
       catch (e) { toast(e.message, true); }
     });
@@ -1986,32 +2025,36 @@ async function carregaWhatsApp() {
 
     (conectada
       ? '<div class="alert alert-ok"><strong>WhatsApp conectado.</strong> A Aurea já pode falar com os candidatos por este número.</div>' +
-        '<div class="grid grid-2" style="align-items:end">' +
-          '<div class="field"><label>Mandar uma mensagem de teste</label>' +
-          '<span class="hint">Coloque o seu número com DDD para conferir se chega.</span>' +
-          '<input type="tel" id="wa-teste-fone" placeholder="(11) 91234-5678"></div>' +
-          '<div class="row" style="gap:10px"><button class="btn btn-sm" id="wa-testar">Enviar teste</button>' +
+        '<div class="field" style="max-width:340px"><label>Mandar uma mensagem de teste</label>' +
+        '<span class="hint">Coloque o número com DDD para conferir se chega.</span>' +
+        '<input type="tel" id="wa-teste-fone" placeholder="(11) 91234-5678"></div>' +
+        '<div class="row row-wrap" style="gap:10px;margin-top:14px">' +
+          '<button class="btn btn-sm" id="wa-testar">Enviar teste</button>' +
+          '<button class="btn btn-sm btn-ghost" id="wa-diag">Diagnóstico completo</button>' +
+          '<span style="flex:1"></span>' +
           '<button class="btn btn-sm btn-ghost" id="wa-webhook">Reconfigurar webhook</button>' +
-          '<button class="btn btn-sm btn-ghost" id="wa-sair">Desconectar</button></div>' +
+          '<button class="btn btn-sm btn-ghost" id="wa-sair">Desconectar</button>' +
         '</div><div id="wa-teste-res"></div>'
 
-      : '<div class="grid grid-2" style="align-items:end">' +
-          '<div class="field"><label>Nome da instância</label>' +
-          '<span class="hint">Um apelido para este número. Só letras, números, hífen e underline.</span>' +
-          '<input type="text" id="wa-nome" value="' + esc(inst || 'start-rh') + '"></div>' +
-          '<div><button class="btn" id="wa-conectar">Gerar QR code</button></div>' +
+      : '<p class="small muted" style="margin:0 0 14px">Abra o WhatsApp no celular → <strong>Aparelhos conectados</strong> → ' +
+        '<strong>Conectar um aparelho</strong> e aponte para o código. ' +
+        'O código vence em poucos segundos — o sistema troca por um novo sozinho, você não precisa clicar de novo.</p>' +
+        '<div class="row row-wrap" style="gap:10px;align-items:center">' +
+          '<button class="btn" id="wa-conectar">Gerar QR code</button>' +
+          '<button class="btn btn-ghost btn-sm" id="wa-recriar">Recomeçar do zero</button>' +
+          '<input type="hidden" id="wa-nome" value="' + esc(inst || 'start-rh') + '">' +
         '</div><div id="wa-qr"></div>') +
 
     '<hr class="sep">' +
     '<p class="small muted" style="margin:0">Endereço do webhook (o sistema configura sozinho, isto é só para conferência):<br>' +
     '<span style="font-family:ui-monospace,monospace;font-size:12px;word-break:break-all">' + esc(d.webhook_url) + '</span></p>' +
 
-    (d.instancias.length > 1
-      ? '<hr class="sep"><h3 style="font-size:13.5px;margin:0 0 10px">Outras instâncias nesta Evolution</h3>' +
-        '<div class="row row-wrap" style="gap:8px">' + d.instancias.map(function (i) {
-          return '<button class="btn btn-sm btn-ghost wa-trocar" data-nome="' + esc(i.name) + '">' +
-            esc(i.name) + ' <span class="muted" style="margin-left:5px">' + esc(i.status || '') + '</span></button>';
-        }).join('') + '</div>'
+    ((d.sobrando || []).length
+      ? '<hr class="sep"><div class="alert alert-aviso" style="margin:0">' +
+        '<strong>Sobrou ' + d.sobrando.length + ' instância' + (d.sobrando.length > 1 ? 's' : '') + ' antiga' + (d.sobrando.length > 1 ? 's' : '') + ' na Evolution.</strong> ' +
+        'O sistema usa só uma. As outras ficam ocupando espaço: ' +
+        d.sobrando.map(function (i) { return '<code>' + esc(i.name) + '</code>'; }).join(', ') +
+        '<div style="margin-top:10px"><button class="btn btn-sm" id="wa-limpar">Apagar as outras</button></div></div>'
       : '');
 
   ligaWhatsApp(inst);
@@ -2020,39 +2063,44 @@ async function carregaWhatsApp() {
 function ligaWhatsApp(inst) {
   const b = function (id) { return document.getElementById(id); };
 
+  async function abreQr(acao, btn, rotulo) {
+    const nome = b('wa-nome') ? b('wa-nome').value.trim() : inst;
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Gerando…';
+    try {
+      const r = await api(acao, { body: { instance: nome } });
+      if (r.ja_conectada) { toast('Este número já está conectado'); return carregaWhatsApp(); }
+      if (!r.base64) throw new Error('A Evolution não devolveu o QR code. Clique em "Recomeçar do zero".');
+      desenhaQr(r);
+      vigiaConexao(nome);
+    } catch (e) {
+      b('wa-qr').innerHTML = '<div class="alert alert-erro" style="margin-top:14px">' + esc(e.message) + '</div>';
+    }
+    btn.disabled = false; btn.textContent = rotulo;
+  }
+
   if (b('wa-conectar')) {
-    b('wa-conectar').addEventListener('click', async function () {
-      const nome = b('wa-nome').value.trim();
-      const btn = this;
-      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Gerando…';
+    b('wa-conectar').addEventListener('click', function () {
+      abreQr('wa_conectar', this, 'Gerar QR code');
+    });
+  }
+
+  if (b('wa-recriar')) {
+    b('wa-recriar').addEventListener('click', function () {
+      if (!confirm('Isto apaga a instância na Evolution e cria uma nova, limpinha. É o que resolve quando o QR code não conecta de jeito nenhum. Continuar?')) return;
+      abreQr('wa_recriar', this, 'Recomeçar do zero');
+    });
+  }
+
+  if (b('wa-limpar')) {
+    b('wa-limpar').addEventListener('click', async function () {
+      if (!confirm('Apagar as outras instâncias da Evolution? Só a que o sistema usa continua.')) return;
+      this.disabled = true; this.innerHTML = '<span class="spinner"></span> Apagando…';
       try {
-        const r = await api('wa_conectar', { body: { instance: nome } });
-        if (r.ja_conectada) { toast('Este número já está conectado'); return carregaWhatsApp(); }
-        if (!r.base64) throw new Error('A Evolution não devolveu o QR code. Tente de novo em alguns segundos.');
-        const img = r.base64.indexOf('data:') === 0 ? r.base64 : 'data:image/png;base64,' + r.base64;
-        b('wa-qr').innerHTML =
-          '<div class="qr-box">' +
-            '<img src="' + img + '" alt="QR code do WhatsApp">' +
-            '<div class="qr-passos">' +
-              '<h4>Escaneie com o WhatsApp do número da Start</h4>' +
-              '<ol>' +
-                '<li>Abra o WhatsApp no celular</li>' +
-                '<li>Toque nos três pontinhos → <strong>Aparelhos conectados</strong></li>' +
-                '<li>Toque em <strong>Conectar um aparelho</strong></li>' +
-                '<li>Aponte a câmera para este código</li>' +
-              '</ol>' +
-              (r.pairingCode ? '<p class="small">Se preferir, use o código de pareamento: <strong style="font-size:16px;letter-spacing:2px">' + esc(r.pairingCode) + '</strong></p>' : '') +
-              '<p class="small muted" id="wa-espera">Esperando você escanear… a tela atualiza sozinha.</p>' +
-              (r.webhook_ok
-                ? '<p class="small" style="color:var(--accent)">Webhook configurado automaticamente.</p>'
-                : '<p class="small" style="color:var(--orange)">Não consegui configurar o webhook sozinho: ' + esc(r.webhook_erro || '') + '</p>') +
-            '</div>' +
-          '</div>';
-        vigiaConexao(nome);
-      } catch (e) {
-        b('wa-qr').innerHTML = '<div class="alert alert-erro" style="margin-top:14px">' + esc(e.message) + '</div>';
-      }
-      btn.disabled = false; btn.textContent = 'Gerar QR code';
+        const r = await api('wa_limpar', { body: {} });
+        toast(r.apagadas.length + ' instância(s) apagada(s)');
+        if (r.falhas && r.falhas.length) toast('Não deu para apagar: ' + r.falhas.map(function (f) { return f.nome; }).join(', '), true);
+        carregaWhatsApp();
+      } catch (e) { toast(e.message, true); this.disabled = false; this.textContent = 'Apagar as outras'; }
     });
   }
 
@@ -2071,6 +2119,32 @@ function ligaWhatsApp(inst) {
     });
   }
 
+  if (b('wa-diag')) {
+    b('wa-diag').addEventListener('click', async function () {
+      const fone = b('wa-teste-fone').value.trim();
+      if (!fone) return toast('Coloque o número que está dando problema', true);
+      this.disabled = true; this.textContent = 'Checando…';
+      b('wa-teste-res').innerHTML = '<div class="loading-page" style="padding:20px">Rodando os testes…</div>';
+      try {
+        const d = await api('wa_diagnostico', { body: { phone: fone } });
+        b('wa-teste-res').innerHTML =
+          '<div class="card" style="margin-top:14px"><h3 style="font-size:13.5px;margin:0 0 12px">Resultado do diagnóstico</h3>' +
+          d.passos.map(function (p) {
+            return '<div class="row" style="gap:10px;padding:7px 0;border-top:1px solid var(--hairline)">' +
+              '<span style="font-weight:600;color:' + (p.ok ? 'var(--ok,#00a15c)' : 'var(--erro,#d13b3b)') + '">' +
+              (p.ok ? '✓' : '✕') + '</span>' +
+              '<span style="min-width:170px">' + esc(p.passo) + '</span>' +
+              '<span class="small muted" style="word-break:break-all">' + esc(String(p.detalhe)) + '</span></div>';
+          }).join('') +
+          '<p class="small muted" style="margin:12px 0 0">Endereço que o sistema está usando nos links: <strong>' +
+          esc(d.base || '(não descoberto)') + '</strong></p></div>';
+      } catch (e) {
+        b('wa-teste-res').innerHTML = '<div class="alert alert-erro" style="margin-top:14px">' + esc(e.message) + '</div>';
+      }
+      this.disabled = false; this.textContent = 'Diagnóstico completo';
+    });
+  }
+
   if (b('wa-webhook')) {
     b('wa-webhook').addEventListener('click', async function () {
       try { await api('wa_webhook', { body: {} }); toast('Webhook reconfigurado'); }
@@ -2086,29 +2160,74 @@ function ligaWhatsApp(inst) {
     });
   }
 
-  document.querySelectorAll('.wa-trocar').forEach(function (bt) {
-    bt.addEventListener('click', async function () {
-      try {
-        await api('settings_save', { body: { key: 'whatsapp', value: { instance: bt.dataset.nome } } });
-        toast('Agora usando ' + bt.dataset.nome);
-        carregaWhatsApp();
-      } catch (e) { toast(e.message, true); }
-    });
-  });
 }
 
-// fica olhando até o WhatsApp conectar
+// desenha (ou troca) a imagem do QR code na tela
+function desenhaQr(r) {
+  const alvo = document.getElementById('wa-qr');
+  if (!alvo) return;
+  const img = r.base64.indexOf('data:') === 0 ? r.base64 : 'data:image/png;base64,' + r.base64;
+  const antiga = document.getElementById('wa-qr-img');
+
+  // se o QR já está na tela, só troca a figura — sem piscar o resto
+  if (antiga) {
+    antiga.src = img;
+    const p = document.getElementById('wa-pairing');
+    if (p && r.pairingCode) p.innerHTML = 'Se preferir, use o código de pareamento: <strong style="font-size:16px;letter-spacing:2px">' + esc(r.pairingCode) + '</strong>';
+    return;
+  }
+
+  alvo.innerHTML =
+    '<div class="qr-box">' +
+      '<img id="wa-qr-img" src="' + img + '" alt="QR code do WhatsApp">' +
+      '<div class="qr-passos">' +
+        '<h4>Escaneie com o WhatsApp do número da Start</h4>' +
+        '<ol>' +
+          '<li>Abra o WhatsApp no celular</li>' +
+          '<li>Toque nos três pontinhos → <strong>Aparelhos conectados</strong></li>' +
+          '<li>Toque em <strong>Conectar um aparelho</strong></li>' +
+          '<li>Aponte a câmera para este código</li>' +
+        '</ol>' +
+        '<p class="small" id="wa-pairing">' + (r.pairingCode ? 'Se preferir, use o código de pareamento: <strong style="font-size:16px;letter-spacing:2px">' + esc(r.pairingCode) + '</strong>' : '') + '</p>' +
+        '<p class="small muted" id="wa-espera">Esperando você escanear… o código se renova sozinho, pode ficar com a câmera apontada.</p>' +
+        (r.webhook_ok === false
+          ? '<p class="small" style="color:var(--orange)">Não consegui configurar o webhook sozinho: ' + esc(r.webhook_erro || '') + '</p>'
+          : '<p class="small" style="color:var(--accent)">Webhook configurado automaticamente.</p>') +
+      '</div>' +
+    '</div>';
+}
+
+// Fica olhando se conectou. E, o mais importante: TROCA O QR sozinho.
+// O código da Evolution vence em menos de 1 minuto — era por isso que
+// escanear não funcionava: a pessoa lia um código já morto.
 function vigiaConexao(nome) {
   clearInterval(WA_TIMER);
   let tentativas = 0;
   WA_TIMER = setInterval(async function () {
     tentativas++;
-    if (tentativas > 40) {
+
+    // 5 minutos de paciência (100 voltas de 3s)
+    if (tentativas > 100) {
       clearInterval(WA_TIMER);
       const el = document.getElementById('wa-espera');
-      if (el) el.textContent = 'O código expirou. Clique em "Gerar QR code" de novo.';
+      if (el) {
+        el.innerHTML = 'Passaram 5 minutos sem conectar. Clique em <strong>Recomeçar do zero</strong> — ' +
+          'isso apaga a instância travada e cria uma nova.';
+      }
       return;
     }
+
+    // a cada 8 voltas (24 segundos) pede um código novo
+    if (tentativas % 8 === 0) {
+      try {
+        const q = await api('wa_qr', { params: { instance: nome } });
+        if (q.ja_conectada) {
+          clearInterval(WA_TIMER); toast('WhatsApp conectado!'); return carregaWhatsApp();
+        }
+        if (q.base64) desenhaQr(q);
+      } catch (e) { /* tenta na proxima volta */ }
+    }
+
     try {
       const r = await api('wa_estado', { params: { instance: nome } });
       if (r.conectada) {
