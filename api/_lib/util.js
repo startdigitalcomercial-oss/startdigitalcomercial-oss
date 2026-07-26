@@ -91,13 +91,65 @@ function safeEqual(a, b) {
   return crypto.timingSafeEqual(ha, hb);
 }
 
+
+// ---------- Senha do candidato ----------
+function hashPassword(senha, saltHex) {
+  const salt = saltHex || crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(String(senha), salt, 32).toString('hex');
+  return { hash: hash, salt: salt };
+}
+
+function checkPassword(senha, hash, salt) {
+  if (!hash || !salt) return false;
+  try {
+    const calc = crypto.scryptSync(String(senha), salt, 32);
+    const alvo = Buffer.from(hash, 'hex');
+    if (calc.length !== alvo.length) return false;
+    return crypto.timingSafeEqual(calc, alvo);
+  } catch (e) { return false; }
+}
+
+// Sessao do candidato (12 horas)
+function signCandidateSession(candidateId) {
+  return signSession({ role: 'candidato', cid: candidateId, exp: Date.now() + 12 * 3600 * 1000 });
+}
+
+function candidateFromRequest(req) {
+  const auth = req.headers['authorization'] || '';
+  const token = auth.replace(/^Bearer\s+/i, '').trim();
+  const s = verifySession(token);
+  if (!s || s.role !== 'candidato' || !s.cid) return null;
+  return s.cid;
+}
+
+// ---------- Telefone: ultimos 8 digitos para casar com o WhatsApp ----------
+function phoneTail(raw) {
+  const d = String(raw || '').replace(/\D/g, '');
+  return d.length >= 8 ? d.slice(-8) : '';
+}
+
 // ---------- Texto ----------
 function firstName(name) {
   return String(name || '').trim().split(/\s+/)[0] || '';
 }
 
+// Endereço público do sistema.
+// Se APP_URL não estiver configurada, ele é descoberto sozinho a partir
+// do endereço pelo qual a requisição chegou (dominio da Vercel).
+let BASE_DESCOBERTA = '';
+
+function setBaseFromReq(req) {
+  try {
+    const host = req.headers['x-forwarded-host'] || req.headers['host'] || '';
+    if (!host) return;
+    const proto = req.headers['x-forwarded-proto'] ||
+      (host.indexOf('localhost') === 0 || host.indexOf('127.') === 0 ? 'http' : 'https');
+    BASE_DESCOBERTA = proto + '://' + host;
+  } catch (e) { /* ignora */ }
+}
+
 function appUrl() {
-  const u = process.env.APP_URL || '';
+  const u = process.env.APP_URL || BASE_DESCOBERTA || '';
   return u.replace(/\/+$/, '');
 }
 
@@ -107,7 +159,9 @@ function candidateLinks(candidate) {
   return {
     link_portal: base + '/portal?t=' + t,
     link_disc: base + '/disc?t=' + t,
-    link_quiz: base + '/prova?t=' + t
+    link_quiz: base + '/prova?t=' + t,
+    link_senha: base + '/criar-senha?t=' + t,
+    link_entrar: base + '/entrar'
   };
 }
 
@@ -174,6 +228,7 @@ function isEmail(v) {
 module.exports = {
   json, ok, fail, readBody,
   signSession, verifySession, requireAdmin, candidateToken, safeEqual,
-  firstName, appUrl, candidateLinks, renderTemplate, templateVars,
+  firstName, appUrl, setBaseFromReq, candidateLinks, renderTemplate, templateVars,
+  hashPassword, checkPassword, signCandidateSession, candidateFromRequest, phoneTail,
   escapeHtml, textToEmailHtml, normalizePhone, isEmail
 };

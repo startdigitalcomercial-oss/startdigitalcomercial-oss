@@ -142,6 +142,47 @@
   /* ---------- cartoes de indicadores ---------- */
   .stat { display: flex; align-items: center; gap: 14px; }
   .stat-ico { width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center; flex: none; }
+
+  /* ---------- indicadores do dashboard ---------- */
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .kpis-2 { grid-template-columns: 1fr 1fr; margin-top: 14px; }
+  @media (max-width: 900px) { .kpis, .kpis-2 { grid-template-columns: 1fr; } }
+  .kpi { background: var(--surface); border-radius: 14px; padding: 18px 20px; box-shadow: var(--shadow-1); }
+  .kpis-2 .kpi { box-shadow: none; background: var(--fill-1); }
+  .kpi-rot { font-size: 12.5px; color: var(--label-3); }
+  .kpi-num { font-size: 32px; font-weight: 600; letter-spacing: -.028em; line-height: 1.1; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .kpi-extra { font-size: 12.5px; color: var(--label-3); margin-top: 5px; }
+  .var { font-weight: 600; }
+  .var.sobe { color: var(--accent); }
+  .var.desce { color: var(--red); }
+
+  /* ---------- gráficos ---------- */
+  .gr-wrap { position: relative; margin-top: 4px; }
+  .gr-svg { width: 100%; height: 190px; display: block; overflow: visible; }
+  .gr-tip { position: absolute; transform: translate(-50%, -100%); background: var(--label); color: var(--canvas);
+            font-size: 12px; font-weight: 500; padding: 5px 10px; border-radius: 8px; white-space: nowrap;
+            opacity: 0; pointer-events: none; transition: opacity .12s; }
+  .gr-tip.on { opacity: 1; }
+  .hit { cursor: crosshair; }
+
+  .barras { display: grid; gap: 11px; margin-top: 4px; }
+  .barra-linha { display: grid; grid-template-columns: 132px 1fr 42px; align-items: center; gap: 12px; }
+  .barra-rot { font-size: 13px; display: flex; align-items: center; gap: 7px; min-width: 0;
+               overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .barra-trilho { height: 8px; background: var(--fill-2); border-radius: var(--r-pill); overflow: hidden; }
+  .barra-trilho > i { display: block; height: 100%; background: var(--accent); border-radius: var(--r-pill);
+                      transition: width .5s cubic-bezier(.4,0,.2,1); }
+  .barra-val { font-size: 13px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+  .pt { width: 7px; height: 7px; border-radius: 50%; flex: none; display: inline-block; }
+
+  /* ---------- conversa da Aurea ---------- */
+  .bolha-msg { max-width: 78%; margin-bottom: 12px; }
+  .bolha-msg .txt { padding: 11px 14px; border-radius: 16px; font-size: 14.5px; line-height: 1.5; }
+  .bolha-msg .hora { font-size: 11.5px; color: var(--label-3); margin-top: 4px; }
+  .bolha-msg.aurea { margin-left: auto; }
+  .bolha-msg.aurea .txt { background: var(--accent-tint); border-bottom-right-radius: 5px; }
+  .bolha-msg.aurea .hora { text-align: right; }
+  .bolha-msg.cand .txt { background: var(--fill-1); border-bottom-left-radius: 5px; }
 </style>
 </head>
 <body>
@@ -180,8 +221,13 @@
     <div class="logo"><span class="dot"></span>StartDigital <small>RH</small></div>
     <nav id="abas">
       <div class="nav-sec">Principal</div>
-      <button data-aba="quadro" class="on"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="16" rx="1.8"/><rect x="13.5" y="4" width="6.5" height="10" rx="1.8"/></svg><span>Quadro</span></button>
-      <button data-aba="boasvindas"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M21 3 10.6 13.4"/><path d="M21 3l-6.6 18-3.8-8.6L2 8.6z"/></svg><span>Boas-vindas</span></button>
+      <button data-aba="dashboard" class="on"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3.6" y="3.6" width="7" height="6" rx="1.6"/><rect x="3.6" y="12.4" width="7" height="8" rx="1.6"/><rect x="13.4" y="3.6" width="7" height="10" rx="1.6"/><rect x="13.4" y="16.4" width="7" height="4" rx="1.6"/></svg><span>Dashboard</span></button>
+      <button data-aba="triagem"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="16" rx="1.8"/><rect x="13.5" y="4" width="6.5" height="10" rx="1.8"/></svg><span>Triagem</span></button>
+      <button data-aba="candidatos"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><circle cx="9" cy="8.6" r="3.4"/><path d="M3.6 19.4c.6-3 2.9-4.5 5.4-4.5s4.8 1.5 5.4 4.5"/><path d="M15.4 5.7a3.4 3.4 0 0 1 0 6M16.9 15.2c1.9.6 3.1 2 3.5 4.2"/></svg><span>Candidatos</span></button>
+      <div class="nav-sec">Automação</div>
+      <button data-aba="prequalificacao"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M9.4 9.2a2.7 2.7 0 1 1 3.6 2.5c-.8.3-1.2 1-1.2 1.8v.6"/><path d="M11.8 17.6v.2"/><circle cx="12" cy="12" r="8.8"/></svg><span>Pré Qualificação</span></button>
+      <button data-aba="aurea"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M12 3.4 13.9 9l5.7 1.9-5.7 1.9L12 18.5l-1.9-5.7L4.4 10.9 10.1 9z"/><path d="M18.6 16.4l.7 2.1 2.1.7-2.1.7-.7 2.1-.7-2.1-2.1-.7 2.1-.7z"/></svg><span>Aurea</span></button>
+      <button data-aba="preonboarding"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M21 3 10.6 13.4"/><path d="M21 3l-6.6 18-3.8-8.6L2 8.6z"/></svg><span>Pré Onboarding</span></button>
       <div class="nav-sec">Conteúdo</div>
       <button data-aba="conteudo"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M10.3 9.1v5.8l4.8-2.9z"/></svg><span>Aulas</span></button>
       <button data-aba="quiz"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="5.5" y="4.2" width="13" height="16.6" rx="2"/><path d="M9.3 4.2V3.2h5.4v1"/><path d="m9.3 13.6 2 2 3.8-4.4"/></svg><span>Quiz</span></button>
@@ -195,10 +241,10 @@
   </aside>
 
   <main class="conteudo">
-    <header class="pagina-cab"><h1 id="titulo-pagina">Quadro</h1></header>
+    <header class="pagina-cab"><h1 id="titulo-pagina">Dashboard</h1></header>
 
     <!-- ---------- QUADRO ---------- -->
-    <section data-painel="quadro">
+    <section data-painel="triagem" style="display:none">
       <div class="row row-wrap" style="padding:18px 0 0;justify-content:space-between">
         <div class="row row-wrap">
           <input type="text" id="busca" placeholder="Buscar por nome, e-mail ou vaga…" style="width:290px">
@@ -214,8 +260,28 @@
       <div class="board" id="board"></div>
     </section>
 
+    <!-- ---------- DASHBOARD ---------- -->
+    <section data-painel="dashboard">
+      <div id="painel-dashboard" style="padding:18px 0 40px"><div class="loading-page">Carregando…</div></div>
+    </section>
+
+    <!-- ---------- CANDIDATOS ---------- -->
+    <section data-painel="candidatos" style="display:none">
+      <div style="padding:18px 0 40px" id="painel-candidatos"><div class="loading-page">Carregando…</div></div>
+    </section>
+
+    <!-- ---------- PRE QUALIFICACAO ---------- -->
+    <section data-painel="prequalificacao" style="display:none">
+      <div style="padding:18px 0 40px" id="painel-prequal"><div class="loading-page">Carregando…</div></div>
+    </section>
+
+    <!-- ---------- AUREA ---------- -->
+    <section data-painel="aurea" style="display:none">
+      <div style="padding:18px 0 40px" id="painel-aurea"><div class="loading-page">Carregando…</div></div>
+    </section>
+
     <!-- ---------- BOAS-VINDAS ---------- -->
-    <section data-painel="boasvindas" style="display:none">
+    <section data-painel="preonboarding" style="display:none">
       <div style="padding:22px 0 0">
         <div class="card">
           <h2>Boas-vindas ao aprovado</h2>
@@ -398,7 +464,12 @@ document.getElementById('form-login').addEventListener('submit', async function 
 /* ============================================================
    abas
    ============================================================ */
-const TITULOS = { quadro: 'Quadro', boasvindas: 'Boas-vindas', conteudo: 'Aulas da integração', quiz: 'Quiz de seleção', mensagens: 'Modelos de mensagem', ajustes: 'Ajustes' };
+const TITULOS = {
+  dashboard: 'Dashboard', triagem: 'Triagem', candidatos: 'Candidatos',
+  prequalificacao: 'Pré Qualificação', aurea: 'Aurea', preonboarding: 'Pré Onboarding',
+  conteudo: 'Aulas da integração', quiz: 'Quiz de seleção',
+  mensagens: 'Modelos de mensagem', ajustes: 'Ajustes'
+};
 document.getElementById('abas').addEventListener('click', function (ev) {
   const b = ev.target.closest('button[data-aba]');
   if (!b) return;
@@ -410,7 +481,11 @@ document.getElementById('abas').addEventListener('click', function (ev) {
     s.classList.remove('enter');
     if (ativa) { void s.offsetWidth; s.classList.add('enter'); }
   });
-  const carregar = { conteudo: carregaConteudo, quiz: carregaQuiz, mensagens: carregaTemplates, ajustes: carregaAjustes, boasvindas: carregaBoasVindas };
+  const carregar = {
+    dashboard: carregaDashboard, triagem: carregaBoard, candidatos: carregaCandidatos,
+    prequalificacao: carregaPrequal, aurea: carregaAurea, preonboarding: carregaBoasVindas,
+    conteudo: carregaConteudo, quiz: carregaQuiz, mensagens: carregaTemplates, ajustes: carregaAjustes
+  };
   if (carregar[b.dataset.aba]) carregar[b.dataset.aba]();
 });
 
@@ -512,6 +587,7 @@ function ligaArrasto() {
         await api('move', { body: { id: id, stage_key: stage } });
         const nome = (BOARD.stages.find(function (s) { return s.key === stage; }) || {}).name;
         toast(c.name.split(' ')[0] + ' → ' + nome);
+        if (stage === 'concluido') gatilhoConcluido(c);
       } catch (err) {
         c.stage_key = antes; desenhaBoard(); toast(err.message, true);
       }
@@ -1239,13 +1315,651 @@ async function carregaAjustes() {
   } catch (e) { document.getElementById('tab-logs').textContent = e.message; }
 }
 
+
+/* ============================================================
+   GRÁFICOS — SVG à mão, um tom só (o trabalho aqui é magnitude,
+   não identidade), rótulos diretos e eixos discretos.
+   ============================================================ */
+function graficoLinha(serie, id) {
+  const W = 720, H = 190, mE = 34, mD = 12, mT = 14, mB = 26;
+  const larg = W - mE - mD, alt = H - mT - mB;
+  const max = Math.max(1, ...serie.map(function (p) { return p.total; }));
+  const passo = serie.length > 1 ? larg / (serie.length - 1) : larg;
+  const x = function (i) { return mE + i * passo; };
+  const y = function (v) { return mT + alt - (v / max) * alt; };
+
+  const pontos = serie.map(function (p, i) { return x(i) + ',' + y(p.total); });
+  const area = 'M' + x(0) + ',' + (mT + alt) + ' L' + pontos.join(' L') +
+               ' L' + x(serie.length - 1) + ',' + (mT + alt) + ' Z';
+
+  // grade discreta: 3 linhas
+  let grade = '';
+  for (let g = 0; g <= 2; g++) {
+    const v = Math.round((max / 2) * g);
+    const yy = y(v);
+    grade += '<line x1="' + mE + '" y1="' + yy + '" x2="' + (W - mD) + '" y2="' + yy +
+      '" stroke="var(--hairline)" stroke-width="1"/>' +
+      '<text x="' + (mE - 8) + '" y="' + (yy + 4) + '" text-anchor="end" font-size="10.5" fill="var(--label-3)">' + v + '</text>';
+  }
+
+  const marcas = serie.map(function (p, i) {
+    const mostrar = i === 0 || i === serie.length - 1 || i === Math.floor(serie.length / 2);
+    if (!mostrar) return '';
+    const d = p.dia.slice(8, 10) + '/' + p.dia.slice(5, 7);
+    return '<text x="' + x(i) + '" y="' + (H - 7) + '" text-anchor="middle" font-size="10.5" fill="var(--label-3)">' + d + '</text>';
+  }).join('');
+
+  // camada de hover
+  const hits = serie.map(function (p, i) {
+    const d = p.dia.slice(8, 10) + '/' + p.dia.slice(5, 7);
+    return '<rect x="' + (x(i) - passo / 2) + '" y="' + mT + '" width="' + passo + '" height="' + alt +
+      '" fill="transparent" class="hit" data-x="' + x(i) + '" data-y="' + y(p.total) +
+      '" data-txt="' + d + ' · ' + p.total + (p.total === 1 ? ' candidato' : ' candidatos') + '"/>';
+  }).join('');
+
+  const ultimo = serie[serie.length - 1];
+  return '<div class="gr-wrap" id="' + id + '">' +
+    '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" class="gr-svg">' +
+    '<defs><linearGradient id="g-' + id + '" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0%" stop-color="var(--accent)" stop-opacity=".18"/>' +
+    '<stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>' +
+    grade +
+    '<path d="' + area + '" fill="url(#g-' + id + ')"/>' +
+    '<polyline points="' + pontos.join(' ') + '" fill="none" stroke="var(--accent)" stroke-width="2" ' +
+    'stroke-linejoin="round" stroke-linecap="round"/>' +
+    '<circle cx="' + x(serie.length - 1) + '" cy="' + y(ultimo.total) + '" r="4" fill="var(--accent)" ' +
+    'stroke="var(--surface)" stroke-width="2"/>' +
+    marcas +
+    '<line class="cross" x1="0" y1="' + mT + '" x2="0" y2="' + (mT + alt) + '" stroke="var(--label-3)" ' +
+    'stroke-width="1" stroke-dasharray="3 3" style="display:none"/>' +
+    '<circle class="dot" r="4.5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2" style="display:none"/>' +
+    hits + '</svg><div class="gr-tip"></div></div>';
+}
+
+function ligaHoverLinha(id) {
+  const wrap = document.getElementById(id);
+  if (!wrap) return;
+  const svg = wrap.querySelector('svg');
+  const tip = wrap.querySelector('.gr-tip');
+  const cross = wrap.querySelector('.cross');
+  const dot = wrap.querySelector('.dot');
+  wrap.querySelectorAll('.hit').forEach(function (h) {
+    h.addEventListener('mouseenter', function () {
+      const px = parseFloat(h.dataset.x), py = parseFloat(h.dataset.y);
+      cross.setAttribute('x1', px); cross.setAttribute('x2', px);
+      cross.style.display = ''; dot.style.display = '';
+      dot.setAttribute('cx', px); dot.setAttribute('cy', py);
+      const r = svg.getBoundingClientRect();
+      tip.textContent = h.dataset.txt;
+      tip.style.left = (px / 720 * r.width) + 'px';
+      tip.style.top = (py / 190 * r.height - 10) + 'px';
+      tip.classList.add('on');
+    });
+  });
+  wrap.addEventListener('mouseleave', function () {
+    cross.style.display = 'none'; dot.style.display = 'none'; tip.classList.remove('on');
+  });
+}
+
+function graficoBarras(itens, opts) {
+  opts = opts || {};
+  const max = Math.max(1, ...itens.map(function (i) { return i.total; }));
+  return '<div class="barras">' + itens.map(function (i) {
+    const pct = Math.round((i.total / max) * 100);
+    return '<div class="barra-linha" title="' + esc(i.nome) + ': ' + i.total + '">' +
+      '<span class="barra-rot">' +
+      (i.cor ? '<i class="pt" style="background:' + esc(i.cor) + '"></i>' : '') +
+      esc(i.nome) + '</span>' +
+      '<span class="barra-trilho"><i style="width:' + Math.max(pct, i.total ? 2 : 0) + '%"></i></span>' +
+      '<span class="barra-val">' + i.total + '</span></div>';
+  }).join('') + '</div>';
+}
+
+/* ============================================================
+   DASHBOARD
+   ============================================================ */
+async function carregaDashboard() {
+  const box = document.getElementById('painel-dashboard');
+  let d;
+  try { d = await api('dashboard'); }
+  catch (e) { box.innerHTML = '<div class="card"><div class="alert alert-erro" style="margin:0">' + esc(e.message) + '</div></div>'; return; }
+
+  const k = d.indicadores;
+  const varia = k.variacao_7d === null ? ''
+    : '<span class="var ' + (k.variacao_7d >= 0 ? 'sobe' : 'desce') + '">' +
+      (k.variacao_7d >= 0 ? '+' : '') + k.variacao_7d + '% vs. 7 dias antes</span>';
+
+  function tile(rotulo, valor, extra) {
+    return '<div class="kpi"><div class="kpi-rot">' + rotulo + '</div>' +
+      '<div class="kpi-num">' + valor + '</div>' +
+      '<div class="kpi-extra">' + (extra || '&nbsp;') + '</div></div>';
+  }
+
+  box.innerHTML =
+    '<div class="kpis">' +
+      tile('Candidatos ativos', k.ativos, k.novos_7d + ' novos nos últimos 7 dias') +
+      tile('Concluíram o processo', k.concluidos, 'aprovados e liberados para a integração') +
+      tile('Pré-qualificações da Aurea', k.prequal_concluidas,
+           k.prequal_em_andamento + ' conversa(s) em andamento') +
+    '</div>' +
+
+    '<div class="grid grid-2" style="margin-top:16px;align-items:start">' +
+      '<div class="card"><h2>Candidatos por dia</h2>' +
+      '<p class="sub">Últimos 14 dias. ' + (varia || 'Sem base de comparação ainda.') + '</p>' +
+      graficoLinha(d.serie_novos, 'gr-novos') + '</div>' +
+
+      '<div class="card"><h2>Onde estão os candidatos</h2>' +
+      '<p class="sub">Quantos em cada etapa do funil, agora.</p>' +
+      graficoBarras(d.funil) + '</div>' +
+    '</div>' +
+
+    '<div class="grid grid-2" style="margin-top:16px;align-items:start">' +
+      '<div class="card"><h2>De onde eles vêm</h2>' +
+      '<p class="sub">Origem dos candidatos cadastrados.</p>' +
+      (d.origens.length ? graficoBarras(d.origens) : '<p class="muted small" style="margin:0">Ainda sem dados.</p>') +
+      '</div>' +
+
+      '<div class="card"><h2>Qualidade da pré-qualificação</h2>' +
+      '<p class="sub">O que a Aurea achou de quem já conversou com ela.</p>' +
+      '<div class="kpis kpis-2">' +
+        tile('Nota média', k.prequal_nota_media === null ? '—' : k.prequal_nota_media, 'de 0 a 10, dada pela Aurea') +
+        tile('Recomendados', k.prequal_recomendados, 'ela sugeriu avançar') +
+      '</div></div>' +
+    '</div>';
+
+  ligaHoverLinha('gr-novos');
+}
+
+/* ============================================================
+   CANDIDATOS (lista)
+   ============================================================ */
+let CANDS_FILTRO = { busca: '', etapa: '', origem: '' };
+
+async function carregaCandidatos() {
+  const box = document.getElementById('painel-candidatos');
+  if (!BOARD.candidates.length) { try { await carregaBoard(); } catch (e) { } }
+  let dados;
+  try { dados = await api('board'); } catch (e) { box.innerHTML = '<div class="card">' + esc(e.message) + '</div>'; return; }
+
+  const etapas = dados.stages;
+  const origens = {};
+  dados.candidates.forEach(function (c) { origens[c.source_detail || c.source || 'Formulário do site'] = 1; });
+
+  box.innerHTML =
+    '<div class="card"><div class="row row-wrap" style="gap:10px">' +
+      '<input type="text" id="cl-busca" placeholder="Buscar por nome, e-mail, telefone ou vaga…" style="flex:1;min-width:240px">' +
+      '<select id="cl-etapa" style="width:180px"><option value="">Todas as etapas</option>' +
+        etapas.map(function (e) { return '<option value="' + e.key + '">' + esc(e.name) + '</option>'; }).join('') +
+      '</select>' +
+      '<select id="cl-origem" style="width:180px"><option value="">Todas as origens</option>' +
+        Object.keys(origens).sort().map(function (o) { return '<option>' + esc(o) + '</option>'; }).join('') +
+      '</select>' +
+      '<button class="btn btn-sm btn-ghost" id="cl-csv">Baixar CSV</button>' +
+    '</div></div>' +
+    '<div class="card" style="margin-top:14px"><div id="cl-tabela"></div></div>';
+
+  function desenha() {
+    const q = (document.getElementById('cl-busca').value || '').trim().toLowerCase();
+    const et = document.getElementById('cl-etapa').value;
+    const og = document.getElementById('cl-origem').value;
+    const lista = dados.candidates.filter(function (c) {
+      if (et && c.stage_key !== et) return false;
+      if (og && (c.source_detail || c.source || 'Formulário do site') !== og) return false;
+      if (!q) return true;
+      return [c.name, c.email, c.phone, c.role_applied, c.city].join(' ').toLowerCase().indexOf(q) >= 0;
+    });
+    const nomeEtapa = {}; etapas.forEach(function (e) { nomeEtapa[e.key] = e; });
+
+    document.getElementById('cl-tabela').innerHTML = lista.length
+      ? '<table class="tbl"><thead><tr><th>Nome</th><th>Vaga</th><th>Contato</th><th>Origem</th><th>Etapa</th><th>Entrou em</th></tr></thead><tbody>' +
+        lista.map(function (c) {
+          const e = nomeEtapa[c.stage_key] || {};
+          return '<tr class="linha-cand" data-id="' + c.id + '" style="cursor:pointer">' +
+            '<td><strong>' + esc(c.name) + '</strong>' +
+            (c.disc ? '<div class="small muted">DISC ' + esc(c.disc) + '</div>' : '') + '</td>' +
+            '<td>' + esc(c.role_applied || '—') + '<div class="small muted">' + esc(c.city || '') + '</div></td>' +
+            '<td class="small">' + esc(c.email || '') + '<div class="muted">' + esc(c.phone || '') + '</div></td>' +
+            '<td class="small">' + esc(c.source_detail || c.source || '—') + '</td>' +
+            '<td><span class="tag"><i class="pt" style="background:' + esc(e.color || '#999') + '"></i>' + esc(e.name || c.stage_key) + '</span></td>' +
+            '<td class="small muted" style="white-space:nowrap">' + dataBr(c.created_at) + '</td></tr>';
+        }).join('') + '</tbody></table>' +
+        '<p class="small muted" style="margin:14px 0 0">' + lista.length + ' de ' + dados.candidates.length + ' candidatos. Clique numa linha para abrir a ficha.</p>'
+      : '<p class="muted small" style="margin:0">Nenhum candidato com esses filtros.</p>';
+
+    document.querySelectorAll('.linha-cand').forEach(function (tr) {
+      tr.addEventListener('click', function () { abreCandidato(tr.dataset.id); });
+    });
+  }
+
+  ['cl-busca', 'cl-etapa', 'cl-origem'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', desenha);
+    document.getElementById(id).addEventListener('change', desenha);
+  });
+  document.getElementById('cl-csv').addEventListener('click', function () {
+    const linhas = [['Nome', 'E-mail', 'Telefone', 'Vaga', 'Cidade', 'Origem', 'Etapa', 'Entrou em']];
+    dados.candidates.forEach(function (c) {
+      linhas.push([c.name, c.email, c.phone, c.role_applied, c.city,
+        c.source_detail || c.source, c.stage_key, c.created_at]);
+    });
+    const csv = linhas.map(function (l) {
+      return l.map(function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; }).join(';');
+    }).join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,﻿' + encodeURIComponent(csv);
+    a.download = 'candidatos-startdigital.csv';
+    a.click();
+    toast('CSV gerado');
+  });
+  desenha();
+}
+
+
+/* ============================================================
+   PRÉ QUALIFICAÇÃO — grupos de perguntas da Aurea
+   ============================================================ */
+async function carregaPrequal() {
+  const box = document.getElementById('painel-prequal');
+  box.innerHTML = '<div class="loading-page">Carregando…</div>';
+  let d;
+  try { d = await api('prequal'); }
+  catch (e) { box.innerHTML = '<div class="card">' + esc(e.message) + '</div>'; return; }
+
+  box.innerHTML =
+    '<div class="card"><div class="row" style="justify-content:space-between;align-items:flex-start">' +
+      '<div><h2 style="margin:0">Grupos de perguntas</h2>' +
+      '<p class="sub" style="margin:4px 0 0">Cada grupo é um roteiro que a Aurea segue no WhatsApp. ' +
+      'Você pode ter um roteiro por vaga e marcar um deles como padrão.</p></div>' +
+      '<button class="btn btn-sm" id="btn-novo-grupo">+ Novo grupo</button>' +
+    '</div></div>' +
+    (d.grupos.length ? d.grupos.map(grupoHtml).join('') :
+      '<div class="card" style="margin-top:14px"><p class="sub" style="margin:0">Nenhum grupo criado ainda.</p></div>');
+
+  ligaPrequal();
+}
+
+function grupoHtml(g) {
+  return '<div class="card" style="margin-top:14px" data-grupo="' + g.id + '">' +
+    '<div class="row" style="justify-content:space-between;align-items:flex-start;gap:12px">' +
+      '<div style="flex:1;min-width:0">' +
+        '<div class="row" style="gap:8px">' +
+          '<input type="text" class="g-nome" value="' + esc(g.name) + '" style="font-weight:600;font-size:17px;letter-spacing:-.016em;border-color:transparent;background:transparent;padding:4px 6px">' +
+          (g.is_default ? '<span class="tag tag-verde">padrão</span>' : '') +
+          (g.active ? '' : '<span class="tag">desligado</span>') +
+        '</div>' +
+        '<input type="text" class="g-desc" value="' + esc(g.description || '') + '" placeholder="para que serve este roteiro" style="font-size:13.5px;color:var(--label-3);border-color:transparent;background:transparent;padding:4px 6px">' +
+      '</div>' +
+      '<button class="btn btn-sm btn-ghost g-salvar">Salvar</button>' +
+      '<button class="btn btn-sm btn-ghost g-excluir" title="excluir grupo">' + ICO.lixo(14) + '</button>' +
+    '</div>' +
+
+    '<div class="grid grid-2" style="margin-top:14px">' +
+      '<div class="field"><label>Mensagem de abertura</label>' +
+      '<span class="hint">A primeira coisa que a Aurea manda. Use {{primeiro_nome}} e {{vaga}}.</span>' +
+      '<textarea class="g-abertura" style="min-height:110px">' + esc(g.opening_message || '') + '</textarea></div>' +
+      '<div class="field"><label>Mensagem de encerramento</label>' +
+      '<span class="hint">O que ela diz quando termina as perguntas.</span>' +
+      '<textarea class="g-fecho" style="min-height:110px">' + esc(g.closing_message || '') + '</textarea></div>' +
+    '</div>' +
+
+    '<div class="row row-wrap" style="margin-top:12px;gap:16px">' +
+      '<label class="row small" style="gap:7px"><input type="checkbox" class="g-ativo" ' + (g.active ? 'checked' : '') + '> roteiro ligado</label>' +
+      '<label class="row small" style="gap:7px"><input type="checkbox" class="g-padrao" ' + (g.is_default ? 'checked' : '') + '> usar como padrão</label>' +
+      '<label class="row small" style="gap:7px"><input type="checkbox" class="g-auto" ' + (g.auto_on_apply ? 'checked' : '') + '> disparar ao receber candidatura</label>' +
+    '</div>' +
+
+    '<hr class="sep">' +
+    '<h3 style="font-size:14px;margin:0 0 12px">Perguntas <span class="muted" style="font-weight:400">(' + g.questions.length + ')</span></h3>' +
+    (g.questions.length ? g.questions.map(perguntaHtml).join('') :
+      '<p class="small muted" style="margin:0 0 12px">Nenhuma pergunta neste roteiro ainda.</p>') +
+    '<button class="btn btn-sm nova-pergunta" data-grupo="' + g.id + '">+ Adicionar pergunta</button>' +
+    '</div>';
+}
+
+function perguntaHtml(q) {
+  return '<div class="item" data-pergunta="' + q.id + '">' +
+    '<div class="row" style="gap:10px;align-items:flex-start">' +
+      '<div class="field" style="width:80px"><label>Ordem</label><input type="number" class="q-pos" value="' + q.position + '"></div>' +
+      '<div class="field" style="flex:1"><label>Pergunta que a Aurea faz</label>' +
+      '<textarea class="q-texto" style="min-height:56px">' + esc(q.question) + '</textarea></div>' +
+    '</div>' +
+    '<div class="field" style="margin-top:10px"><label>O que avaliar nessa resposta</label>' +
+    '<span class="hint">Só a Aurea lê isto — é o critério que ela usa para julgar. Ex: “requisito eliminatório, precisa ser sim”.</span>' +
+    '<textarea class="q-objetivo" style="min-height:56px">' + esc(q.objective || '') + '</textarea></div>' +
+    '<div class="row row-wrap" style="margin-top:12px;gap:14px">' +
+      '<button class="btn btn-sm salvar-pergunta">Salvar pergunta</button>' +
+      '<div class="field" style="width:110px;margin:0"><label style="margin:0 0 3px">Peso na nota</label>' +
+      '<input type="number" class="q-peso" value="' + (q.weight || 1) + '" min="1" max="5"></div>' +
+      '<span style="flex:1"></span>' +
+      '<button class="btn btn-sm btn-ghost excluir-pergunta">Excluir</button>' +
+    '</div></div>';
+}
+
+function ligaPrequal() {
+  document.getElementById('btn-novo-grupo').addEventListener('click', async function () {
+    const nome = prompt('Nome do novo roteiro:', 'Pré-qualificação — ');
+    if (!nome) return;
+    try { await api('prequal_group_save', { body: { name: nome, active: true } }); carregaPrequal(); }
+    catch (e) { toast(e.message, true); }
+  });
+
+  document.querySelectorAll('[data-grupo] .g-salvar').forEach(function (b) {
+    b.addEventListener('click', async function () {
+      const c = b.closest('[data-grupo]');
+      try {
+        await api('prequal_group_save', {
+          body: {
+            id: c.dataset.grupo,
+            name: c.querySelector('.g-nome').value,
+            description: c.querySelector('.g-desc').value,
+            opening_message: c.querySelector('.g-abertura').value,
+            closing_message: c.querySelector('.g-fecho').value,
+            active: c.querySelector('.g-ativo').checked,
+            is_default: c.querySelector('.g-padrao').checked,
+            auto_on_apply: c.querySelector('.g-auto').checked
+          }
+        });
+        toast('Roteiro salvo');
+        carregaPrequal();
+      } catch (e) { toast(e.message, true); }
+    });
+  });
+
+  document.querySelectorAll('[data-grupo] .g-excluir').forEach(function (b) {
+    b.addEventListener('click', async function () {
+      if (!confirm('Excluir este roteiro e todas as perguntas dele?')) return;
+      try { await api('prequal_group_delete', { body: { id: b.closest('[data-grupo]').dataset.grupo } }); carregaPrequal(); }
+      catch (e) { toast(e.message, true); }
+    });
+  });
+
+  document.querySelectorAll('.nova-pergunta').forEach(function (b) {
+    b.addEventListener('click', async function () {
+      const t = prompt('Qual pergunta a Aurea deve fazer?');
+      if (!t) return;
+      try { await api('prequal_question_save', { body: { group_id: b.dataset.grupo, question: t } }); carregaPrequal(); }
+      catch (e) { toast(e.message, true); }
+    });
+  });
+
+  document.querySelectorAll('.salvar-pergunta').forEach(function (b) {
+    b.addEventListener('click', async function () {
+      const c = b.closest('[data-pergunta]');
+      try {
+        await api('prequal_question_save', {
+          body: {
+            id: c.dataset.pergunta,
+            question: c.querySelector('.q-texto').value,
+            objective: c.querySelector('.q-objetivo').value,
+            position: Number(c.querySelector('.q-pos').value) || 1,
+            weight: Number(c.querySelector('.q-peso').value) || 1
+          }
+        });
+        toast('Pergunta salva');
+      } catch (e) { toast(e.message, true); }
+    });
+  });
+
+  document.querySelectorAll('.excluir-pergunta').forEach(function (b) {
+    b.addEventListener('click', async function () {
+      if (!confirm('Excluir esta pergunta?')) return;
+      try { await api('prequal_question_delete', { body: { id: b.closest('[data-pergunta]').dataset.pergunta } }); carregaPrequal(); }
+      catch (e) { toast(e.message, true); }
+    });
+  });
+}
+
+/* ============================================================
+   AUREA
+   ============================================================ */
+async function carregaAurea() {
+  const box = document.getElementById('painel-aurea');
+  box.innerHTML = '<div class="loading-page">Carregando…</div>';
+  let d, grupos = { grupos: [] };
+  try { d = await api('aurea'); grupos = await api('prequal'); }
+  catch (e) { box.innerHTML = '<div class="card">' + esc(e.message) + '</div>'; return; }
+
+  const c = d.config;
+  const rotStatus = {
+    em_andamento: ['tag-azul', 'conversando'], concluida: ['tag-verde', 'concluída'],
+    desistiu: ['tag-ambar', 'desistiu'], sem_interesse: ['tag', 'sem interesse'],
+    erro: ['tag-vermelho', 'erro'], aguardando: ['tag', 'aguardando']
+  };
+  const rotRec = { avancar: ['tag-verde', 'avançar'], talvez: ['tag-ambar', 'talvez'], descartar: ['tag-vermelho', 'descartar'] };
+
+  box.innerHTML =
+    '<div class="card"><div class="row" style="gap:14px;align-items:flex-start">' +
+      '<span class="stat-ico" style="width:44px;height:44px;background:var(--purple-tint);color:var(--purple)">' + ICO.check(20) + '</span>' +
+      '<div style="flex:1"><h2 style="margin:0">Aurea</h2>' +
+      '<p class="sub" style="margin:4px 0 0">A assistente que conversa com o candidato no WhatsApp, faz as perguntas do roteiro, ' +
+      'entende as respostas e entrega um resumo com nota para você.</p></div>' +
+      '<label class="row small" style="gap:7px;white-space:nowrap"><input type="checkbox" id="a-ativa" ' + (c.ativa ? 'checked' : '') + '> ligada</label>' +
+    '</div>' +
+
+    '<div class="row row-wrap" style="gap:10px;margin-top:16px">' +
+      '<span class="tag ' + (d.tem_chave_ia ? 'tag-verde' : 'tag-vermelho') + '">' +
+        (d.tem_chave_ia ? 'IA conectada' : 'falta ANTHROPIC_API_KEY') + '</span>' +
+      '<span class="tag ' + (d.providers.whatsapp ? 'tag-verde' : 'tag-ambar') + '">' +
+        (d.providers.whatsapp ? 'WhatsApp conectado' : 'WhatsApp não configurado') + '</span>' +
+      '<button class="btn btn-sm btn-ghost" id="a-testar">Testar conexão da IA</button>' +
+      '<span id="a-teste-res" class="small muted"></span>' +
+    '</div></div>' +
+
+    '<div class="card" style="margin-top:14px"><h2>Como ela se comporta</h2>' +
+    '<p class="sub">Este texto é a personalidade da Aurea. Ela segue isto em toda conversa.</p>' +
+    '<div class="grid grid-3">' +
+      '<div class="field"><label>Modelo de IA</label><input type="text" id="a-modelo" value="' + esc(c.modelo || '') + '"></div>' +
+      '<div class="field"><label>Instância do WhatsApp</label>' +
+      '<span class="hint">Vazio usa a dos Ajustes.</span>' +
+      '<input type="text" id="a-inst" value="' + esc(c.instancia_whatsapp || '') + '"></div>' +
+      '<div class="field"><label>Horário de envio</label>' +
+      '<div class="row" style="gap:8px"><input type="number" id="a-h1" value="' + (c.hora_inicio || 8) + '" style="width:70px">' +
+      '<span class="muted small">até</span><input type="number" id="a-h2" value="' + (c.hora_fim || 20) + '" style="width:70px"></div></div>' +
+    '</div>' +
+    '<div class="field" style="margin-top:12px"><label>Personalidade e regras</label>' +
+    '<textarea id="a-personalidade" style="min-height:220px;font-size:13.5px;line-height:1.6">' + esc(c.personalidade || '') + '</textarea></div>' +
+    '<div class="row row-wrap" style="margin-top:12px;gap:16px">' +
+      '<button class="btn btn-sm" id="a-salvar">Salvar</button>' +
+      '<label class="row small" style="gap:7px"><input type="checkbox" id="a-auto" ' + (c.auto_ao_receber_formulario ? 'checked' : '') + '> puxar conversa assim que chegar uma candidatura</label>' +
+      '<label class="row small" style="gap:7px"><input type="checkbox" id="a-horario" ' + (c.horario_comercial ? 'checked' : '') + '> só em horário comercial</label>' +
+    '</div></div>' +
+
+    '<div class="card" style="margin-top:14px"><h2>Importar lista e chamar</h2>' +
+    '<p class="sub">Cole a lista de candidatos do Indeed, LinkedIn, Catho ou de onde vier. Um por linha, no formato: ' +
+    '<code>Nome ; telefone ; e-mail ; vaga</code> — o e-mail e a vaga são opcionais.</p>' +
+    '<div class="grid grid-3">' +
+      '<div class="field"><label>Origem da lista</label>' +
+      '<select id="imp-origem"><option>Indeed</option><option>LinkedIn</option><option>Catho</option><option>Infojobs</option><option>Indicação</option><option>Outra</option></select></div>' +
+      '<div class="field"><label>Vaga (se todos forem da mesma)</label><input type="text" id="imp-vaga" placeholder="opcional"></div>' +
+      '<div class="field"><label>Roteiro da Aurea</label><select id="imp-grupo">' +
+        '<option value="">Usar o padrão</option>' +
+        grupos.grupos.map(function (g) { return '<option value="' + g.id + '">' + esc(g.name) + '</option>'; }).join('') +
+      '</select></div>' +
+    '</div>' +
+    '<div class="field" style="margin-top:12px"><label>A lista</label>' +
+    '<textarea id="imp-lista" style="min-height:150px;font-family:ui-monospace,monospace;font-size:13px" ' +
+    'placeholder="Maria Souza ; (11) 98877-6655 ; maria@email.com ; Social Media&#10;João Lima ; 11 97766-5544"></textarea></div>' +
+    '<div class="row row-wrap" style="margin-top:12px;gap:16px">' +
+      '<button class="btn" id="imp-enviar">Importar</button>' +
+      '<label class="row small" style="gap:7px"><input type="checkbox" id="imp-aurea" checked> a Aurea já chama cada um no WhatsApp</label>' +
+    '</div>' +
+    '<div id="imp-resultado"></div></div>' +
+
+    '<div class="card" style="margin-top:14px"><h2>Conversas</h2>' +
+    '<p class="sub">Tudo que a Aurea já conversou. Clique para ler a conversa inteira.</p>' +
+    (d.sessoes.length
+      ? '<table class="tbl"><thead><tr><th>Candidato</th><th>Roteiro</th><th>Situação</th><th>Respostas</th><th>Nota</th><th>Última mensagem</th></tr></thead><tbody>' +
+        d.sessoes.map(function (s2) {
+          const st = rotStatus[s2.status] || ['tag', s2.status];
+          const rec = s2.recommendation ? rotRec[s2.recommendation] : null;
+          return '<tr class="linha-sessao" data-id="' + s2.id + '" style="cursor:pointer">' +
+            '<td><strong>' + esc(s2.candidato) + '</strong><div class="small muted">' + esc(s2.telefone) + '</div></td>' +
+            '<td class="small">' + esc(s2.grupo) + '</td>' +
+            '<td><span class="tag ' + st[0] + '">' + st[1] + '</span>' +
+            (rec ? ' <span class="tag ' + rec[0] + '">' + rec[1] + '</span>' : '') + '</td>' +
+            '<td class="small">' + s2.total_respostas + '</td>' +
+            '<td class="small"><strong>' + (s2.score === null || s2.score === undefined ? '—' : s2.score) + '</strong></td>' +
+            '<td class="small muted" style="white-space:nowrap">' + dataBr(s2.last_message_at || s2.started_at) + '</td></tr>';
+        }).join('') + '</tbody></table>'
+      : '<p class="small muted" style="margin:0">Nenhuma conversa ainda.</p>') +
+    '</div>' +
+
+    '<div class="card" style="margin-top:14px"><h2>Ligar o WhatsApp na Aurea</h2>' +
+    '<p class="sub">Para ela <strong>receber</strong> as respostas, cole este endereço no webhook da sua Evolution API ' +
+    '(Instância → Webhook → marque o evento <code>MESSAGES_UPSERT</code>).</p>' +
+    '<div class="item"><div class="topo"><span class="t" style="word-break:break-all;font-family:ui-monospace,monospace;font-size:12.5px">' +
+    esc(d.webhook_url) + '</span>' +
+    '<button class="btn btn-sm btn-ghost" id="a-copiar-webhook">Copiar</button></div></div>' +
+    '<p class="small muted" style="margin:12px 0 0">Sem esse passo a Aurea envia as perguntas mas não escuta as respostas.</p>' +
+    '</div>';
+
+  ligaAurea(d);
+}
+
+function ligaAurea(d) {
+  document.getElementById('a-salvar').addEventListener('click', async function () {
+    try {
+      await api('aurea_config_save', {
+        body: {
+          value: {
+            ativa: document.getElementById('a-ativa').checked,
+            auto_ao_receber_formulario: document.getElementById('a-auto').checked,
+            horario_comercial: document.getElementById('a-horario').checked,
+            hora_inicio: Number(document.getElementById('a-h1').value) || 8,
+            hora_fim: Number(document.getElementById('a-h2').value) || 20,
+            modelo: document.getElementById('a-modelo').value.trim(),
+            instancia_whatsapp: document.getElementById('a-inst').value.trim(),
+            personalidade: document.getElementById('a-personalidade').value
+          }
+        }
+      });
+      toast('Aurea atualizada');
+    } catch (e) { toast(e.message, true); }
+  });
+
+  document.getElementById('a-testar').addEventListener('click', async function () {
+    const alvo = document.getElementById('a-teste-res');
+    alvo.textContent = 'testando…';
+    try {
+      const r = await api('aurea_test');
+      alvo.innerHTML = '<span style="color:var(--accent)">✓ ' + esc(r.resposta) + '</span>';
+    } catch (e) {
+      alvo.innerHTML = '<span style="color:var(--red)">✕ ' + esc(e.message) + '</span>';
+    }
+  });
+
+  document.getElementById('a-copiar-webhook').addEventListener('click', function () {
+    navigator.clipboard.writeText(d.webhook_url).then(function () { toast('Endereço copiado'); });
+  });
+
+  document.getElementById('imp-enviar').addEventListener('click', async function () {
+    const bruto = document.getElementById('imp-lista').value.trim();
+    if (!bruto) return toast('Cole a lista primeiro', true);
+    const rows = bruto.split('\n').map(function (l) { return l.trim(); }).filter(Boolean).map(function (l) {
+      const p = l.split(/[;\t]/).map(function (x) { return x.trim(); });
+      return { name: p[0], phone: p[1], email: p[2] || '', role: p[3] || '' };
+    });
+    const btn = this;
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Importando…';
+    try {
+      const r = await api('import_candidates', {
+        body: {
+          rows: rows,
+          source: document.getElementById('imp-origem').value,
+          role: document.getElementById('imp-vaga').value.trim(),
+          group_id: document.getElementById('imp-grupo').value || null,
+          iniciar_aurea: document.getElementById('imp-aurea').checked,
+          forcar: true
+        }
+      });
+      const falhas = (r.disparos || []).filter(function (x) { return !x.ok; });
+      document.getElementById('imp-resultado').innerHTML =
+        '<div class="alert alert-ok" style="margin-top:14px"><strong>' + r.criados.length + ' importado(s)</strong>' +
+        (r.pulados.length ? ' · ' + r.pulados.length + ' pulado(s): ' +
+          esc(r.pulados.map(function (p) { return (p.linha.name || '?') + ' (' + p.motivo + ')'; }).join(', ')) : '') +
+        (r.disparos.length ? '<br>Aurea chamou ' + (r.disparos.length - falhas.length) + ' de ' + r.disparos.length + '.' : '') +
+        (falhas.length ? '<br><span style="opacity:.85">Não deu para chamar: ' +
+          esc(falhas.map(function (f) { return f.nome + ' — ' + f.error; }).join(' · ')) + '</span>' : '') +
+        '</div>';
+      document.getElementById('imp-lista').value = '';
+      carregaBoard();
+    } catch (e) {
+      document.getElementById('imp-resultado').innerHTML =
+        '<div class="alert alert-erro" style="margin-top:14px">' + esc(e.message) + '</div>';
+    }
+    btn.disabled = false; btn.textContent = 'Importar';
+  });
+
+  document.querySelectorAll('.linha-sessao').forEach(function (tr) {
+    tr.addEventListener('click', function () { abreConversa(tr.dataset.id); });
+  });
+}
+
+async function abreConversa(id) {
+  document.getElementById('fundo').style.display = 'block';
+  const gv = document.getElementById('gaveta');
+  gv.style.display = 'flex';
+  gv.classList.remove('aberta'); void gv.offsetWidth; gv.classList.add('aberta');
+  document.getElementById('g-corpo').innerHTML = '<div class="loading-page">Carregando…</div>';
+
+  let d;
+  try { d = await api('aurea_session', { params: { id: id } }); }
+  catch (e) { return toast(e.message, true); }
+
+  const s2 = d.sessao, c = d.candidato || {};
+  document.getElementById('g-nome').textContent = c.name || 'Conversa';
+  const legivel = { em_andamento: 'conversando agora', concluida: 'conversa concluída',
+    desistiu: 'candidato desistiu', sem_interesse: 'sem interesse', erro: 'deu erro', aguardando: 'aguardando' };
+  document.getElementById('g-sub').textContent =
+    (c.role_applied || 'sem vaga') + ' · ' + (c.phone || '') + ' · ' + (legivel[s2.status] || s2.status);
+
+  const bolhas = d.mensagens.map(function (m) {
+    const eu = m.role === 'aurea';
+    return '<div class="bolha-msg ' + (eu ? 'aurea' : 'cand') + '">' +
+      '<div class="txt">' + esc(m.text).replace(/\n/g, '<br>') + '</div>' +
+      '<div class="hora">' + (eu ? 'Aurea' : (c.name || 'candidato').split(' ')[0]) + ' · ' + dataBr(m.created_at) + '</div>' +
+      '</div>';
+  }).join('');
+
+  document.getElementById('g-corpo').innerHTML =
+    (s2.summary
+      ? '<div class="card"><h2>O que a Aurea concluiu</h2>' +
+        '<div class="row row-wrap" style="gap:12px;margin:10px 0 14px">' +
+        '<div class="stat" style="min-width:110px"><span><span class="n" style="display:block">' +
+          (s2.score === null || s2.score === undefined ? '—' : s2.score) + '</span><span class="l">nota de 0 a 10</span></span></div>' +
+        '<div class="stat" style="min-width:150px"><span><span class="n" style="display:block;font-size:19px">' +
+          esc({ avancar: 'Avançar', talvez: 'Talvez', descartar: 'Descartar' }[s2.recommendation] || '—') +
+          '</span><span class="l">recomendação</span></span></div></div>' +
+        '<p style="margin:0;white-space:pre-wrap;line-height:1.6;font-size:14.5px">' + esc(s2.summary) + '</p></div>'
+      : '<div class="card"><div class="alert alert-info" style="margin:0">Esta conversa ainda não foi encerrada, então a Aurea não gerou o resumo.</div></div>') +
+
+    (s2.error ? '<div class="card"><div class="alert alert-erro" style="margin:0"><strong>Erro registrado</strong><br>' + esc(s2.error) + '</div></div>' : '') +
+
+    '<div class="card"><h2>A conversa</h2>' +
+    '<p class="sub">' + d.mensagens.length + ' mensagem(ns) · começou em ' + dataBr(s2.started_at) + '</p>' +
+    (bolhas || '<p class="small muted" style="margin:0">Nenhuma mensagem.</p>') + '</div>';
+}
+
+/* ============================================================
+   GATILHO AO CONCLUIR
+   ============================================================ */
+async function gatilhoConcluido(c) {
+  if (!confirm(c.name.split(' ')[0] + ' foi para Concluído.\n\nEnviar agora as boas-vindas por e-mail, WhatsApp e SMS?\n' +
+    'Isso também libera a área de integração e o link para ele criar a senha.')) return;
+  try {
+    const r = await api('send', { body: { candidate_id: c.id, set: 'welcome' } });
+    const linhas = r.results.map(function (x) { return x.channel + ': ' + x.status + (x.error ? ' (' + x.error + ')' : ''); });
+    alert('Resultado do envio:\n\n' + linhas.join('\n'));
+    carregaBoard();
+  } catch (e) { toast(e.message, true); }
+}
+
 /* ============================================================
    inicio
    ============================================================ */
 async function iniciar() {
   document.getElementById('tela-login').style.display = 'none';
   document.getElementById('app').style.display = 'block';
-  try { await carregaBoard(); }
+  try { await carregaBoard(); await carregaDashboard(); }
   catch (e) { if (e.message !== 'sessao expirada') toast(e.message, true); }
 }
 

@@ -8,6 +8,7 @@ const db = require('./_lib/db');
 const u = require('./_lib/util');
 const disc = require('./_lib/disc');
 const send = require('./_lib/send');
+const aurea = require('./_lib/aurea');
 
 const CAMPOS_FORM = [
   'name', 'email', 'phone', 'cpf', 'birth_date', 'city', 'state', 'role_applied',
@@ -26,7 +27,18 @@ async function candidateByToken(token) {
   return db.selectOne('candidates', { token: 'eq.' + token, select: '*' });
 }
 
+// Aceita os dois caminhos: sessao logada (area de integracao) ou link pessoal.
+async function candidateFrom(req, token) {
+  const cid = u.candidateFromRequest(req);
+  if (cid) {
+    const c = await db.selectOne('candidates', { id: 'eq.' + cid, select: '*' });
+    if (c) return c;
+  }
+  return candidateByToken(token);
+}
+
 module.exports = async function handler(req, res) {
+  u.setBaseFromReq(req);
   const action = (req.query && req.query.action) ||
     new URL(req.url, 'http://x').searchParams.get('action') || '';
   const q = (req.query && Object.keys(req.query).length)
@@ -66,7 +78,7 @@ module.exports = async function handler(req, res) {
         return u.fail(res, 409, 'Ja recebemos uma candidatura com este e-mail. Se precisar atualizar alguma informacao, responda o e-mail de confirmacao que enviamos.');
       }
 
-      const row = { token: u.candidateToken(), stage_key: 'inscrito', source: 'formulario' };
+      const row = { token: u.candidateToken(), stage_key: 'triagem', source: 'formulario', source_detail: 'Formulário do site' };
       CAMPOS_FORM.forEach(function (c) {
         if (body[c] !== undefined && body[c] !== null) {
           row[c] = c === 'email' ? email : String(body[c]).trim().slice(0, 4000);
@@ -79,7 +91,7 @@ module.exports = async function handler(req, res) {
 
       const cand = await db.insert('candidates', row);
       await db.insert('stage_history', {
-        candidate_id: cand.id, from_stage: null, to_stage: 'inscrito',
+        candidate_id: cand.id, from_stage: null, to_stage: 'triagem',
         note: 'Formulario recebido'
       });
 
@@ -97,7 +109,17 @@ module.exports = async function handler(req, res) {
         });
       }
 
-      return u.ok(res, { message: 'Candidatura recebida com sucesso!', id: cand.id });
+      // a Aurea puxa conversa no WhatsApp, se estiver ligada
+      let aureaOk = false;
+      try {
+        const cfgA = await aurea.config();
+        if (cfgA.ativa && cfgA.auto_ao_receber_formulario) {
+          const ra = await aurea.iniciar(cand, null, {});
+          aureaOk = !!ra.ok;
+        }
+      } catch (e) { console.error('[aurea/apply]', e.message); }
+
+      return u.ok(res, { message: 'Candidatura recebida com sucesso!', id: cand.id, aurea: aureaOk });
     }
 
     // ---------------------------------------------------- dados do candidato
@@ -266,10 +288,67 @@ module.exports = async function handler(req, res) {
       return u.ok(res, { message: 'Respostas enviadas!', pendentes: pendentes });
     }
 
-    // ---------------------------------------------------- AREA DE MEMBROS
-    if (action === 'portal') {
+    // ---------------------------------------------------- CONTA DO CANDIDATO
+    if (action === 'conta_info') {
       const cand = await candidateByToken(q.t);
       if (!cand) return u.fail(res, 404, 'Link invalido ou expirado.');
+      if (!cand.member_access) {
+        return u.fail(res, 403, 'Sua area de integracao ainda nao foi liberada.');
+      }
+      return u.ok(res, {
+        nome: cand.name, primeiro_nome: u.firstName(cand.name), email: cand.email,
+        ja_tem_senha: !!cand.password_hash
+      });
+    }
+
+    if (action === 'conta_criar_senha') {
+      if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
+      const body = await u.readBody(req);
+      const cand = await candidateByToken(body.t);
+      if (!cand) return u.fail(res, 404, 'Link invalido ou expirado.');
+      if (!cand.member_access) return u.fail(res, 403, 'Sua area de integracao ainda nao foi liberada.');
+      const senha = String(body.password || '');
+      if (senha.length < 6) return u.fail(res, 400, 'A senha precisa ter pelo menos 6 caracteres.');
+
+      const h = u.hashPassword(senha);
+      await db.update('candidates', {
+        password_hash: h.hash, password_salt: h.salt,
+        password_set_at: new Date().toISOString(),
+        last_login_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }, { id: 'eq.' + cand.id });
+      await db.insert('stage_history', {
+        candidate_id: cand.id, from_stage: cand.stage_key, to_stage: cand.stage_key,
+        note: cand.password_hash ? 'Candidato redefiniu a senha de acesso' : 'Candidato criou a senha de acesso'
+      });
+      return u.ok(res, { token: u.signCandidateSession(cand.id), nome: cand.name });
+    }
+
+    if (action === 'entrar') {
+      if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
+      const body = await u.readBody(req);
+      const email = String(body.email || '').trim().toLowerCase();
+      const senha = String(body.password || '');
+      const generico = 'E-mail ou senha incorretos.';
+      if (!email || !senha) return u.fail(res, 400, generico);
+
+      const cand = await db.selectOne('candidates', {
+        email: 'eq.' + email, archived: 'eq.false', select: '*'
+      });
+      if (!cand || !cand.password_hash) return u.fail(res, 401, generico);
+      if (!u.checkPassword(senha, cand.password_hash, cand.password_salt)) {
+        return u.fail(res, 401, generico);
+      }
+      if (!cand.member_access) return u.fail(res, 403, 'Sua area de integracao ainda nao foi liberada.');
+
+      await db.update('candidates', { last_login_at: new Date().toISOString() }, { id: 'eq.' + cand.id });
+      return u.ok(res, { token: u.signCandidateSession(cand.id), nome: cand.name });
+    }
+
+    // ---------------------------------------------------- AREA DE MEMBROS
+    if (action === 'portal') {
+      const cand = await candidateFrom(req, q.t);
+      if (!cand) return u.fail(res, 401, 'Entre com o seu e-mail e senha para acessar.');
       if (!cand.member_access) {
         return u.fail(res, 403, 'Sua area de integracao ainda nao foi liberada. Fique de olho no seu e-mail e WhatsApp.');
       }
@@ -299,7 +378,7 @@ module.exports = async function handler(req, res) {
     if (action === 'lesson_done') {
       if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
       const body = await u.readBody(req);
-      const cand = await candidateByToken(body.t);
+      const cand = await candidateFrom(req, body.t);
       if (!cand || !cand.member_access) return u.fail(res, 403, 'Acesso nao liberado.');
       if (!body.lesson_id) return u.fail(res, 400, 'Aula nao informada.');
       if (body.completed === false) {

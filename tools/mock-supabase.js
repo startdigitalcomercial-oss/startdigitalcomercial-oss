@@ -45,24 +45,22 @@ const MOD2 = '22222222-2222-4222-8222-222222222222';
 
 const DB = {
   stages: [
-    ['inscrito', 'Formulário recebido', '#0ea5e9', 1, 'normal'],
-    ['triagem', 'Triagem', '#6366f1', 2, 'normal'],
-    ['entrevista', 'Entrevista inicial', '#8b5cf6', 3, 'normal'],
-    ['teste_pratico', 'Teste prático', '#a855f7', 4, 'normal'],
-    ['teste_disc', 'Teste DISC', '#ec4899', 5, 'normal'],
-    ['quiz', 'Quiz supervisionado', '#f59e0b', 6, 'normal'],
-    ['entrevista_final', 'Entrevista final', '#14b8a6', 7, 'normal'],
-    ['aprovado', 'Aprovado / Boas-vindas', '#22c55e', 8, 'normal'],
-    ['contratado', 'Contratado', '#16a34a', 9, 'hired'],
-    ['reprovado', 'Não seguiu', '#ef4444', 10, 'rejected']
+    ['triagem', 'Triagem', '#0ea5e9', 1, 'normal'],
+    ['entrevista', 'Entrevista', '#8b5cf6', 2, 'normal'],
+    ['teste', 'Teste', '#f59e0b', 3, 'normal'],
+    ['concluido', 'Concluído', '#00a15c', 4, 'hired'],
+    ['nao_seguiu', 'Não seguiu', '#8e8e93', 5, 'rejected']
   ].map(function (r, i) { return { id: i + 1, key: r[0], name: r[1], color: r[2], position: r[3], kind: r[4] }; }),
 
   settings: [
     { key: 'company', value: { name: 'StartDigital', primary_color: '#22c55e', logo_url: '', site: '', support_email: 'startdigitalcomercial@gmail.com' } },
+    { key: 'aurea', value: { nome: 'Aurea', ativa: true, auto_ao_receber_formulario: true, horario_comercial: false, hora_inicio: 8, hora_fim: 20, modelo: 'claude-sonnet-4-6', instancia_whatsapp: '', personalidade: 'Você é a Aurea, assistente de recrutamento da StartDigital. Fale em português do Brasil, informal e curto.' } },
+    { key: 'origens', value: { lista: ['Formulário do site', 'Indeed', 'LinkedIn', 'Catho'] } },
     { key: 'form', value: { headline: 'Trabalhe na StartDigital', subhead: 'Preencha o formulário abaixo. Levamos o seu tempo a sério: leia com calma e responda com sinceridade.', roles: ['Social Media', 'Gestor de Tráfego', 'Designer', 'Redator / Copywriter', 'Comercial / SDR', 'Atendimento / CS', 'Outra'], open: true } }
   ],
 
   message_templates: [
+    { key: 'welcome_email_senha', channel: 'email', name: 'Boas-vindas com criação de senha', subject: 'Bem-vindo(a) à StartDigital, {{primeiro_nome}}!', body: 'Olá {{primeiro_nome}}!\n\nVocê foi aprovado(a) para {{vaga}}.\n\nCrie a sua senha aqui:\n{{link_senha}}\n\nSeu e-mail de acesso: {{email}}\n\nEquipe StartDigital' },
     { key: 'welcome_email', channel: 'email', name: 'Boas-vindas — E-mail', subject: 'Bem-vindo(a) à StartDigital, {{primeiro_nome}}!', body: 'Olá {{primeiro_nome}}, tudo bem?\n\nVocê foi aprovado(a) para a vaga de {{vaga}}.\n\nAcesse a sua área de integração:\n{{link_portal}}\n\nEquipe StartDigital' },
     { key: 'welcome_whatsapp', channel: 'whatsapp', name: 'Boas-vindas — WhatsApp', subject: null, body: 'Oi {{primeiro_nome}}! *Você foi aprovado(a)* para {{vaga}}.\n\n👉 {{link_portal}}' },
     { key: 'welcome_sms', channel: 'sms', name: 'Boas-vindas — SMS', subject: null, body: 'StartDigital: {{primeiro_nome}}, voce foi aprovado(a)! Acesse: {{link_portal}}' },
@@ -105,6 +103,31 @@ const DB = {
     { module_id: MOD2, position: 2, title: 'Aula 4 — Rotinas da Start no remoto', description: 'Horários, reuniões, ferramentas e o ritual do dia a dia online.', duration: '10 min', video_url: null, materials: [] }
   ].map(function (l) { return Object.assign({ id: uuid(), published: true, created_at: agora() }, l); }),
 
+  prequal_groups: [{
+    id: 'g-padrao', name: 'Pré-qualificação geral',
+    description: 'Perguntas iniciais para qualquer vaga.', role_target: null,
+    active: true, is_default: true, auto_on_apply: true,
+    opening_message: 'Oi {{primeiro_nome}}! Aqui é a Aurea, da *StartDigital*. Posso te fazer umas perguntas rápidas?',
+    closing_message: 'Prontinho, {{primeiro_nome}}! Obrigada. Já encaminhei tudo para o time.',
+    created_at: agora()
+  }],
+
+  prequal_questions: [
+    ['Me conta rapidinho: qual foi a sua última experiência de trabalho e por quanto tempo?', 'Tempo de casa e estabilidade.', 1],
+    ['Você já trabalhou com marketing digital? Com o que exatamente?', 'Experiência na área e frente de atuação.', 2],
+    ['Você tem computador próprio e internet estável para trabalhar 100% remoto?', 'Requisito eliminatório.', 3],
+    ['Qual a sua disponibilidade de horário e quando poderia começar?', 'Compatibilidade e prazo de entrada.', 2],
+    ['Qual a sua pretensão salarial?', 'Cabe no orçamento da vaga.', 2],
+    ['Por que você quer trabalhar na StartDigital?', 'Interesse real e pesquisa prévia.', 1]
+  ].map(function (q, i) {
+    return {
+      id: 'q' + (i + 1), group_id: 'g-padrao', position: i + 1,
+      question: q[0], objective: q[1], required: true, weight: q[2]
+    };
+  }),
+
+  prequal_sessions: [],
+  prequal_messages: [],
   candidates: [],
   stage_history: [],
   disc_results: [],
@@ -115,7 +138,7 @@ const DB = {
 
 /* ---------------- defaults por tabela ---------------- */
 const DEFAULTS = {
-  candidates: function () { return { id: uuid(), extra: {}, source: 'formulario', stage_key: 'inscrito', rating: null, notes: null, member_access: false, archived: false, created_at: agora(), updated_at: agora() }; },
+  candidates: function () { return { id: uuid(), extra: {}, source: 'formulario', source_detail: null, stage_key: 'triagem', password_hash: null, password_salt: null, rating: null, notes: null, member_access: false, archived: false, created_at: agora(), updated_at: agora() }; },
   stage_history: function () { return { id: seq('stage_history'), created_at: agora(), note: null, from_stage: null, to_stage: null }; },
   disc_results: function () { return { id: uuid(), answers: {}, created_at: agora() }; },
   quiz_attempts: function () { return { id: uuid(), answers: {}, score: null, max_score: null, percent: null, passed: null, focus_lost: 0, paste_blocked: 0, integrity_flags: [], started_at: agora(), finished_at: null }; },
@@ -127,7 +150,11 @@ const DEFAULTS = {
   quiz_questions: function () { return { id: uuid(), kind: 'single', options: [], correct: [], points: 1, position: 1 }; },
   disc_questions: function () { return { id: seq('disc_questions'), active: true }; },
   settings: function () { return { value: {} }; },
-  message_templates: function () { return { id: seq('message_templates'), updated_at: agora() }; }
+  message_templates: function () { return { id: seq('message_templates'), updated_at: agora() }; },
+  prequal_groups: function () { return { id: uuid(), active: true, is_default: false, auto_on_apply: true, created_at: agora() }; },
+  prequal_questions: function () { return { id: uuid(), position: 1, required: true, weight: 1, objective: null }; },
+  prequal_sessions: function () { return { id: uuid(), channel: 'whatsapp', status: 'aguardando', current_index: 0, answers: [], score: null, recommendation: null, summary: null, last_message_at: null, started_at: agora(), finished_at: null, error: null }; },
+  prequal_messages: function () { return { id: seq('prequal_messages'), created_at: agora() }; }
 };
 
 const contadores = {};
@@ -154,6 +181,10 @@ function combina(row, campo, expr) {
     return String(val) === String(alvo);
   }
   if (expr.startsWith('neq.')) return String(val) !== String(norm(expr.slice(4)));
+  if (expr.startsWith('like.')) {
+    const padrao = expr.slice(5).replace(/[.*+?^${}()|[\]\\]/g, function (m) { return m === '*' ? m : '\\' + m; });
+    return new RegExp('^' + padrao.replace(/\*/g, '.*') + '$').test(String(val == null ? '' : val));
+  }
   return true;
 }
 
@@ -234,6 +265,7 @@ const server = http.createServer(function (req, res) {
           if (achado) { Object.assign(achado, r); return achado; }
         }
         const novo = Object.assign(DEFAULTS[tabela] ? DEFAULTS[tabela]() : { id: uuid() }, r);
+        if (tabela === 'candidates') novo.phone_digits = String(novo.phone || '').replace(/\D/g, '');
         DB[tabela].push(novo);
         return novo;
       });
@@ -242,7 +274,10 @@ const server = http.createServer(function (req, res) {
 
     if (req.method === 'PATCH') {
       const alvos = aplica(DB[tabela], params);
-      alvos.forEach(function (r) { Object.assign(r, body); });
+      alvos.forEach(function (r) {
+        Object.assign(r, body);
+        if (tabela === 'candidates') r.phone_digits = String(r.phone || '').replace(/\D/g, '');
+      });
       return responder(200, alvos);
     }
 

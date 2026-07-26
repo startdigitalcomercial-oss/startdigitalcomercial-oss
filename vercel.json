@@ -1,18 +1,55 @@
 {
   "rewrites": [
-    { "source": "/vaga", "destination": "/vaga.html" },
-    { "source": "/candidatura", "destination": "/vaga.html" },
-    { "source": "/admin", "destination": "/admin.html" },
-    { "source": "/disc", "destination": "/disc.html" },
-    { "source": "/teste", "destination": "/disc.html" },
-    { "source": "/prova", "destination": "/prova.html" },
-    { "source": "/portal", "destination": "/portal.html" },
-    { "source": "/integracao", "destination": "/portal.html" }
+    {
+      "source": "/vaga",
+      "destination": "/vaga.html"
+    },
+    {
+      "source": "/candidatura",
+      "destination": "/vaga.html"
+    },
+    {
+      "source": "/admin",
+      "destination": "/admin.html"
+    },
+    {
+      "source": "/disc",
+      "destination": "/disc.html"
+    },
+    {
+      "source": "/teste",
+      "destination": "/disc.html"
+    },
+    {
+      "source": "/prova",
+      "destination": "/prova.html"
+    },
+    {
+      "source": "/portal",
+      "destination": "/portal.html"
+    },
+    {
+      "source": "/integracao",
+      "destination": "/portal.html"
+    },
+    {
+      "source": "/entrar",
+      "destination": "/entrar.html"
+    },
+    {
+      "source": "/criar-senha",
+      "destination": "/criar-senha.html"
+    }
   ],
   "headers": [
     {
       "source": "/api/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
     }
   ]
 }

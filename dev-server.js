@@ -31,14 +31,16 @@ const MIME = {
 };
 
 const ROTAS = {
-  '/vaga': '/index.html',
-  '/candidatura': '/index.html',
+  '/vaga': '/vaga.html',
+  '/candidatura': '/vaga.html',
   '/admin': '/admin.html',
   '/disc': '/disc.html',
   '/teste': '/disc.html',
   '/prova': '/prova.html',
   '/portal': '/portal.html',
-  '/integracao': '/portal.html'
+  '/integracao': '/portal.html',
+  '/entrar': '/entrar.html',
+  '/criar-senha': '/criar-senha.html'
 };
 
 const server = http.createServer(async function (req, res) {

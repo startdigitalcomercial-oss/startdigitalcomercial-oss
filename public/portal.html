@@ -40,7 +40,8 @@
   <div class="container-wide topbar-inner">
     <div class="brand"><span class="dot"></span> StartDigital <small>Integração</small></div>
     <div class="spacer"></div>
-    <div class="small" id="ola" style="opacity:.75"></div>
+    <div class="small muted" id="ola"></div>
+    <button class="btn btn-sm btn-ghost" id="btn-sair" style="margin-left:12px">Sair</button>
   </div>
 </div>
 
@@ -99,16 +100,24 @@
 
 <script>
 const TOKEN = new URLSearchParams(location.search).get('t') || '';
+const SESSAO = sessionStorage.getItem('start_rh_candidato') || '';
 let MODULOS = [], AULAS = [], atual = null;
 
 function api(action, opts) {
   opts = opts || {};
   const url = '/api/public?action=' + action + (opts.method ? '' : '&t=' + encodeURIComponent(TOKEN));
+  const headers = { 'Content-Type': 'application/json' };
+  if (SESSAO) headers.Authorization = 'Bearer ' + SESSAO;
   return fetch(url, {
     method: opts.method || 'GET',
-    headers: { 'Content-Type': 'application/json' },
+    headers: headers,
     body: opts.body ? JSON.stringify(Object.assign({ t: TOKEN }, opts.body)) : undefined
   }).then(function (r) { return r.json(); });
+}
+
+function sair() {
+  sessionStorage.removeItem('start_rh_candidato');
+  location.href = '/entrar';
 }
 
 function esc(s) {
@@ -240,15 +249,14 @@ document.getElementById('btn-proxima').addEventListener('click', function () {
   if (i < AULAS.length - 1) abrir(AULAS[i + 1]);
 });
 
+document.getElementById('btn-sair').addEventListener('click', sair);
+
 (async function init() {
-  if (!TOKEN) {
-    document.getElementById('carregando').style.display = 'none';
-    document.getElementById('msg-erro').textContent = 'Link inválido. Use o link pessoal que a nossa equipe enviou para você por e-mail ou WhatsApp.';
-    return document.getElementById('tela-erro').style.display = 'block';
-  }
+  if (!TOKEN && !SESSAO) { location.replace('/entrar'); return; }
   const r = await api('portal');
   document.getElementById('carregando').style.display = 'none';
   if (!r.ok) {
+    if (!SESSAO) { location.replace('/entrar'); return; }
     document.getElementById('msg-erro').textContent = r.error || 'Não foi possível abrir a sua área.';
     return document.getElementById('tela-erro').style.display = 'block';
   }

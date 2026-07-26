@@ -8,11 +8,13 @@ const db = require('./_lib/db');
 const u = require('./_lib/util');
 const disc = require('./_lib/disc');
 const send = require('./_lib/send');
+const aurea = require('./_lib/aurea');
+const webhook = require('./webhook');
 
 const SESSION_HOURS = 12;
 
 const CONJUNTOS = {
-  welcome: { email: 'welcome_email', whatsapp: 'welcome_whatsapp', sms: 'welcome_sms' },
+  welcome: { email: 'welcome_email_senha', whatsapp: 'welcome_whatsapp', sms: 'welcome_sms' },
   disc_invite: { email: 'disc_invite_email', whatsapp: 'disc_invite_whatsapp', sms: 'disc_invite_sms' },
   quiz_invite: { email: 'quiz_invite_email', whatsapp: 'quiz_invite_whatsapp', sms: 'quiz_invite_sms' },
   reject: { email: 'reject_email' }
@@ -45,6 +47,7 @@ async function renderSet(candidate, setName, channels) {
 }
 
 module.exports = async function handler(req, res) {
+  u.setBaseFromReq(req);
   const params = (req.query && Object.keys(req.query).length)
     ? req.query
     : Object.fromEntries(new URL(req.url, 'http://x').searchParams.entries());
@@ -137,8 +140,20 @@ module.exports = async function handler(req, res) {
         candidate_id: 'eq.' + cand.id, order: 'created_at.desc', select: '*', limit: 60
       });
 
+      const prequal = await db.selectOne('prequal_sessions', {
+        candidate_id: 'eq.' + cand.id, order: 'started_at.desc', select: '*'
+      });
+      let prequalMsgs = [];
+      if (prequal) {
+        prequalMsgs = await db.select('prequal_messages', {
+          session_id: 'eq.' + prequal.id, order: 'created_at.asc', select: '*', limit: 200
+        });
+      }
+
       return u.ok(res, {
         candidate: cand,
+        prequal: prequal,
+        prequal_messages: prequalMsgs,
         links: u.candidateLinks(cand),
         disc: discDetail,
         disc_profiles: disc.PROFILES,
@@ -401,19 +416,19 @@ module.exports = async function handler(req, res) {
       // O conjunto de boas-vindas libera a area de integracao
       if ((body.set || 'welcome') === 'welcome' && body.grant_access !== false) {
         const patch = { member_access: true, updated_at: new Date().toISOString() };
-        if (cand.stage_key !== 'contratado') patch.stage_key = 'aprovado';
+        if (cand.stage_key !== 'concluido') patch.stage_key = 'concluido';
         await db.update('candidates', patch, { id: 'eq.' + cand.id });
-        if (cand.stage_key !== 'aprovado' && cand.stage_key !== 'contratado') {
+        if (cand.stage_key !== 'concluido') {
           await db.insert('stage_history', {
-            candidate_id: cand.id, from_stage: cand.stage_key, to_stage: 'aprovado',
+            candidate_id: cand.id, from_stage: cand.stage_key, to_stage: 'concluido',
             note: 'Boas-vindas enviadas e area de integracao liberada'
           });
         }
       }
       if ((body.set) === 'reject') {
-        await db.update('candidates', { stage_key: 'reprovado', updated_at: new Date().toISOString() }, { id: 'eq.' + cand.id });
+        await db.update('candidates', { stage_key: 'nao_seguiu', updated_at: new Date().toISOString() }, { id: 'eq.' + cand.id });
         await db.insert('stage_history', {
-          candidate_id: cand.id, from_stage: cand.stage_key, to_stage: 'reprovado', note: 'Retorno negativo enviado'
+          candidate_id: cand.id, from_stage: cand.stage_key, to_stage: 'nao_seguiu', note: 'Retorno negativo enviado'
         });
       }
 
@@ -446,6 +461,265 @@ module.exports = async function handler(req, res) {
       if (!body.key) return u.fail(res, 400, 'Chave nao informada.');
       const row = await db.upsert('settings', { key: body.key, value: body.value || {} }, 'key');
       return u.ok(res, { setting: row });
+    }
+
+    // ==========================================================
+    // DASHBOARD
+    // ==========================================================
+    if (action === 'dashboard') {
+      const stages = await db.select('stages', { order: 'position.asc', select: '*' });
+      const cands = await db.select('candidates', {
+        archived: 'eq.false', select: 'id,stage_key,source,source_detail,created_at,member_access'
+      });
+      const sessoes = await db.select('prequal_sessions', { select: 'status,score,recommendation,started_at' });
+
+      const hoje = new Date();
+      const diaISO = function (d) { return d.toISOString().slice(0, 10); };
+      const dias = [];
+      for (let i = 13; i >= 0; i--) {
+        const d = new Date(hoje.getTime() - i * 86400000);
+        dias.push({ dia: diaISO(d), total: 0 });
+      }
+      const porDia = {}; dias.forEach(function (d) { porDia[d.dia] = d; });
+      cands.forEach(function (c) {
+        const k = String(c.created_at || '').slice(0, 10);
+        if (porDia[k]) porDia[k].total += 1;
+      });
+
+      const funil = stages.map(function (st) {
+        return {
+          key: st.key, nome: st.name, cor: st.color,
+          total: cands.filter(function (c) { return c.stage_key === st.key; }).length
+        };
+      });
+
+      const origens = {};
+      cands.forEach(function (c) {
+        const o = c.source_detail || c.source || 'Formulário do site';
+        origens[o] = (origens[o] || 0) + 1;
+      });
+      const listaOrigens = Object.keys(origens).map(function (k) { return { nome: k, total: origens[k] }; })
+        .sort(function (a, b) { return b.total - a.total; }).slice(0, 6);
+
+      const ultimos7 = cands.filter(function (c) {
+        return new Date(c.created_at).getTime() > hoje.getTime() - 7 * 86400000;
+      }).length;
+      const anteriores7 = cands.filter(function (c) {
+        const t = new Date(c.created_at).getTime();
+        return t <= hoje.getTime() - 7 * 86400000 && t > hoje.getTime() - 14 * 86400000;
+      }).length;
+
+      const concluidas = sessoes.filter(function (x) { return x.status === 'concluida'; });
+      const notas = concluidas.filter(function (x) { return x.score !== null && x.score !== undefined; });
+      const media = notas.length
+        ? Math.round((notas.reduce(function (t, x) { return t + Number(x.score); }, 0) / notas.length) * 10) / 10
+        : null;
+
+      return u.ok(res, {
+        indicadores: {
+          ativos: cands.length,
+          novos_7d: ultimos7,
+          variacao_7d: anteriores7 ? Math.round(((ultimos7 - anteriores7) / anteriores7) * 100) : null,
+          concluidos: cands.filter(function (c) { return c.stage_key === 'concluido'; }).length,
+          prequal_em_andamento: sessoes.filter(function (x) { return x.status === 'em_andamento'; }).length,
+          prequal_concluidas: concluidas.length,
+          prequal_nota_media: media,
+          prequal_recomendados: concluidas.filter(function (x) { return x.recommendation === 'avancar'; }).length
+        },
+        serie_novos: dias,
+        funil: funil,
+        origens: listaOrigens
+      });
+    }
+
+    // ==========================================================
+    // PRÉ-QUALIFICAÇÃO (grupos e perguntas)
+    // ==========================================================
+    if (action === 'prequal') {
+      const grupos = await db.select('prequal_groups', { order: 'created_at.asc', select: '*' });
+      const perguntas = await db.select('prequal_questions', { order: 'position.asc', select: '*' });
+      return u.ok(res, {
+        grupos: grupos.map(function (g) {
+          return Object.assign({}, g, {
+            questions: perguntas.filter(function (q) { return q.group_id === g.id; })
+          });
+        })
+      });
+    }
+
+    if (action === 'prequal_group_save') {
+      const body = await u.readBody(req);
+      const patch = {};
+      ['name', 'description', 'role_target', 'active', 'is_default', 'auto_on_apply',
+       'opening_message', 'closing_message'].forEach(function (k) {
+        if (body[k] !== undefined) patch[k] = body[k];
+      });
+      if (patch.is_default === true) {
+        await db.update('prequal_groups', { is_default: false }, { is_default: 'eq.true' });
+      }
+      let row;
+      if (body.id) row = await db.update('prequal_groups', patch, { id: 'eq.' + body.id });
+      else {
+        if (!patch.name) return u.fail(res, 400, 'Dê um nome ao grupo.');
+        row = await db.insert('prequal_groups', patch);
+      }
+      return u.ok(res, { grupo: row });
+    }
+
+    if (action === 'prequal_group_delete') {
+      const body = await u.readBody(req);
+      await db.remove('prequal_groups', { id: 'eq.' + body.id });
+      return u.ok(res, {});
+    }
+
+    if (action === 'prequal_question_save') {
+      const body = await u.readBody(req);
+      const patch = {};
+      ['group_id', 'position', 'question', 'objective', 'required', 'weight'].forEach(function (k) {
+        if (body[k] !== undefined) patch[k] = body[k];
+      });
+      let row;
+      if (body.id) row = await db.update('prequal_questions', patch, { id: 'eq.' + body.id });
+      else {
+        if (!patch.group_id) return u.fail(res, 400, 'Grupo nao informado.');
+        if (!patch.question) return u.fail(res, 400, 'Escreva a pergunta.');
+        if (patch.position === undefined) {
+          patch.position = (await db.count('prequal_questions', { group_id: 'eq.' + patch.group_id })) + 1;
+        }
+        row = await db.insert('prequal_questions', patch);
+      }
+      return u.ok(res, { pergunta: row });
+    }
+
+    if (action === 'prequal_question_delete') {
+      const body = await u.readBody(req);
+      await db.remove('prequal_questions', { id: 'eq.' + body.id });
+      return u.ok(res, {});
+    }
+
+    // ==========================================================
+    // AUREA
+    // ==========================================================
+    if (action === 'aurea') {
+      const cfg = await aurea.config();
+      const sessoes = await db.select('prequal_sessions', {
+        order: 'started_at.desc', select: '*', limit: 60
+      });
+      const cands = await db.select('candidates', { select: 'id,name,phone,role_applied,stage_key' });
+      const nomeDe = {}; cands.forEach(function (c) { nomeDe[c.id] = c; });
+      const grupos = await db.select('prequal_groups', { select: 'id,name' });
+      const nomeGrupo = {}; grupos.forEach(function (g) { nomeGrupo[g.id] = g.name; });
+
+      return u.ok(res, {
+        config: cfg,
+        webhook_url: u.appUrl() + '/api/webhook?k=' + webhook.chaveWebhook(),
+        tem_chave_ia: !!process.env.ANTHROPIC_API_KEY,
+        providers: send.providerStatus(),
+        sessoes: sessoes.map(function (s2) {
+          const c = nomeDe[s2.candidate_id] || {};
+          return Object.assign({}, s2, {
+            candidato: c.name || '—', telefone: c.phone || '',
+            vaga: c.role_applied || '', grupo: nomeGrupo[s2.group_id] || '—',
+            total_respostas: Array.isArray(s2.answers) ? s2.answers.length : 0
+          });
+        })
+      });
+    }
+
+    if (action === 'aurea_config_save') {
+      const body = await u.readBody(req);
+      const atual = await aurea.config();
+      const novo = Object.assign({}, atual, body.value || {});
+      await db.upsert('settings', { key: 'aurea', value: novo }, 'key');
+      return u.ok(res, { config: novo });
+    }
+
+    if (action === 'aurea_test') {
+      try {
+        const r = await aurea.testar();
+        return u.ok(res, r);
+      } catch (e) {
+        return u.fail(res, 400, e.message);
+      }
+    }
+
+    if (action === 'aurea_start') {
+      const body = await u.readBody(req);
+      const ids = Array.isArray(body.candidate_ids) ? body.candidate_ids
+        : (body.candidate_id ? [body.candidate_id] : []);
+      if (!ids.length) return u.fail(res, 400, 'Nenhum candidato selecionado.');
+
+      const resultados = [];
+      for (const id of ids) {
+        const cand = await db.selectOne('candidates', { id: 'eq.' + id, select: '*' });
+        if (!cand) { resultados.push({ id: id, ok: false, error: 'Candidato nao encontrado' }); continue; }
+        const r = await aurea.iniciar(cand, body.group_id, { forcar: !!body.forcar, reiniciar: !!body.reiniciar });
+        resultados.push(Object.assign({ id: id, nome: cand.name }, r));
+      }
+      return u.ok(res, { resultados: resultados });
+    }
+
+    if (action === 'aurea_session') {
+      const s2 = await db.selectOne('prequal_sessions', { id: 'eq.' + params.id, select: '*' });
+      if (!s2) return u.fail(res, 404, 'Conversa nao encontrada.');
+      const msgs = await db.select('prequal_messages', {
+        session_id: 'eq.' + s2.id, order: 'created_at.asc', select: '*', limit: 300
+      });
+      const cand = await db.selectOne('candidates', { id: 'eq.' + s2.candidate_id, select: 'id,name,phone,role_applied' });
+      return u.ok(res, { sessao: s2, mensagens: msgs, candidato: cand });
+    }
+
+    // ==========================================================
+    // IMPORTAR LISTA (Indeed, LinkedIn, Catho...)
+    // ==========================================================
+    if (action === 'import_candidates') {
+      const body = await u.readBody(req);
+      const linhas = Array.isArray(body.rows) ? body.rows : [];
+      const origem = String(body.source || 'Importação').trim();
+      if (!linhas.length) return u.fail(res, 400, 'Nenhuma linha para importar.');
+
+      const criados = [], pulados = [];
+      for (const l of linhas) {
+        const nome = String(l.name || '').trim();
+        const email = String(l.email || '').trim().toLowerCase();
+        const fone = String(l.phone || '').trim();
+        if (nome.length < 3) { pulados.push({ linha: l, motivo: 'nome muito curto' }); continue; }
+        if (u.normalizePhone(fone).length < 12) { pulados.push({ linha: l, motivo: 'telefone invalido' }); continue; }
+
+        if (email) {
+          const dup = await db.selectOne('candidates', { email: 'eq.' + email, archived: 'eq.false', select: 'id' });
+          if (dup) { pulados.push({ linha: l, motivo: 'e-mail ja cadastrado' }); continue; }
+        }
+        const tail = u.phoneTail(fone);
+        if (tail) {
+          const dupF = await db.selectOne('candidates', { phone_digits: 'like.*' + tail, archived: 'eq.false', select: 'id' });
+          if (dupF) { pulados.push({ linha: l, motivo: 'telefone ja cadastrado' }); continue; }
+        }
+
+        const novo = await db.insert('candidates', {
+          token: u.candidateToken(), name: nome,
+          email: email || (u.normalizePhone(fone) + '@sem-email.local'),
+          phone: fone, role_applied: l.role || body.role || null,
+          city: l.city || null, source: 'importacao', source_detail: origem,
+          stage_key: 'triagem'
+        });
+        await db.insert('stage_history', {
+          candidate_id: novo.id, from_stage: null, to_stage: 'triagem',
+          note: 'Importado de ' + origem
+        });
+        criados.push({ id: novo.id, nome: nome });
+      }
+
+      // dispara a Aurea para o lote, se pedido
+      const disparos = [];
+      if (body.iniciar_aurea && criados.length) {
+        for (const c of criados) {
+          const cand = await db.selectOne('candidates', { id: 'eq.' + c.id, select: '*' });
+          const r = await aurea.iniciar(cand, body.group_id, { forcar: !!body.forcar });
+          disparos.push(Object.assign({ nome: c.nome }, r));
+        }
+      }
+      return u.ok(res, { criados: criados, pulados: pulados, disparos: disparos });
     }
 
     return u.fail(res, 404, 'Acao desconhecida: ' + action);

@@ -2,6 +2,7 @@
 'use strict';
 const BASE = 'http://localhost:3000';
 let TOKEN_ADMIN = '';
+const SUFIXO = Date.now().toString(36);
 let falhas = 0, ok = 0;
 
 function check(nome, cond, extra) {
@@ -37,7 +38,7 @@ async function adm(action, body, query) {
   check('rejeita formulario invalido', !ruim.ok, ruim.error);
 
   const cand = await pub('apply', {
-    name: 'Maria Aparecida Souza', email: 'maria.teste@exemplo.com', phone: '(11) 98877-6655',
+    name: 'Maria Aparecida Souza', email: 'maria.' + SUFIXO + '@exemplo.com', phone: '(11) 9' + String(Date.now()).slice(-8),
     city: 'São Paulo', state: 'SP', role_applied: 'Social Media',
     salary_expectation: 'R$ 2.500', availability: 'Imediata',
     has_computer: 'Sim, notebook', internet_speed: 'Fibra estável, acima de 100 Mbps',
@@ -50,7 +51,7 @@ async function adm(action, body, query) {
   });
   check('cria candidato', cand.ok && cand.id, cand);
 
-  const dup = await pub('apply', { name: 'Maria Aparecida Souza', email: 'maria.teste@exemplo.com', phone: '(11) 98877-6655', experience: 'x', why_start: 'y', role_applied: 'Social Media' });
+  const dup = await pub('apply', { name: 'Maria Aparecida Souza', email: 'maria.' + SUFIXO + '@exemplo.com', phone: '(11) 9' + String(Date.now()).slice(-8), experience: 'x', why_start: 'y', role_applied: 'Social Media' });
   check('bloqueia e-mail duplicado', !dup.ok && /Ja recebemos/.test(dup.error || ''), dup.error);
 
   console.log('\n2) PAINEL');
@@ -65,17 +66,17 @@ async function adm(action, body, query) {
   check('bloqueia acesso sem login', !semAuth.ok);
 
   const board = await adm('board');
-  check('quadro tem 10 etapas', board.ok && board.stages.length === 10, board.stages && board.stages.length);
-  check('candidato aparece em "inscrito"', board.candidates.some(function (c) { return c.id === cand.id && c.stage_key === 'inscrito'; }));
+  check('quadro tem 5 etapas', board.ok && board.stages.length === 5, board.stages && board.stages.length);
+  check('candidato aparece em "triagem"', board.candidates.some(function (c) { return c.id === cand.id && c.stage_key === 'triagem'; }));
 
   const ficha = await adm('candidate', null, { id: cand.id });
   check('ficha carrega com links', ficha.ok && /portal\?t=/.test(ficha.links.link_portal), ficha.links);
   const tk = ficha.links.link_portal.split('t=')[1];
 
-  const mv = await adm('move', { id: cand.id, stage_key: 'teste_disc' });
+  const mv = await adm('move', { id: cand.id, stage_key: 'teste' });
   check('move de etapa', mv.ok);
   const board2 = await adm('board');
-  check('etapa persistiu', board2.candidates.find(function (c) { return c.id === cand.id; }).stage_key === 'teste_disc');
+  check('etapa persistiu', board2.candidates.find(function (c) { return c.id === cand.id; }).stage_key === 'teste');
 
   console.log('\n3) TESTE DISC');
   const dq = await pub('disc_questions', null, { t: tk });
@@ -139,7 +140,7 @@ async function adm(action, body, query) {
   const prev = await adm('preview', { candidate_id: cand.id, set: 'welcome' });
   check('gera 3 mensagens', prev.ok && prev.items.length === 3, prev.items && prev.items.length);
   check('troca as variaveis', prev.ok && prev.items[0].body.indexOf('Maria') >= 0 && prev.items[0].body.indexOf('{{') < 0);
-  check('inclui o link do portal', prev.ok && prev.items[0].body.indexOf('/portal?t=') >= 0);
+  check('inclui o link de criar senha', prev.ok && prev.items[0].body.indexOf('/criar-senha?t=') >= 0, prev.items && prev.items[0].body.slice(0, 120));
 
   const envio2 = await adm('send', { candidate_id: cand.id, set: 'welcome', items: prev.items });
   check('envio registra os 3 canais', envio2.ok && envio2.results.length === 3, envio2.results);
@@ -147,7 +148,7 @@ async function adm(action, body, query) {
 
   const board3 = await adm('board');
   const cb = board3.candidates.find(function (c) { return c.id === cand.id; });
-  check('boas-vindas move para "aprovado"', cb.stage_key === 'aprovado', cb.stage_key);
+  check('boas-vindas move para "concluido"', cb.stage_key === 'concluido', cb.stage_key);
   check('boas-vindas libera a integracao', cb.member_access === true);
 
   console.log('\n7) AREA DE MEMBROS');
@@ -190,7 +191,7 @@ async function adm(action, body, query) {
   check('cria questao', nq.ok);
   check('exclui questao', (await adm('question_delete', { id: nq.question.id })).ok);
   const tpls = await adm('templates');
-  check('11 modelos de mensagem', tpls.ok && tpls.templates.length === 11, tpls.templates && tpls.templates.length);
+  check('12 modelos de mensagem', tpls.ok && tpls.templates.length === 12, tpls.templates && tpls.templates.length);
   const salvo = await adm('template_save', { key: 'welcome_sms', body: 'Texto novo {{primeiro_nome}}' });
   check('salva modelo', salvo.ok && salvo.template.body.indexOf('Texto novo') === 0);
   const stg = await adm('settings');
