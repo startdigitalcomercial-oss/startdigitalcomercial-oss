@@ -32,7 +32,12 @@ async function sendEmail(opts) {
     });
     const data = await res.json().catch(function () { return {}; });
     if (!res.ok) {
-      return { status: 'erro', provider: 'resend', error: (data && (data.message || data.name)) || ('HTTP ' + res.status) };
+      let erro = (data && (data.message || data.name)) || ('HTTP ' + res.status);
+      if (/verify a domain|only send testing emails/i.test(String(erro))) {
+        erro = 'O Resend ainda está em modo de teste: só entrega e-mail para o seu próprio endereço. ' +
+               'Verifique um domínio em resend.com/domains e troque a variável MAIL_FROM na Vercel. (Original: ' + erro + ')';
+      }
+      return { status: 'erro', provider: 'resend', error: erro };
     }
     return { status: 'enviado', provider: 'resend', id: data.id || null };
   } catch (e) {
@@ -41,6 +46,30 @@ async function sendEmail(opts) {
 }
 
 // ---------------- WHATSAPP (Evolution API) ----------------
+// Le a mensagem de erro REAL da Evolution. Ela costuma esconder o motivo
+// dentro de response.message (as vezes uma lista), e deixar so
+// "Bad Request" no campo error — que nao ajuda ninguem.
+function erroEvolution(data, status) {
+  function achata(x) {
+    if (x === null || x === undefined) return '';
+    if (typeof x === 'string') return x;
+    if (Array.isArray(x)) return x.map(achata).filter(Boolean).join(' | ');
+    if (typeof x === 'object') {
+      if (x.message !== undefined) return achata(x.message);
+      if (x.error !== undefined && typeof x.error !== 'string') return achata(x.error);
+      try { return JSON.stringify(x); } catch (e) { return String(x); }
+    }
+    return String(x);
+  }
+  const partes = [];
+  if (data && data.response) partes.push(achata(data.response));
+  if (data && data.message) partes.push(achata(data.message));
+  if (data && typeof data.error === 'string') partes.push(data.error);
+  if (typeof data === 'string' && data) partes.push(data.slice(0, 300));
+  const txt = partes.filter(Boolean).join(' — ');
+  return txt || ('HTTP ' + status);
+}
+
 async function sendWhatsApp(opts) {
   const base = (process.env.EVOLUTION_API_URL || '').replace(/\/+$/, '');
   const apiKey = process.env.EVOLUTION_API_KEY;
@@ -57,23 +86,82 @@ async function sendWhatsApp(opts) {
   const url = base + '/message/sendText/' + encodeURIComponent(instance);
   const headers = { apikey: apiKey, 'Content-Type': 'application/json' };
 
-  // Evolution v2
-  let body = { number: number, text: opts.text || '' };
+  const texto = String(opts.text || '');
+  if (!texto.trim()) {
+    return { status: 'erro', provider: 'evolution', error: 'Mensagem vazia (o modelo nao gerou texto).' };
+  }
+
+  async function tentativa(body) {
+    const res = await fetch(url, { method: 'POST', headers: headers, body: JSON.stringify(body) });
+    const bruto = await res.text();
+    let data = null;
+    if (bruto) { try { data = JSON.parse(bruto); } catch (e) { data = bruto; } }
+    return { ok: res.ok, status: res.status, data: data };
+  }
+
   try {
-    let res = await fetch(url, { method: 'POST', headers: headers, body: JSON.stringify(body) });
-    if (res.status === 400 || res.status === 422) {
-      // Evolution v1 usa outro formato
-      body = { number: number, options: { delay: 400, presence: 'composing' }, textMessage: { text: opts.text || '' } };
-      res = await fetch(url, { method: 'POST', headers: headers, body: JSON.stringify(body) });
+    // 1) Evolution v2. linkPreview:false e importante: quando a mensagem tem um
+    //    link, a Evolution tenta baixar a previa do site e o envio quebra
+    //    ("Bad Request" / "Internal Server Error"). Sem previa, vai sempre.
+    let r = await tentativa({ number: number, text: texto, linkPreview: false });
+
+    // 2) versoes antigas nao conhecem "linkPreview" e recusam o corpo
+    if (!r.ok && (r.status === 400 || r.status === 422)) {
+      r = await tentativa({ number: number, text: texto });
     }
-    const data = await res.json().catch(function () { return {}; });
-    if (!res.ok) {
-      const msg = (data && (data.message || data.error)) || ('HTTP ' + res.status);
-      return { status: 'erro', provider: 'evolution', error: typeof msg === 'string' ? msg : JSON.stringify(msg) };
+
+    // 3) Evolution v1 usa outro formato de corpo
+    if (!r.ok && (r.status === 400 || r.status === 422)) {
+      const r3 = await tentativa({
+        number: number,
+        options: { delay: 400, presence: 'composing', linkPreview: false },
+        textMessage: { text: texto }
+      });
+      if (r3.ok) r = r3;
+      else if (erroEvolution(r3.data, r3.status).length > erroEvolution(r.data, r.status).length) r = r3;
     }
-    return { status: 'enviado', provider: 'evolution', id: (data && data.key && data.key.id) || null };
+
+    if (!r.ok) {
+      return {
+        status: 'erro',
+        provider: 'evolution',
+        error: erroEvolution(r.data, r.status) + ' [numero ' + number + ']'
+      };
+    }
+    const d = r.data || {};
+    return { status: 'enviado', provider: 'evolution', id: (d.key && d.key.id) || null };
   } catch (e) {
     return { status: 'erro', provider: 'evolution', error: e.message };
+  }
+}
+
+// Pergunta para a Evolution se um numero realmente existe no WhatsApp.
+async function waNumeroExiste(telefone, instancia) {
+  const base = (process.env.EVOLUTION_API_URL || '').replace(/\/+$/, '');
+  const apiKey = process.env.EVOLUTION_API_KEY;
+  const inst = instancia || process.env.EVOLUTION_INSTANCE;
+  if (!base || !apiKey || !inst) return { ok: false, error: 'Evolution nao configurada.' };
+  const number = u.normalizePhone(telefone);
+  try {
+    const res = await fetch(base + '/chat/whatsappNumbers/' + encodeURIComponent(inst), {
+      method: 'POST',
+      headers: { apikey: apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ numbers: [number] })
+    });
+    const bruto = await res.text();
+    let data = null;
+    if (bruto) { try { data = JSON.parse(bruto); } catch (e) { data = bruto; } }
+    if (!res.ok) return { ok: false, numero: number, error: erroEvolution(data, res.status) };
+    const arr = Array.isArray(data) ? data : [];
+    const achou = arr[0] || {};
+    return {
+      ok: true,
+      numero: number,
+      existe: achou.exists === true,
+      jid: achou.jid || null
+    };
+  } catch (e) {
+    return { ok: false, numero: number, error: e.message };
   }
 }
 
@@ -137,7 +225,7 @@ function providerStatus() {
   };
 }
 
-module.exports = { sendEmail, sendWhatsApp, sendSms, listWhatsAppInstances, providerStatus };
+module.exports = { sendEmail, sendWhatsApp, sendSms, listWhatsAppInstances, providerStatus, waNumeroExiste };
 
 // ============================================================
 // GESTÃO DA INSTÂNCIA DO WHATSAPP (Evolution API)
@@ -215,6 +303,47 @@ async function waEstado(nome) {
   return { ok: true, estado: st, conectada: st === 'open' };
 }
 
+// apaga a instância de vez (o QR antigo morre com ela)
+async function waApagarInstancia(nome) {
+  if (!evoPronta()) return { ok: false, error: 'Evolution nao configurada.' };
+  const r = await evoFetch('/instance/delete/' + encodeURIComponent(nome), { method: 'DELETE' });
+  // 404 = ja nao existe, o que para nos e sucesso
+  if (r.status === 404) return { ok: true, ja_nao_existia: true };
+  return { ok: r.ok, error: r.ok ? null : erroEvolution(r.data, r.status) };
+}
+
+// Recomeça do zero: desconecta, apaga e cria de novo.
+// É o que resolve instância travada em "connecting" que nunca aceita o QR.
+async function waRecriar(nome) {
+  if (!evoPronta()) return { ok: false, error: 'Evolution nao configurada.' };
+  await waDesconectar(nome).catch(function () { return null; });
+  await waApagarInstancia(nome).catch(function () { return null; });
+  // a Evolution precisa de um instante para liberar o nome
+  await new Promise(function (r) { setTimeout(r, 1200); });
+  const r = await evoFetch('/instance/create', {
+    method: 'POST',
+    body: { instanceName: nome, qrcode: true, integration: 'WHATSAPP-BAILEYS' }
+  });
+  if (!r.ok) return { ok: false, error: erroEvolution(r.data, r.status) };
+  const q = (r.data && r.data.qrcode) || {};
+  return { ok: true, recriada: true, base64: q.base64 || q.code || null, pairingCode: q.pairingCode || null };
+}
+
+// apaga todas as instâncias menos a que o sistema usa
+async function waLimparOutras(manter) {
+  if (!evoPronta()) return { ok: false, error: 'Evolution nao configurada.' };
+  const todas = await listWhatsAppInstances();
+  const alvos = todas.filter(function (i) { return i.name && i.name !== manter; });
+  const apagadas = [];
+  const falhas = [];
+  for (const i of alvos) {
+    const r = await waApagarInstancia(i.name);
+    if (r.ok) apagadas.push(i.name);
+    else falhas.push({ nome: i.name, erro: r.error });
+  }
+  return { ok: true, apagadas: apagadas, falhas: falhas };
+}
+
 async function waDesconectar(nome) {
   if (!evoPronta()) return { ok: false, error: 'Evolution nao configurada.' };
   const r = await evoFetch('/instance/logout/' + encodeURIComponent(nome), { method: 'DELETE' });
@@ -249,3 +378,6 @@ module.exports.waEstado = waEstado;
 module.exports.waDesconectar = waDesconectar;
 module.exports.waWebhook = waWebhook;
 module.exports.evoPronta = evoPronta;
+module.exports.waApagarInstancia = waApagarInstancia;
+module.exports.waRecriar = waRecriar;
+module.exports.waLimparOutras = waLimparOutras;

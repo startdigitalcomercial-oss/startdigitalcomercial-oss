@@ -13,7 +13,24 @@
   @media (max-width: 980px) { .lateral { position: static; } }
   .lateral .cab { padding: 20px 20px 18px; border-bottom: 1px solid var(--hairline); }
   .lateral .cab h3 { margin: 0 0 4px; font-size: 15px; font-weight: 600; letter-spacing: -.014em; }
-  .mod-tit { padding: 18px 20px 8px; font-size: 12px; font-weight: 500; color: var(--label-3); letter-spacing: -.004em; }
+  /* módulos em sanfona: cada um abre e fecha, a lista não cresce sem fim */
+  .mod + .mod { border-top: 1px solid var(--hairline); }
+  .mod-tit { display: flex; align-items: center; gap: 10px; width: 100%; padding: 14px 20px; background: none; border: 0;
+    font: inherit; font-size: 13px; font-weight: 600; color: var(--label); letter-spacing: -.008em;
+    text-align: left; cursor: pointer; transition: background .14s; }
+  .mod-tit:hover { background: var(--fill-1); }
+  .mod-tit .seta { flex: none; width: 16px; height: 16px; stroke: var(--label-3); fill: none; stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round; transition: transform .24s cubic-bezier(.32,.72,0,1); }
+  .mod.aberto .mod-tit .seta { transform: rotate(90deg); }
+  .mod-tit .quantas { margin-left: auto; flex: none; font-size: 11.5px; font-weight: 500; color: var(--label-3);
+    font-variant-numeric: tabular-nums; }
+  .mod-tit .quantas.completo { color: var(--accent); }
+  .mod-corpo { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .26s cubic-bezier(.32,.72,0,1); }
+  .mod.aberto .mod-corpo { grid-template-rows: 1fr; }
+  .mod-corpo > div { overflow: hidden; }
+  @media (prefers-reduced-motion: reduce) {
+    .mod-corpo, .mod-tit .seta { transition: none; }
+  }
   .aula { display: flex; gap: 12px; align-items: flex-start; padding: 12px 20px; cursor: pointer; transition: background .14s; }
   .aula:hover { background: var(--fill-1); }
   .aula.ativa { background: var(--accent-tint); }
@@ -102,6 +119,8 @@
 const TOKEN = new URLSearchParams(location.search).get('t') || '';
 const SESSAO = sessionStorage.getItem('start_rh_candidato') || '';
 let MODULOS = [], AULAS = [], atual = null;
+// quais módulos estão abertos na sanfona (lembra enquanto a página está aberta)
+const ABERTOS = {};
 
 function api(action, opts) {
   opts = opts || {};
@@ -153,17 +172,47 @@ function iconeMaterial(url) {
 }
 
 function desenhaLista() {
+  // qual módulo tem a aula que está tocando — esse fica aberto
+  const moduloAtual = atual
+    ? (MODULOS.filter(function (m) {
+        return m.lessons.some(function (l) { return l.id === atual.id; });
+      })[0] || null)
+    : null;
+  if (moduloAtual) ABERTOS[moduloAtual.id] = true;
+
   document.getElementById('lista').innerHTML = MODULOS.map(function (m) {
-    return '<div class="mod"><div class="mod-tit">' + esc(m.title) + '</div>' +
-      m.lessons.map(function (l) {
-        const at = atual && atual.id === l.id ? ' ativa' : '';
-        const fe = l.done ? ' feita' : '';
-        return '<div class="aula' + at + fe + '" data-id="' + l.id + '">' +
-          '<span class="bola">' + (l.done ? '✓' : '') + '</span>' +
-          '<span class="info"><span class="nome">' + esc(l.title) + '</span>' +
-          (l.duration ? '<span class="dur">' + esc(l.duration) + '</span>' : '') + '</span></div>';
-      }).join('') + '</div>';
+    const feitas = m.lessons.filter(function (l) { return l.done; }).length;
+    const completo = m.lessons.length && feitas === m.lessons.length;
+    const aberto = ABERTOS[m.id] === true;
+
+    return '<div class="mod' + (aberto ? ' aberto' : '') + '" data-mod="' + esc(m.id) + '">' +
+      '<button type="button" class="mod-tit" aria-expanded="' + (aberto ? 'true' : 'false') + '">' +
+        '<svg class="seta" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>' +
+        '<span>' + esc(m.title) + '</span>' +
+        '<span class="quantas' + (completo ? ' completo' : '') + '">' + feitas + '/' + m.lessons.length + '</span>' +
+      '</button>' +
+      '<div class="mod-corpo"><div>' +
+        m.lessons.map(function (l) {
+          const at = atual && atual.id === l.id ? ' ativa' : '';
+          const fe = l.done ? ' feita' : '';
+          return '<div class="aula' + at + fe + '" data-id="' + l.id + '">' +
+            '<span class="bola">' + (l.done ? '✓' : '') + '</span>' +
+            '<span class="info"><span class="nome">' + esc(l.title) + '</span>' +
+            (l.duration ? '<span class="dur">' + esc(l.duration) + '</span>' : '') + '</span></div>';
+        }).join('') +
+      '</div></div></div>';
   }).join('');
+
+  document.getElementById('lista').querySelectorAll('.mod-tit').forEach(function (bt) {
+    bt.addEventListener('click', function () {
+      const caixa = bt.closest('.mod');
+      const id = caixa.dataset.mod;
+      const vaiAbrir = !caixa.classList.contains('aberto');
+      caixa.classList.toggle('aberto', vaiAbrir);
+      bt.setAttribute('aria-expanded', vaiAbrir ? 'true' : 'false');
+      ABERTOS[id] = vaiAbrir;
+    });
+  });
 
   document.getElementById('lista').querySelectorAll('.aula').forEach(function (el) {
     el.addEventListener('click', function () {

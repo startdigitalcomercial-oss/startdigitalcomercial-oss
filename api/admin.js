@@ -731,13 +731,48 @@ module.exports = async function handler(req, res) {
       const escolhida = w.instance || process.env.EVOLUTION_INSTANCE || '';
       let estado = null;
       if (escolhida) estado = await send.waEstado(escolhida);
+      const sobrando = instancias.filter(function (i) { return i.name !== escolhida; });
       return u.ok(res, {
         configurada: send.evoPronta(),
         instancias: instancias,
+        sobrando: sobrando,
         escolhida: escolhida,
         estado: estado,
         webhook_url: u.appUrl() + '/api/webhook?k=' + webhook.chaveWebhook()
       });
+    }
+
+    // pede um QR novo (o QR da Evolution vence em menos de 1 minuto)
+    if (action === 'wa_qr') {
+      const nome = params.instance || (await getSetting('whatsapp', {})).instance;
+      if (!nome) return u.fail(res, 400, 'Nenhuma instância escolhida.');
+      const r = await send.waQrCode(nome);
+      return r.ok ? u.ok(res, r) : u.fail(res, 400, r.error);
+    }
+
+    // apaga e cria de novo — resolve instância travada
+    if (action === 'wa_recriar') {
+      const body = await u.readBody(req);
+      const nome = String(body.instance || (await getSetting('whatsapp', {})).instance || 'start-rh').trim();
+      if (!/^[a-zA-Z0-9_-]{3,40}$/.test(nome)) {
+        return u.fail(res, 400, 'Use só letras, números, hífen e underline no nome (3 a 40 caracteres).');
+      }
+      const r = await send.waRecriar(nome);
+      if (!r.ok) return u.fail(res, 400, r.error);
+      await db.upsert('settings', { key: 'whatsapp', value: { instance: nome } }, 'key');
+      const wh = await send.waWebhook(nome, u.appUrl() + '/api/webhook?k=' + webhook.chaveWebhook());
+      return u.ok(res, {
+        base64: r.base64, pairingCode: r.pairingCode,
+        webhook_ok: wh.ok, webhook_erro: wh.error || null
+      });
+    }
+
+    // deixa só a instância que o sistema usa
+    if (action === 'wa_limpar') {
+      const nome = (await getSetting('whatsapp', {})).instance || process.env.EVOLUTION_INSTANCE || '';
+      if (!nome) return u.fail(res, 400, 'Conecte uma instância primeiro.');
+      const r = await send.waLimparOutras(nome);
+      return r.ok ? u.ok(res, r) : u.fail(res, 400, r.error);
     }
 
     if (action === 'wa_conectar') {
@@ -798,6 +833,55 @@ module.exports = async function handler(req, res) {
         subject: null, body: 'teste de conexao', status: r.status, provider: r.provider, error: r.error || null
       });
       return r.status === 'enviado' ? u.ok(res, r) : u.fail(res, 400, r.error || 'Não foi enviado.');
+    }
+
+    // Diagnostico completo do WhatsApp de um candidato:
+    // numero normalizado -> existe no WhatsApp? -> consegue enviar com link?
+    if (action === 'wa_diagnostico') {
+      const body = await u.readBody(req);
+      const nome = (await getSetting('whatsapp', {}) || {}).instance || process.env.EVOLUTION_INSTANCE;
+      const passos = [];
+
+      const estado = await send.waEstado(nome);
+      passos.push({
+        passo: 'Instância conectada',
+        ok: !!estado.conectada,
+        detalhe: estado.estado || estado.error || '—'
+      });
+
+      let telefone = body.phone || '';
+      let cand = null;
+      if (body.candidate_id) {
+        cand = await db.selectOne('candidates', { id: 'eq.' + body.candidate_id, select: '*' });
+        if (cand) telefone = cand.phone;
+      }
+      const numero = u.normalizePhone(telefone);
+      passos.push({
+        passo: 'Número montado',
+        ok: numero.length >= 12,
+        detalhe: (telefone || '—') + '  →  ' + (numero || '—')
+      });
+
+      const existe = await send.waNumeroExiste(telefone, nome);
+      passos.push({
+        passo: 'Número tem WhatsApp',
+        ok: existe.ok && existe.existe === true,
+        detalhe: existe.ok ? (existe.existe ? 'sim' : 'NÃO — esse número não tem WhatsApp') : (existe.error || 'não deu para checar')
+      });
+
+      const links = cand ? u.candidateLinks(cand) : { link_disc: u.appUrl() + '/disc?t=TESTE' };
+      const r1 = await send.sendWhatsApp({ to: telefone, text: 'Teste 1 de 2 (texto simples, sem link).', instance: nome });
+      passos.push({ passo: 'Envio sem link', ok: r1.status === 'enviado', detalhe: r1.error || 'enviado' });
+
+      const r2 = await send.sendWhatsApp({ to: telefone, text: 'Teste 2 de 2 (com link). ' + links.link_disc, instance: nome });
+      passos.push({ passo: 'Envio com link', ok: r2.status === 'enviado', detalhe: r2.error || 'enviado' });
+
+      await db.insert('message_logs', {
+        candidate_id: cand ? cand.id : null, channel: 'whatsapp', to_address: telefone,
+        subject: null, body: 'diagnostico', status: r2.status, provider: r2.provider, error: r2.error || null
+      });
+
+      return u.ok(res, { instancia: nome || null, passos: passos, link: links.link_disc, base: u.appUrl() });
     }
 
     return u.fail(res, 404, 'Acao desconhecida: ' + action);

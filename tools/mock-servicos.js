@@ -88,6 +88,13 @@ const server = http.createServer(async function (req, res) {
     ESTADO.aberta = false;
     return json({ status: 'SUCCESS' });
   }
+  if (url.pathname.indexOf('/instance/delete/') === 0) {
+    const nome = decodeURIComponent(url.pathname.split('/instance/delete/')[1] || '');
+    ESTADO.apagadas = ESTADO.apagadas || [];
+    ESTADO.apagadas.push(nome);
+    ESTADO.criada = false; ESTADO.aberta = false; ESTADO.escaneios = 0;
+    return json({ status: 'SUCCESS', instanceName: nome });
+  }
   if (url.pathname.indexOf('/webhook/set/') === 0) {
     if (!body.webhook) { res.statusCode = 400; return res.end('{"message":"formato v1"}'); }
     return json({ webhook: { enabled: true, url: body.webhook.url } });
@@ -96,6 +103,10 @@ const server = http.createServer(async function (req, res) {
   // ---------------- Evolution ----------------
   if (url.pathname.indexOf('/message/sendText/') === 0) {
     return json({ key: { id: 'mock-' + Math.random().toString(36).slice(2, 9) } });
+  }
+  if (url.pathname.indexOf('/chat/whatsappNumbers/') === 0) {
+    const nums = (body && body.numbers) || [];
+    return json(nums.map(function (n) { return { exists: true, jid: n + '@s.whatsapp.net', number: n }; }));
   }
   if (url.pathname === '/instance/fetchInstances') {
     return json([{ instance: { instanceName: 'start-comercial', connectionStatus: 'open', owner: '5511999999999' } }]);

@@ -240,6 +240,25 @@ async function webhook(telefone, texto) {
 
   const testeWa = await adm('wa_teste', { phone: '11 98877-6655' });
   check('envia mensagem de teste', testeWa.ok, testeWa.error);
+  const diag = await adm('wa_diagnostico', { phone: '13 99600-3897' });
+  check('diagnostico roda', diag.ok, diag.error);
+  const passos = (diag.data && diag.data.passos) || (diag.passos) || [];
+  check('diagnostico tem 5 passos', passos.length === 5, 'passos: ' + passos.length);
+  const pNum = passos.filter(function (p) { return p.passo === 'Número montado'; })[0];
+  check('diagnostico monta 5513996003897', !!pNum && /5513996003897/.test(String(pNum.detalhe)), pNum && pNum.detalhe);
+  const pLink = passos.filter(function (p) { return p.passo === 'Envio com link'; })[0];
+  check('diagnostico envia com link', !!pLink && pLink.ok === true, pLink && pLink.detalhe);
+
+  const qrNovo = await adm('wa_qr', {});
+  check('pede QR novo (renovacao)', qrNovo.ok && !!(qrNovo.data || qrNovo).base64, qrNovo.error);
+
+  const recriada = await adm('wa_recriar', { instance: 'start-rh' });
+  check('recria instancia do zero', recriada.ok, recriada.error);
+
+  const limpou = await adm('wa_limpar', {});
+  const dl = limpou.data || limpou;
+  check('apaga as instancias que sobraram', limpou.ok && Array.isArray(dl.apagadas), limpou.error);
+
   check('desconecta', (await adm('wa_desconectar', {})).ok);
 
   console.log('\n----------------------------------------');
