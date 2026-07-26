@@ -722,6 +722,84 @@ module.exports = async function handler(req, res) {
       return u.ok(res, { criados: criados, pulados: pulados, disparos: disparos });
     }
 
+    // ==========================================================
+    // WHATSAPP — conectar por QR code
+    // ==========================================================
+    if (action === 'wa_status') {
+      const instancias = await send.listWhatsAppInstances();
+      const w = await getSetting('whatsapp', {});
+      const escolhida = w.instance || process.env.EVOLUTION_INSTANCE || '';
+      let estado = null;
+      if (escolhida) estado = await send.waEstado(escolhida);
+      return u.ok(res, {
+        configurada: send.evoPronta(),
+        instancias: instancias,
+        escolhida: escolhida,
+        estado: estado,
+        webhook_url: u.appUrl() + '/api/webhook?k=' + webhook.chaveWebhook()
+      });
+    }
+
+    if (action === 'wa_conectar') {
+      const body = await u.readBody(req);
+      const nome = String(body.instance || '').trim();
+      if (!nome) return u.fail(res, 400, 'Dê um nome para a instância.');
+      if (!/^[a-zA-Z0-9_-]{3,40}$/.test(nome)) {
+        return u.fail(res, 400, 'Use só letras, números, hífen e underline no nome (3 a 40 caracteres).');
+      }
+
+      const r = body.recriar ? await send.waQrCode(nome) : await send.waCriarInstancia(nome);
+      if (!r.ok) return u.fail(res, 400, r.error);
+
+      // guarda a escolha e já liga o webhook
+      await db.upsert('settings', { key: 'whatsapp', value: { instance: nome } }, 'key');
+      const wh = await send.waWebhook(nome, u.appUrl() + '/api/webhook?k=' + webhook.chaveWebhook());
+
+      return u.ok(res, {
+        base64: r.base64, pairingCode: r.pairingCode,
+        ja_conectada: !!r.ja_conectada,
+        webhook_ok: wh.ok, webhook_erro: wh.error || null
+      });
+    }
+
+    if (action === 'wa_estado') {
+      const nome = params.instance || (await getSetting('whatsapp', {})).instance;
+      if (!nome) return u.fail(res, 400, 'Nenhuma instância escolhida.');
+      const r = await send.waEstado(nome);
+      return r.ok ? u.ok(res, r) : u.fail(res, 400, r.error);
+    }
+
+    if (action === 'wa_webhook') {
+      const body = await u.readBody(req);
+      const nome = body.instance || (await getSetting('whatsapp', {})).instance;
+      if (!nome) return u.fail(res, 400, 'Nenhuma instância escolhida.');
+      const r = await send.waWebhook(nome, u.appUrl() + '/api/webhook?k=' + webhook.chaveWebhook());
+      return r.ok ? u.ok(res, {}) : u.fail(res, 400, r.error);
+    }
+
+    if (action === 'wa_desconectar') {
+      const body = await u.readBody(req);
+      const nome = body.instance || (await getSetting('whatsapp', {})).instance;
+      if (!nome) return u.fail(res, 400, 'Nenhuma instância escolhida.');
+      const r = await send.waDesconectar(nome);
+      return r.ok ? u.ok(res, {}) : u.fail(res, 400, r.error);
+    }
+
+    if (action === 'wa_teste') {
+      const body = await u.readBody(req);
+      const nome = (await getSetting('whatsapp', {})).instance || process.env.EVOLUTION_INSTANCE;
+      const r = await send.sendWhatsApp({
+        to: body.phone,
+        text: body.text || 'Teste do sistema de RH da StartDigital. Se você recebeu isto, o WhatsApp está conectado.',
+        instance: nome
+      });
+      await db.insert('message_logs', {
+        candidate_id: null, channel: 'whatsapp', to_address: body.phone,
+        subject: null, body: 'teste de conexao', status: r.status, provider: r.provider, error: r.error || null
+      });
+      return r.status === 'enviado' ? u.ok(res, r) : u.fail(res, 400, r.error || 'Não foi enviado.');
+    }
+
     return u.fail(res, 404, 'Acao desconhecida: ' + action);
   } catch (e) {
     console.error('[admin]', action, e);

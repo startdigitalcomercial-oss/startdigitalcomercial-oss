@@ -64,6 +64,35 @@ const server = http.createServer(async function (req, res) {
     return json({ content: [{ type: 'text', text: 'Conexao com a Aurea funcionando.' }] });
   }
 
+  // ---------------- Evolution: instancias ----------------
+  let ESTADO = global.__waEstado || (global.__waEstado = { criada: false, aberta: false, escaneios: 0 });
+
+  if (url.pathname === '/instance/create') {
+    ESTADO.criada = true; ESTADO.aberta = false; ESTADO.escaneios = 0;
+    return json({
+      instance: { instanceName: body.instanceName, status: 'created' },
+      qrcode: { base64: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==', code: '2@abc', pairingCode: 'ABCD-1234' }
+    });
+  }
+  if (url.pathname.indexOf('/instance/connect/') === 0) {
+    ESTADO.criada = true;
+    return json({ base64: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==', code: '2@abc', pairingCode: 'ABCD-1234' });
+  }
+  if (url.pathname.indexOf('/instance/connectionState/') === 0) {
+    // simula o usuario escaneando depois de 2 consultas
+    ESTADO.escaneios++;
+    if (ESTADO.escaneios >= 2) ESTADO.aberta = true;
+    return json({ instance: { instanceName: 'x', state: ESTADO.aberta ? 'open' : 'connecting' } });
+  }
+  if (url.pathname.indexOf('/instance/logout/') === 0) {
+    ESTADO.aberta = false;
+    return json({ status: 'SUCCESS' });
+  }
+  if (url.pathname.indexOf('/webhook/set/') === 0) {
+    if (!body.webhook) { res.statusCode = 400; return res.end('{"message":"formato v1"}'); }
+    return json({ webhook: { enabled: true, url: body.webhook.url } });
+  }
+
   // ---------------- Evolution ----------------
   if (url.pathname.indexOf('/message/sendText/') === 0) {
     return json({ key: { id: 'mock-' + Math.random().toString(36).slice(2, 9) } });

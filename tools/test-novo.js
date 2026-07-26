@@ -217,6 +217,31 @@ async function webhook(telefone, texto) {
   const info2 = await pub('conta_info', null, { t: tk2 });
   check('agora consta que tem senha', info2.ja_tem_senha === true);
 
+  console.log('\n8) WHATSAPP — conexao por QR code');
+  const st1 = await adm('wa_status');
+  check('status do whatsapp responde', st1.ok && st1.configurada === true, st1.error);
+  check('mostra o endereco do webhook', /\/api\/webhook\?k=/.test(st1.webhook_url || ''));
+
+  const conn = await adm('wa_conectar', { instance: 'start-teste' });
+  check('gera o QR code', conn.ok && !!conn.base64, conn.error);
+  check('devolve codigo de pareamento', !!conn.pairingCode, conn.pairingCode);
+  check('configura o webhook sozinho', conn.webhook_ok === true, conn.webhook_erro);
+
+  const st2 = await adm('wa_status');
+  check('guarda a instancia escolhida', st2.escolhida === 'start-teste', st2.escolhida);
+
+  const e1 = await adm('wa_estado', null, { instance: 'start-teste' });
+  check('le o estado da conexao', e1.ok && !!e1.estado, e1);
+  const e2 = await adm('wa_estado', null, { instance: 'start-teste' });
+  check('detecta quando conecta', e2.conectada === true, e2.estado);
+
+  const nomeRuim = await adm('wa_conectar', { instance: 'nome invalido!' });
+  check('recusa nome invalido', !nomeRuim.ok, nomeRuim.error);
+
+  const testeWa = await adm('wa_teste', { phone: '11 98877-6655' });
+  check('envia mensagem de teste', testeWa.ok, testeWa.error);
+  check('desconecta', (await adm('wa_desconectar', {})).ok);
+
   console.log('\n----------------------------------------');
   console.log(ok + ' passaram · ' + falhas + ' falharam');
   process.exit(falhas ? 1 : 0);

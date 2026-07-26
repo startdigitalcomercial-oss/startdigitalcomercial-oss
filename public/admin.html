@@ -183,6 +183,15 @@
   .bolha-msg.aurea .txt { background: var(--accent-tint); border-bottom-right-radius: 5px; }
   .bolha-msg.aurea .hora { text-align: right; }
   .bolha-msg.cand .txt { background: var(--fill-1); border-bottom-left-radius: 5px; }
+
+  /* ---------- QR code do WhatsApp ---------- */
+  .qr-box { display: grid; grid-template-columns: 240px 1fr; gap: 24px; align-items: start;
+            margin-top: 18px; padding: 20px; background: var(--fill-1); border-radius: var(--r-card); }
+  @media (max-width: 760px) { .qr-box { grid-template-columns: 1fr; } }
+  .qr-box img { width: 240px; height: 240px; border-radius: 12px; background: #fff; padding: 10px; display: block; }
+  .qr-passos h4 { margin: 0 0 10px; font-size: 15px; font-weight: 600; letter-spacing: -.014em; }
+  .qr-passos ol { margin: 0 0 14px; padding-left: 20px; line-height: 1.9; font-size: 14px; color: var(--label-2); }
+  .qr-passos p { margin: 0 0 8px; }
 </style>
 </head>
 <body>
@@ -1266,16 +1275,12 @@ async function carregaAjustes() {
     '<tr><td>WhatsApp (Evolution)</td><td><span class="tag ' + (p.whatsapp ? 'tag-verde' : 'tag-ambar') + '">' + (p.whatsapp ? 'configurado' : 'faltam EVOLUTION_API_URL / KEY') + '</span></td></tr>' +
     '<tr><td>SMS (Twilio)</td><td><span class="tag ' + (p.sms ? 'tag-verde' : 'tag-ambar') + '">' + (p.sms ? 'configurado' : 'sem provedor — envio manual') + '</span></td></tr>' +
     '</tbody></table>' +
-    '<div class="field" style="margin-top:16px"><label>Instância do WhatsApp</label>' +
-    '<span class="hint">' + (d.wa_instances.length ? 'Instâncias encontradas na sua Evolution API.' : 'Nenhuma instância encontrada. Digite o nome manualmente.') + '</span>' +
-    (d.wa_instances.length
-      ? '<select id="w-inst">' + '<option value="">— nenhuma —</option>' + d.wa_instances.map(function (i) {
-          return '<option value="' + esc(i.name) + '"' + (w.instance === i.name ? ' selected' : '') + '>' + esc(i.name) + ' (' + esc(i.status || '?') + ')</option>';
-        }).join('') + '</select>'
-      : '<input type="text" id="w-inst" value="' + esc(w.instance || '') + '" placeholder="nome-da-instancia">') +
     '</div>' +
-    '<div class="row" style="margin-top:12px"><button class="btn btn-sm" id="btn-wa-salvar">Salvar instância</button></div>' +
-    '</div>' +
+
+    '<div class="card" id="card-wa"><h2>WhatsApp</h2>' +
+    '<p class="sub">Conecte o número escaneando o QR code aqui mesmo. O sistema também liga o webhook sozinho, ' +
+    'para a Aurea conseguir <strong>receber</strong> as respostas.</p>' +
+    '<div id="wa-area"><div class="loading-page" style="padding:30px">Verificando…</div></div></div>' +
 
     '<div class="card"><h2>Últimos envios</h2><div id="tab-logs" class="small muted">carregando…</div></div>';
 
@@ -1294,12 +1299,7 @@ async function carregaAjustes() {
       toast('Formulário salvo');
     } catch (e) { toast(e.message, true); }
   });
-  document.getElementById('btn-wa-salvar').addEventListener('click', async function () {
-    try {
-      await api('settings_save', { body: { key: 'whatsapp', value: { instance: document.getElementById('w-inst').value } } });
-      toast('Instância salva');
-    } catch (e) { toast(e.message, true); }
-  });
+  carregaWhatsApp();
 
   try {
     const l = await api('logs', { params: { limit: 40 } });
@@ -1951,6 +1951,173 @@ async function gatilhoConcluido(c) {
     alert('Resultado do envio:\n\n' + linhas.join('\n'));
     carregaBoard();
   } catch (e) { toast(e.message, true); }
+}
+
+
+/* ============================================================
+   WHATSAPP — conectar por QR code
+   ============================================================ */
+let WA_TIMER = null;
+
+async function carregaWhatsApp() {
+  const box = document.getElementById('wa-area');
+  if (!box) return;
+  let d;
+  try { d = await api('wa_status'); }
+  catch (e) { box.innerHTML = '<div class="alert alert-erro" style="margin:0">' + esc(e.message) + '</div>'; return; }
+
+  if (!d.configurada) {
+    box.innerHTML = '<div class="alert alert-aviso" style="margin:0">' +
+      'Faltam as variáveis <code>EVOLUTION_API_URL</code> e <code>EVOLUTION_API_KEY</code> na Vercel. ' +
+      'Depois de colocar, faça Redeploy e volte aqui.</div>';
+    return;
+  }
+
+  const conectada = d.estado && d.estado.conectada;
+  const inst = d.escolhida || '';
+  const rotEstado = { open: ['tag-verde', 'conectado'], connecting: ['tag-ambar', 'conectando'], close: ['tag-vermelho', 'desconectado'] };
+  const e = d.estado ? (rotEstado[d.estado.estado] || ['tag', d.estado.estado]) : null;
+
+  box.innerHTML =
+    '<div class="row row-wrap" style="gap:10px;margin-bottom:16px">' +
+      (inst ? '<span class="tag">instância: <strong style="margin-left:4px">' + esc(inst) + '</strong></span>' : '') +
+      (e ? '<span class="tag ' + e[0] + '">' + e[1] + '</span>' : '') +
+    '</div>' +
+
+    (conectada
+      ? '<div class="alert alert-ok"><strong>WhatsApp conectado.</strong> A Aurea já pode falar com os candidatos por este número.</div>' +
+        '<div class="grid grid-2" style="align-items:end">' +
+          '<div class="field"><label>Mandar uma mensagem de teste</label>' +
+          '<span class="hint">Coloque o seu número com DDD para conferir se chega.</span>' +
+          '<input type="tel" id="wa-teste-fone" placeholder="(11) 91234-5678"></div>' +
+          '<div class="row" style="gap:10px"><button class="btn btn-sm" id="wa-testar">Enviar teste</button>' +
+          '<button class="btn btn-sm btn-ghost" id="wa-webhook">Reconfigurar webhook</button>' +
+          '<button class="btn btn-sm btn-ghost" id="wa-sair">Desconectar</button></div>' +
+        '</div><div id="wa-teste-res"></div>'
+
+      : '<div class="grid grid-2" style="align-items:end">' +
+          '<div class="field"><label>Nome da instância</label>' +
+          '<span class="hint">Um apelido para este número. Só letras, números, hífen e underline.</span>' +
+          '<input type="text" id="wa-nome" value="' + esc(inst || 'start-rh') + '"></div>' +
+          '<div><button class="btn" id="wa-conectar">Gerar QR code</button></div>' +
+        '</div><div id="wa-qr"></div>') +
+
+    '<hr class="sep">' +
+    '<p class="small muted" style="margin:0">Endereço do webhook (o sistema configura sozinho, isto é só para conferência):<br>' +
+    '<span style="font-family:ui-monospace,monospace;font-size:12px;word-break:break-all">' + esc(d.webhook_url) + '</span></p>' +
+
+    (d.instancias.length > 1
+      ? '<hr class="sep"><h3 style="font-size:13.5px;margin:0 0 10px">Outras instâncias nesta Evolution</h3>' +
+        '<div class="row row-wrap" style="gap:8px">' + d.instancias.map(function (i) {
+          return '<button class="btn btn-sm btn-ghost wa-trocar" data-nome="' + esc(i.name) + '">' +
+            esc(i.name) + ' <span class="muted" style="margin-left:5px">' + esc(i.status || '') + '</span></button>';
+        }).join('') + '</div>'
+      : '');
+
+  ligaWhatsApp(inst);
+}
+
+function ligaWhatsApp(inst) {
+  const b = function (id) { return document.getElementById(id); };
+
+  if (b('wa-conectar')) {
+    b('wa-conectar').addEventListener('click', async function () {
+      const nome = b('wa-nome').value.trim();
+      const btn = this;
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Gerando…';
+      try {
+        const r = await api('wa_conectar', { body: { instance: nome } });
+        if (r.ja_conectada) { toast('Este número já está conectado'); return carregaWhatsApp(); }
+        if (!r.base64) throw new Error('A Evolution não devolveu o QR code. Tente de novo em alguns segundos.');
+        const img = r.base64.indexOf('data:') === 0 ? r.base64 : 'data:image/png;base64,' + r.base64;
+        b('wa-qr').innerHTML =
+          '<div class="qr-box">' +
+            '<img src="' + img + '" alt="QR code do WhatsApp">' +
+            '<div class="qr-passos">' +
+              '<h4>Escaneie com o WhatsApp do número da Start</h4>' +
+              '<ol>' +
+                '<li>Abra o WhatsApp no celular</li>' +
+                '<li>Toque nos três pontinhos → <strong>Aparelhos conectados</strong></li>' +
+                '<li>Toque em <strong>Conectar um aparelho</strong></li>' +
+                '<li>Aponte a câmera para este código</li>' +
+              '</ol>' +
+              (r.pairingCode ? '<p class="small">Se preferir, use o código de pareamento: <strong style="font-size:16px;letter-spacing:2px">' + esc(r.pairingCode) + '</strong></p>' : '') +
+              '<p class="small muted" id="wa-espera">Esperando você escanear… a tela atualiza sozinha.</p>' +
+              (r.webhook_ok
+                ? '<p class="small" style="color:var(--accent)">Webhook configurado automaticamente.</p>'
+                : '<p class="small" style="color:var(--orange)">Não consegui configurar o webhook sozinho: ' + esc(r.webhook_erro || '') + '</p>') +
+            '</div>' +
+          '</div>';
+        vigiaConexao(nome);
+      } catch (e) {
+        b('wa-qr').innerHTML = '<div class="alert alert-erro" style="margin-top:14px">' + esc(e.message) + '</div>';
+      }
+      btn.disabled = false; btn.textContent = 'Gerar QR code';
+    });
+  }
+
+  if (b('wa-testar')) {
+    b('wa-testar').addEventListener('click', async function () {
+      const fone = b('wa-teste-fone').value.trim();
+      if (!fone) return toast('Coloque um número', true);
+      this.disabled = true;
+      try {
+        await api('wa_teste', { body: { phone: fone } });
+        b('wa-teste-res').innerHTML = '<div class="alert alert-ok" style="margin-top:14px">Mensagem enviada. Confira o celular.</div>';
+      } catch (e) {
+        b('wa-teste-res').innerHTML = '<div class="alert alert-erro" style="margin-top:14px">' + esc(e.message) + '</div>';
+      }
+      this.disabled = false;
+    });
+  }
+
+  if (b('wa-webhook')) {
+    b('wa-webhook').addEventListener('click', async function () {
+      try { await api('wa_webhook', { body: {} }); toast('Webhook reconfigurado'); }
+      catch (e) { toast(e.message, true); }
+    });
+  }
+
+  if (b('wa-sair')) {
+    b('wa-sair').addEventListener('click', async function () {
+      if (!confirm('Desconectar este número do sistema? A Aurea para de mandar mensagem até você conectar de novo.')) return;
+      try { await api('wa_desconectar', { body: {} }); toast('Desconectado'); carregaWhatsApp(); }
+      catch (e) { toast(e.message, true); }
+    });
+  }
+
+  document.querySelectorAll('.wa-trocar').forEach(function (bt) {
+    bt.addEventListener('click', async function () {
+      try {
+        await api('settings_save', { body: { key: 'whatsapp', value: { instance: bt.dataset.nome } } });
+        toast('Agora usando ' + bt.dataset.nome);
+        carregaWhatsApp();
+      } catch (e) { toast(e.message, true); }
+    });
+  });
+}
+
+// fica olhando até o WhatsApp conectar
+function vigiaConexao(nome) {
+  clearInterval(WA_TIMER);
+  let tentativas = 0;
+  WA_TIMER = setInterval(async function () {
+    tentativas++;
+    if (tentativas > 40) {
+      clearInterval(WA_TIMER);
+      const el = document.getElementById('wa-espera');
+      if (el) el.textContent = 'O código expirou. Clique em "Gerar QR code" de novo.';
+      return;
+    }
+    try {
+      const r = await api('wa_estado', { params: { instance: nome } });
+      if (r.conectada) {
+        clearInterval(WA_TIMER);
+        toast('WhatsApp conectado!');
+        carregaWhatsApp();
+      }
+    } catch (e) { /* segue tentando */ }
+  }, 3000);
 }
 
 /* ============================================================

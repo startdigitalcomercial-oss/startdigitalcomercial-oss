@@ -138,3 +138,114 @@ function providerStatus() {
 }
 
 module.exports = { sendEmail, sendWhatsApp, sendSms, listWhatsAppInstances, providerStatus };
+
+// ============================================================
+// GESTÃO DA INSTÂNCIA DO WHATSAPP (Evolution API)
+// Criar, mostrar o QR code, ver o estado e ligar o webhook.
+// ============================================================
+function evoBase() {
+  return (process.env.EVOLUTION_API_URL || '').replace(/\/+$/, '');
+}
+function evoKey() {
+  return process.env.EVOLUTION_API_KEY || '';
+}
+function evoPronta() {
+  return !!(evoBase() && evoKey());
+}
+
+async function evoFetch(caminho, opts) {
+  opts = opts || {};
+  const res = await fetch(evoBase() + caminho, {
+    method: opts.method || 'GET',
+    headers: { apikey: evoKey(), 'Content-Type': 'application/json' },
+    body: opts.body === undefined ? undefined : JSON.stringify(opts.body)
+  });
+  const texto = await res.text();
+  let data = null;
+  if (texto) { try { data = JSON.parse(texto); } catch (e) { data = texto; } }
+  return { ok: res.ok, status: res.status, data: data };
+}
+
+// cria a instância e já devolve o QR code
+async function waCriarInstancia(nome) {
+  if (!evoPronta()) return { ok: false, error: 'EVOLUTION_API_URL / EVOLUTION_API_KEY nao configuradas.' };
+  const r = await evoFetch('/instance/create', {
+    method: 'POST',
+    body: { instanceName: nome, qrcode: true, integration: 'WHATSAPP-BAILEYS' }
+  });
+  if (!r.ok) {
+    const msg = (r.data && (r.data.message || r.data.error)) || ('HTTP ' + r.status);
+    // se ja existe, seguimos para o connect normalmente
+    if (String(JSON.stringify(msg)).toLowerCase().indexOf('already') >= 0 || r.status === 403) {
+      return waQrCode(nome);
+    }
+    return { ok: false, error: typeof msg === 'string' ? msg : JSON.stringify(msg) };
+  }
+  const q = r.data && r.data.qrcode;
+  return {
+    ok: true, criada: true,
+    base64: (q && (q.base64 || q.code)) || null,
+    pairingCode: (q && q.pairingCode) || null
+  };
+}
+
+// pede o QR code de uma instância que já existe
+async function waQrCode(nome) {
+  if (!evoPronta()) return { ok: false, error: 'Evolution nao configurada.' };
+  const r = await evoFetch('/instance/connect/' + encodeURIComponent(nome));
+  if (!r.ok) {
+    const msg = (r.data && (r.data.message || r.data.error)) || ('HTTP ' + r.status);
+    return { ok: false, error: typeof msg === 'string' ? msg : JSON.stringify(msg) };
+  }
+  const d = r.data || {};
+  return {
+    ok: true,
+    base64: d.base64 || (d.qrcode && d.qrcode.base64) || null,
+    pairingCode: d.pairingCode || (d.qrcode && d.qrcode.pairingCode) || null,
+    ja_conectada: d.instance && d.instance.state === 'open'
+  };
+}
+
+// estado da conexão: open / connecting / close
+async function waEstado(nome) {
+  if (!evoPronta()) return { ok: false, error: 'Evolution nao configurada.' };
+  const r = await evoFetch('/instance/connectionState/' + encodeURIComponent(nome));
+  if (!r.ok) return { ok: false, error: 'HTTP ' + r.status };
+  const st = (r.data && r.data.instance && (r.data.instance.state || r.data.instance.connectionStatus)) || 'desconhecido';
+  return { ok: true, estado: st, conectada: st === 'open' };
+}
+
+async function waDesconectar(nome) {
+  if (!evoPronta()) return { ok: false, error: 'Evolution nao configurada.' };
+  const r = await evoFetch('/instance/logout/' + encodeURIComponent(nome), { method: 'DELETE' });
+  return { ok: r.ok, error: r.ok ? null : 'HTTP ' + r.status };
+}
+
+// liga o webhook da instância no nosso endereço (tenta v2, cai para v1)
+async function waWebhook(nome, url) {
+  if (!evoPronta()) return { ok: false, error: 'Evolution nao configurada.' };
+  const eventos = ['MESSAGES_UPSERT'];
+
+  let r = await evoFetch('/webhook/set/' + encodeURIComponent(nome), {
+    method: 'POST',
+    body: { webhook: { enabled: true, url: url, webhookByEvents: false, webhookBase64: false, events: eventos } }
+  });
+  if (!r.ok) {
+    r = await evoFetch('/webhook/set/' + encodeURIComponent(nome), {
+      method: 'POST',
+      body: { url: url, enabled: true, webhook_by_events: false, events: eventos }
+    });
+  }
+  if (!r.ok) {
+    const msg = (r.data && (r.data.message || r.data.error)) || ('HTTP ' + r.status);
+    return { ok: false, error: typeof msg === 'string' ? msg : JSON.stringify(msg) };
+  }
+  return { ok: true };
+}
+
+module.exports.waCriarInstancia = waCriarInstancia;
+module.exports.waQrCode = waQrCode;
+module.exports.waEstado = waEstado;
+module.exports.waDesconectar = waDesconectar;
+module.exports.waWebhook = waWebhook;
+module.exports.evoPronta = evoPronta;
