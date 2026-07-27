@@ -230,8 +230,23 @@ function telefoneNacional(raw) {
   return d;
 }
 
+// Mostra a cara da chave sem revelar ela: "8e56…2bbe (36 caracteres)".
+// Serve para comparar com o que esta no painel sem expor o segredo no log.
+function retratoDaChave(bruta) {
+  const c = String(bruta == null ? '' : bruta);
+  const limpa = c.trim();
+  const partes = [];
+  partes.push(limpa.length >= 8 ? limpa.slice(0, 4) + '…' + limpa.slice(-4) : '(muito curta)');
+  partes.push(limpa.length + ' caracteres');
+  if (c !== limpa) partes.push('TINHA ESPAÇO OU QUEBRA DE LINHA SOBRANDO');
+  if (/^[A-Z_]+=/.test(limpa)) partes.push('COMEÇA COM O NOME DA VARIÁVEL — tire o "' + limpa.split('=')[0] + '=" do valor');
+  if (!/^[0-9a-fA-F-]{36}$/.test(limpa)) partes.push('não tem o formato de chave da Comtele (36 caracteres, só números, letras de a-f e hífens)');
+  return partes.join(' · ');
+}
+
 async function sendSmsComtele(opts) {
-  const chave = process.env.COMTELE_API_KEY;
+  // trim: valor colado na Vercel costuma vir com espaço ou quebra de linha atrás
+  const chave = String(process.env.COMTELE_API_KEY || '').trim();
   const numero = telefoneNacional(opts.to);
   if (!numero || numero.length < 10) {
     return { status: 'erro', provider: 'comtele', error: 'Telefone invalido: ' + (opts.to || '') };
@@ -254,7 +269,12 @@ async function sendSmsComtele(opts) {
     if (!res.ok || !okApi) {
       const msg = (data && (data.Message || data.message)) ||
         (typeof data === 'string' ? data.slice(0, 200) : '') || ('HTTP ' + res.status);
-      return { status: 'erro', provider: 'comtele', error: msg + ' [numero ' + numero + ']' };
+      // Quando a Comtele recusa a chave, mostramos a "cara" dela para dar
+      // para comparar com o painel sem precisar expor o segredo.
+      const pista = (res.status === 401 || /chave/i.test(String(msg)))
+        ? ' [chave usada: ' + retratoDaChave(process.env.COMTELE_API_KEY) + ']'
+        : '';
+      return { status: 'erro', provider: 'comtele', error: msg + ' [numero ' + numero + ']' + pista };
     }
     return {
       status: 'enviado', provider: 'comtele',
@@ -297,10 +317,14 @@ async function sendSms(opts) {
 }
 
 function providerStatus() {
+  const temComtele = !!process.env.COMTELE_API_KEY;
+  const temTwilio = !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM);
   return {
     email: !!process.env.RESEND_API_KEY,
     whatsapp: !!(process.env.EVOLUTION_API_URL && process.env.EVOLUTION_API_KEY),
-    sms: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM)
+    sms: temComtele || temTwilio,
+    // qual provedor de SMS o sistema esta enxergando agora
+    sms_provider: temComtele ? 'Comtele' : (temTwilio ? 'Twilio' : null)
   };
 }
 
