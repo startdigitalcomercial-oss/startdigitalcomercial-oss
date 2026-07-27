@@ -194,21 +194,211 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+// ============================================================
+// E-MAIL: transforma o texto simples do modelo em um e-mail bonito.
+//
+// O time escreve texto puro no painel. Esta funcao le esse texto e
+// reconhece sozinha quatro coisas:
+//   1. linha em MAIUSCULAS  -> vira um titulo de secao
+//   2. linha que e so um link -> vira um botao de verdade
+//   3. linhas "Rotulo: valor" -> viram um quadro destacado
+//   4. "Equipe StartDigital"  -> vira assinatura
+// Tudo com estilo em linha e tabelas, que e o que e-mail entende.
+// ============================================================
+const COR = {
+  fundo: '#f5f5f7',
+  cartao: '#ffffff',
+  topo: '#111214',
+  tinta: '#1d1d1f',
+  tinta2: '#515154',
+  tinta3: '#86868b',
+  fio: '#e5e5ea',
+  suave: '#f5f5f7',
+  destaque: '#00a15c',
+  destaqueSuave: '#eaf7f0'
+};
+
+// O texto do botao muda conforme o destino do link.
+function rotuloBotao(url) {
+  const u = String(url || '');
+  if (u.indexOf('/criar-senha') >= 0) return 'Criar a minha senha';
+  if (u.indexOf('/portal') >= 0) return 'Abrir a área de integração';
+  if (u.indexOf('/disc') >= 0) return 'Fazer o teste de perfil';
+  if (u.indexOf('/prova') >= 0) return 'Abrir o quiz';
+  if (u.indexOf('/entrar') >= 0) return 'Entrar na minha conta';
+  if (u.indexOf('/vaga') >= 0) return 'Ver a vaga';
+  return 'Abrir o link';
+}
+
+function ehSoLink(linha) {
+  return /^https?:\/\/\S+$/i.test(String(linha).trim());
+}
+
+// "O QUE ACONTECE AGORA" -> titulo. Precisa ter letras e nenhuma minuscula.
+function ehTitulo(linha) {
+  const t = String(linha).trim();
+  if (!t || t.length > 64) return false;
+  if (!/[A-ZÀ-Þ]/.test(t)) return false;
+  if (/[a-zà-þ]/.test(t)) return false;
+  return !/^https?:/i.test(t);
+}
+
+function ehCampo(linha) {
+  return /^[^:]{2,28}:\s*.+$/.test(String(linha).trim()) && !/^https?:/i.test(String(linha).trim());
+}
+
+function botaoHtml(url) {
+  const u = escapeHtml(url);
+  return '' +
+    '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 14px">' +
+      '<tr><td align="center" bgcolor="' + COR.destaque + '" style="border-radius:980px">' +
+        '<a href="' + u + '" target="_blank" style="display:inline-block;padding:14px 30px;' +
+          'font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Helvetica,Arial,sans-serif;' +
+          'font-size:15px;font-weight:600;letter-spacing:-.01em;color:#ffffff;text-decoration:none;border-radius:980px">' +
+          escapeHtml(rotuloBotao(url)) +
+        '</a>' +
+      '</td></tr>' +
+    '</table>' +
+    '<p style="margin:0 0 20px;font-size:12.5px;line-height:1.6;color:' + COR.tinta3 + '">' +
+      'Se o botão não abrir, copie e cole este endereço no navegador:<br>' +
+      '<a href="' + u + '" style="color:' + COR.tinta3 + ';word-break:break-all">' + u + '</a>' +
+    '</p>';
+}
+
+function corpoEmail(text) {
+  const linhas = String(text || '').replace(/\r/g, '').split('\n');
+  let html = '';
+  let paragrafo = [];
+  let campos = [];
+
+  function fechaParagrafo() {
+    if (!paragrafo.length) return;
+    html += '<p style="margin:0 0 16px;font-size:15.5px;line-height:1.62;color:' + COR.tinta2 + '">' +
+      paragrafo.map(escapeHtml).join('<br>') + '</p>';
+    paragrafo = [];
+  }
+  function fechaCampos() {
+    if (!campos.length) return;
+    html += '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" ' +
+      'style="margin:0 0 20px;background:' + COR.suave + ';border-radius:12px">' +
+      '<tr><td style="padding:16px 18px">' +
+      campos.map(function (l) {
+        const i = l.indexOf(':');
+        const rot = l.slice(0, i).trim();
+        const val = l.slice(i + 1).trim();
+        return '<div style="font-size:14px;line-height:1.7;color:' + COR.tinta + '">' +
+          '<span style="color:' + COR.tinta3 + '">' + escapeHtml(rot) + ':</span> ' +
+          '<strong style="font-weight:600">' + escapeHtml(val) + '</strong></div>';
+      }).join('') +
+      '</td></tr></table>';
+    campos = [];
+  }
+  function fecha() { fechaParagrafo(); fechaCampos(); }
+
+  for (let i = 0; i < linhas.length; i++) {
+    const bruta = linhas[i];
+    const linha = bruta.trim();
+
+    if (!linha) { fecha(); continue; }
+
+    if (ehSoLink(linha)) { fecha(); html += botaoHtml(linha); continue; }
+
+    if (ehTitulo(linha)) {
+      fecha();
+      html += '<p style="margin:26px 0 10px;font-size:11.5px;font-weight:700;letter-spacing:.08em;' +
+        'text-transform:uppercase;color:' + COR.destaque + '">' + escapeHtml(linha) + '</p>';
+      continue;
+    }
+
+    if (/^equipe\s+startdigital$/i.test(linha)) {
+      fecha();
+      html += '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:26px 0 0">' +
+        '<tr><td style="border-top:1px solid ' + COR.fio + ';padding-top:18px;font-size:14.5px;color:' + COR.tinta + '">' +
+        '<strong style="font-weight:600">Equipe StartDigital</strong>' +
+        '<div style="font-size:13px;color:' + COR.tinta3 + ';margin-top:2px">Agência de marketing digital</div>' +
+        '</td></tr></table>';
+      continue;
+    }
+
+    if (ehCampo(linha)) { fechaParagrafo(); campos.push(linha); continue; }
+
+    fechaCampos();
+    paragrafo.push(bruta.trim());
+  }
+  fecha();
+  return html;
+}
+
 // Texto simples -> HTML de e-mail
 function textToEmailHtml(text, title) {
-  const paragraphs = String(text || '')
-    .split(/\n{2,}/)
-    .map(function (p) { return '<p style="margin:0 0 16px;line-height:1.65">' + escapeHtml(p).replace(/\n/g, '<br>') + '</p>'; })
-    .join('');
-  return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
-    '<title>' + escapeHtml(title || '') + '</title></head>' +
-    '<body style="margin:0;padding:24px;background:#f1f5f9;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f172a">' +
-    '<div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0">' +
-    '<div style="background:#0f172a;padding:20px 28px;color:#fff;font-weight:700;font-size:18px;letter-spacing:.3px">StartDigital</div>' +
-    '<div style="padding:28px;font-size:15px">' + paragraphs + '</div>' +
-    '<div style="padding:16px 28px;background:#f8fafc;color:#64748b;font-size:12px;border-top:1px solid #e2e8f0">' +
-    'Esta mensagem foi enviada pelo sistema de recrutamento da StartDigital.</div>' +
-    '</div></body></html>';
+  const previa = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 110);
+  const fonte = '-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Helvetica,Arial,sans-serif';
+
+  return '<!doctype html>' +
+'<html lang="pt-BR"><head>' +
+'<meta charset="utf-8">' +
+'<meta name="viewport" content="width=device-width,initial-scale=1">' +
+'<meta name="color-scheme" content="light dark">' +
+'<meta name="supported-color-schemes" content="light dark">' +
+'<title>' + escapeHtml(title || 'StartDigital') + '</title>' +
+'<style>' +
+'  a{color:' + COR.destaque + '}' +
+'  @media (max-width:620px){ .env{padding:14px !important} .bloco{padding:26px 22px !important} }' +
+'  @media (prefers-color-scheme:dark){' +
+'    .bg{background:#000000 !important}' +
+'    .cartao{background:#1c1c1e !important}' +
+'    .txt{color:#ebebf0 !important}' +
+'    .txt2{color:#aeaeb2 !important}' +
+'    .caixa{background:#2c2c2e !important}' +
+'    .fio{border-color:#3a3a3c !important}' +
+'    .rodape{background:#161618 !important}' +
+'  }' +
+'</style>' +
+'</head>' +
+'<body class="bg" style="margin:0;padding:0;background:' + COR.fundo + ';">' +
+
+// linha de previa que aparece na lista da caixa de entrada, sem aparecer no corpo
+'<div style="display:none;max-height:0;overflow:hidden;opacity:0">' + escapeHtml(previa) + '</div>' +
+
+'<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" class="bg" style="background:' + COR.fundo + '">' +
+'<tr><td align="center" class="env" style="padding:28px 16px 40px">' +
+
+'<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" class="cartao" ' +
+  'style="width:100%;max-width:600px;background:' + COR.cartao + ';border-radius:16px;overflow:hidden;' +
+  'font-family:' + fonte + '">' +
+
+  // topo escuro com a marca
+  '<tr><td style="background:' + COR.topo + ';padding:22px 32px">' +
+    '<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>' +
+      '<td style="padding-right:9px">' +
+        '<div style="width:9px;height:9px;border-radius:50%;background:' + COR.destaque + ';font-size:0;line-height:0">&nbsp;</div>' +
+      '</td>' +
+      '<td style="font-family:' + fonte + ';font-size:16px;font-weight:600;letter-spacing:-.015em;color:#ffffff">' +
+        'StartDigital' +
+        '<span style="font-weight:400;color:#8e8e93;margin-left:8px;font-size:13.5px">Recrutamento</span>' +
+      '</td>' +
+    '</tr></table>' +
+  '</td></tr>' +
+
+  // conteudo
+  '<tr><td class="bloco txt" style="padding:32px 32px 30px;color:' + COR.tinta + '">' +
+    corpoEmail(text) +
+  '</td></tr>' +
+
+'</table>' +
+
+// rodape fora do cartao, discreto
+'<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:100%;max-width:600px">' +
+  '<tr><td align="center" style="padding:20px 24px 0">' +
+    '<p class="txt2" style="margin:0;font-family:' + fonte + ';font-size:12px;line-height:1.65;color:' + COR.tinta3 + '">' +
+      'Mensagem automática do processo seletivo da StartDigital.<br>' +
+      'Se você não se candidatou a nenhuma vaga, pode ignorar este e-mail.' +
+    '</p>' +
+  '</td></tr>' +
+'</table>' +
+
+'</td></tr></table>' +
+'</body></html>';
 }
 
 // ---------- Telefone ----------
