@@ -204,8 +204,21 @@
   .mod-corpo { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .26s cubic-bezier(.32,.72,0,1); }
   .sanfona.aberto .mod-corpo { grid-template-rows: 1fr; }
   .mod-corpo > div { overflow: hidden; }
+
+  /* alça de arrastar */
+  .mod-pega { flex: none; width: 26px; height: 30px; margin: 2px 0 0 -4px; padding: 0; border: 0; border-radius: 7px;
+    background: transparent; color: var(--label-3); cursor: grab; display: flex; align-items: center;
+    justify-content: center; opacity: .6; transition: opacity .14s, background .14s, color .14s; touch-action: none; }
+  .sanfona:hover .mod-pega { opacity: 1; }
+  .mod-pega:hover { background: var(--fill-1); color: var(--label); }
+  .mod-pega:focus-visible { opacity: 1; outline: 2px solid var(--accent); outline-offset: 1px; }
+  .mod-pega:active { cursor: grabbing; }
+  .sanfona.arrastando { opacity: .5; }
+  .sanfona.alvo-cima { box-shadow: 0 -3px 0 -1px var(--accent), var(--shadow-1); }
+  .sanfona.alvo-baixo { box-shadow: 0 3px 0 -1px var(--accent), var(--shadow-1); }
+
   @media (prefers-reduced-motion: reduce) {
-    .mod-corpo, .mod-toggle .seta, .qr-box img { transition: none; }
+    .mod-corpo, .mod-toggle .seta, .qr-box img, .mod-pega { transition: none; }
   }
 </style>
 </head>
@@ -344,7 +357,7 @@
           <div class="row" style="justify-content:space-between">
             <div>
               <h2 style="margin:0">Módulos e aulas da integração</h2>
-              <p class="sub" style="margin:2px 0 0">Cole o link do vídeo (YouTube, Vimeo, Drive, Loom ou MP4) e adicione os materiais para download.</p>
+              <p class="sub" style="margin:2px 0 0">Cole o link do vídeo (YouTube, Vimeo, Drive, Loom ou MP4) e adicione os materiais para download.<br>Para mudar a ordem, segure os <strong>pontinhos à esquerda do módulo</strong> e arraste. A ordem aqui é a que o candidato vê.</p>
             </div>
             <button class="btn btn-sm" id="btn-novo-modulo">+ Novo módulo</button>
           </div>
@@ -1013,6 +1026,13 @@ async function carregaConteudo() {
     const n = m.lessons.length;
     return '<div class="card sanfona' + (aberto ? ' aberto' : '') + '" data-mod="' + esc(m.id) + '">' +
       '<div class="row" style="align-items:flex-start">' +
+      '<button type="button" class="mod-pega" title="Arraste para mudar a ordem (ou use as setas ↑ ↓ do teclado)" aria-label="Mudar a ordem deste módulo">' +
+        '<svg viewBox="0 0 24 24" width="17" height="17" style="fill:currentColor;stroke:none">' +
+          '<circle cx="9.5" cy="6.5" r="1.5"/><circle cx="14.5" cy="6.5" r="1.5"/>' +
+          '<circle cx="9.5" cy="12" r="1.5"/><circle cx="14.5" cy="12" r="1.5"/>' +
+          '<circle cx="9.5" cy="17.5" r="1.5"/><circle cx="14.5" cy="17.5" r="1.5"/>' +
+        '</svg>' +
+      '</button>' +
       '<button type="button" class="mod-toggle" aria-expanded="' + (aberto ? 'true' : 'false') + '" title="abrir/fechar módulo">' +
         '<svg class="seta" viewBox="0 0 24 24" width="16" height="16" style="stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="m9 6 6 6-6 6"/></svg>' +
       '</button>' +
@@ -1065,7 +1085,83 @@ function leMateriais(txt) {
   }).filter(function (m) { return m.url; });
 }
 
+/* ---------- arrastar módulos para mudar a ordem ---------- */
+// Guarda a ordem no banco. Chamado depois de soltar o módulo no lugar novo.
+let SALVANDO_ORDEM = false;
+async function salvaOrdemModulos() {
+  const caixa = document.getElementById('lista-conteudo');
+  const ids = [...caixa.querySelectorAll('.sanfona')].map(function (c) { return c.dataset.mod; });
+  if (!ids.length || SALVANDO_ORDEM) return;
+  SALVANDO_ORDEM = true;
+  try { await api('module_reorder', { body: { ids: ids } }); toast('Ordem salva'); }
+  catch (e) { toast(e.message, true); carregaConteudo(); }
+  SALVANDO_ORDEM = false;
+}
+
+function ligaArrasteModulos() {
+  const caixa = document.getElementById('lista-conteudo');
+  if (!caixa) return;
+  let arrastando = null;
+
+  caixa.querySelectorAll('.sanfona').forEach(function (card) {
+    const pega = card.querySelector('.mod-pega');
+    if (!pega) return;
+
+    // o card só vira "arrastável" quando a pessoa segura a alça —
+    // assim dá para selecionar texto nos campos normalmente
+    pega.addEventListener('mousedown', function () { card.draggable = true; });
+    pega.addEventListener('touchstart', function () { card.draggable = true; }, { passive: true });
+    card.addEventListener('mouseup', function () { card.draggable = false; });
+
+    card.addEventListener('dragstart', function (ev) {
+      arrastando = card;
+      card.classList.add('arrastando');
+      try { ev.dataTransfer.effectAllowed = 'move'; ev.dataTransfer.setData('text/plain', card.dataset.mod); } catch (e) { }
+    });
+
+    card.addEventListener('dragend', function () {
+      card.classList.remove('arrastando');
+      card.draggable = false;
+      caixa.querySelectorAll('.sanfona').forEach(function (c) { c.classList.remove('alvo-cima', 'alvo-baixo'); });
+      arrastando = null;
+      salvaOrdemModulos();
+    });
+
+    card.addEventListener('dragover', function (ev) {
+      if (!arrastando || arrastando === card) return;
+      ev.preventDefault();
+      const r = card.getBoundingClientRect();
+      const emCima = ev.clientY < r.top + r.height / 2;
+      card.classList.toggle('alvo-cima', emCima);
+      card.classList.toggle('alvo-baixo', !emCima);
+      // move de verdade enquanto arrasta, para a pessoa ver onde vai cair
+      if (emCima) caixa.insertBefore(arrastando, card);
+      else caixa.insertBefore(arrastando, card.nextSibling);
+    });
+
+    card.addEventListener('dragleave', function () {
+      card.classList.remove('alvo-cima', 'alvo-baixo');
+    });
+
+    card.addEventListener('drop', function (ev) { ev.preventDefault(); });
+
+    // sem mouse: com a alça focada, as setas do teclado sobem e descem o módulo
+    pega.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown') return;
+      ev.preventDefault();
+      const irrmao = ev.key === 'ArrowUp' ? card.previousElementSibling : card.nextElementSibling;
+      if (!irrmao || !irrmao.classList.contains('sanfona')) return;
+      if (ev.key === 'ArrowUp') caixa.insertBefore(card, irrmao);
+      else caixa.insertBefore(irrmao, card);
+      pega.focus();
+      salvaOrdemModulos();
+    });
+  });
+}
+
 function ligaConteudo() {
+  ligaArrasteModulos();
+
   document.querySelectorAll('.mod-toggle').forEach(function (bt) {
     bt.addEventListener('click', function () {
       const caixa = bt.closest('.sanfona');
