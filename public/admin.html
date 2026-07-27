@@ -1408,8 +1408,12 @@ async function carregaAjustes() {
     '<table class="tbl"><tbody>' +
     '<tr><td>E-mail (Resend)</td><td><span class="tag ' + (p.email ? 'tag-verde' : 'tag-ambar') + '">' + (p.email ? 'configurado' : 'falta RESEND_API_KEY') + '</span></td></tr>' +
     '<tr><td>WhatsApp (Evolution)</td><td><span class="tag ' + (p.whatsapp ? 'tag-verde' : 'tag-ambar') + '">' + (p.whatsapp ? 'configurado' : 'faltam EVOLUTION_API_URL / KEY') + '</span></td></tr>' +
-    '<tr><td>SMS (Twilio)</td><td><span class="tag ' + (p.sms ? 'tag-verde' : 'tag-ambar') + '">' + (p.sms ? 'configurado' : 'sem provedor — envio manual') + '</span></td></tr>' +
+    '<tr><td>SMS' + (p.sms_provider ? ' (' + esc(p.sms_provider) + ')' : '') + '</td><td><span class="tag ' + (p.sms ? 'tag-verde' : 'tag-ambar') + '">' +
+      (p.sms ? 'configurado' : 'sem provedor — envio manual') + '</span></td></tr>' +
     '</tbody></table>' +
+    (p.sms ? '' :
+      '<p class="small muted" style="margin:12px 0 0">Para ligar o SMS: coloque <code>COMTELE_API_KEY</code> nas variáveis ' +
+      'de ambiente da Vercel e faça <strong>Redeploy</strong>. Esta linha vira verde sozinha quando o sistema enxergar a chave.') +
     '</div>' +
 
     '<div class="card" id="card-wa"><h2>WhatsApp</h2>' +
