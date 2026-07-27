@@ -181,6 +181,18 @@ async function adm(action, body, query) {
   check('cria aula com material', novaAula.ok && novaAula.lesson.materials.length === 1);
   const cont = await adm('content');
   check('conteudo lista 3 modulos', cont.ok && cont.modules.length === 3);
+  // arrastar para reordenar: inverte a lista e confere se ficou na ordem nova
+  const antes = cont.modules.map(function (m) { return m.id; });
+  const invertida = antes.slice().reverse();
+  const reord = await adm('module_reorder', { ids: invertida });
+  check('reordena modulos', reord.ok, reord.error);
+  const depois = await adm('content');
+  check('ordem nova foi gravada',
+    depois.ok && depois.modules.map(function (m) { return m.id; }).join() === invertida.join(),
+    depois.ok ? depois.modules.map(function (m) { return m.title; }).join(' | ') : depois.error);
+  check('recusa lista vazia', !(await adm('module_reorder', { ids: [] })).ok);
+  await adm('module_reorder', { ids: antes }); // devolve a ordem original
+
   check('exclui aula', (await adm('lesson_delete', { id: novaAula.lesson.id })).ok);
   check('exclui modulo', (await adm('module_delete', { id: novoMod.module.id })).ok);
 

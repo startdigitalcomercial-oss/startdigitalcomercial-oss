@@ -251,6 +251,17 @@ module.exports = async function handler(req, res) {
       return u.ok(res, { module: row });
     }
 
+    // nova ordem dos modulos: recebe a lista de ids na ordem que o time arrastou
+    if (action === 'module_reorder') {
+      const body = await u.readBody(req);
+      const ids = Array.isArray(body.ids) ? body.ids.filter(Boolean) : [];
+      if (!ids.length) return u.fail(res, 400, 'Nenhum módulo na lista.');
+      for (let i = 0; i < ids.length; i++) {
+        await db.update('modules', { position: i + 1 }, { id: 'eq.' + ids[i] });
+      }
+      return u.ok(res, { ordem: ids });
+    }
+
     if (action === 'module_delete') {
       const body = await u.readBody(req);
       await db.remove('modules', { id: 'eq.' + body.id });
