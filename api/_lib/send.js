@@ -187,8 +187,63 @@ async function listWhatsAppInstances() {
   }
 }
 
-// ---------------- SMS (Twilio, opcional) ----------------
+// ---------------- SMS ----------------
+// Dois provedores: Comtele (brasileira, numero nacional) e Twilio.
+// Se a chave da Comtele existir, ela tem preferencia.
+
+// SMS com acento vira UCS-2 e o limite cai de 160 para 70 caracteres —
+// a mesma mensagem passa a custar 2 ou 3 creditos. Entao tiramos os acentos.
+function semAcento(txt) {
+  return String(txt || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^\x00-\x7F]/g, '');
+}
+
+// A Comtele quer DDD + numero, sem o 55 do Brasil na frente.
+function telefoneNacional(raw) {
+  let d = u.normalizePhone(raw);
+  if (d.indexOf('55') === 0 && d.length > 11) d = d.slice(2);
+  return d;
+}
+
+async function sendSmsComtele(opts) {
+  const chave = process.env.COMTELE_API_KEY;
+  const numero = telefoneNacional(opts.to);
+  if (!numero || numero.length < 10) {
+    return { status: 'erro', provider: 'comtele', error: 'Telefone invalido: ' + (opts.to || '') };
+  }
+  const corpo = {
+    Sender: process.env.COMTELE_SENDER || 'StartDigital',
+    Receivers: numero,
+    Content: semAcento(opts.text).slice(0, 460)
+  };
+  try {
+    const res = await fetch('https://sms.comtele.com.br/api/v2/send', {
+      method: 'POST',
+      headers: { 'auth-key': chave, 'Content-Type': 'application/json' },
+      body: JSON.stringify(corpo)
+    });
+    const bruto = await res.text();
+    let data = null;
+    if (bruto) { try { data = JSON.parse(bruto); } catch (e) { data = bruto; } }
+    const okApi = data && data.Success === true;
+    if (!res.ok || !okApi) {
+      const msg = (data && (data.Message || data.message)) ||
+        (typeof data === 'string' ? data.slice(0, 200) : '') || ('HTTP ' + res.status);
+      return { status: 'erro', provider: 'comtele', error: msg + ' [numero ' + numero + ']' };
+    }
+    return {
+      status: 'enviado', provider: 'comtele',
+      id: (data.Object && data.Object.requestUniqueId) || null
+    };
+  } catch (e) {
+    return { status: 'erro', provider: 'comtele', error: e.message };
+  }
+}
+
 async function sendSms(opts) {
+  if (process.env.COMTELE_API_KEY) return sendSmsComtele(opts);
+
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
   const from = process.env.TWILIO_FROM;
