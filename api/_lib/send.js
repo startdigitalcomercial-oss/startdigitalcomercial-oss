@@ -80,8 +80,21 @@ async function sendWhatsApp(opts) {
   if (!instance) {
     return { status: 'pendente_manual', provider: 'evolution', error: 'Instancia do WhatsApp nao escolhida (configure no painel, aba Ajustes)' };
   }
-  const number = u.normalizePhone(opts.to);
+  let number = u.normalizePhone(opts.to);
   if (!number) return { status: 'erro', provider: 'evolution', error: 'Telefone invalido' };
+
+  // No Brasil existe a bagunca do nono digito: a conta pode estar registrada
+  // no WhatsApp SEM o 9 (numeros antigos). Se mandarmos para o numero errado,
+  // a Evolution aceita e diz "enviado", mas nada chega.
+  // Entao perguntamos a ela qual e o endereco de verdade (o "jid") e usamos ele.
+  let numeroReal = null;
+  try {
+    const cheque = await waNumeroExiste(number, instance);
+    if (cheque.ok && cheque.existe && cheque.jid) {
+      const d = String(cheque.jid).split('@')[0].replace(/\D/g, '');
+      if (d && d !== number) { numeroReal = d; number = d; }
+    }
+  } catch (e) { /* se nao der para checar, seguimos com o numero montado */ }
 
   const url = base + '/message/sendText/' + encodeURIComponent(instance);
   const headers = { apikey: apiKey, 'Content-Type': 'application/json' };
@@ -129,7 +142,18 @@ async function sendWhatsApp(opts) {
       };
     }
     const d = r.data || {};
-    return { status: 'enviado', provider: 'evolution', id: (d.key && d.key.id) || null };
+    // A Evolution devolve o estado da mensagem. "PENDING" quer dizer que ela
+    // aceitou mas ainda nao entregou ao WhatsApp — util para diferenciar
+    // "saiu daqui" de "chegou la".
+    const estado = d.status || (d.key ? 'ACEITA' : null);
+    return {
+      status: 'enviado',
+      provider: 'evolution',
+      id: (d.key && d.key.id) || null,
+      estado: estado,
+      numero: number,
+      numero_corrigido: numeroReal
+    };
   } catch (e) {
     return { status: 'erro', provider: 'evolution', error: e.message };
   }

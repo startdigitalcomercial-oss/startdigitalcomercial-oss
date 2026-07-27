@@ -880,12 +880,48 @@ module.exports = async function handler(req, res) {
         detalhe: existe.ok ? (existe.existe ? 'sim' : 'NÃO — esse número não tem WhatsApp') : (existe.error || 'não deu para checar')
       });
 
+      // O endereco real da conta no WhatsApp. No Brasil ele as vezes vem SEM o
+      // nono digito — e mandar para o numero errado faz a mensagem sumir.
+      const jidDigitos = existe.jid ? String(existe.jid).split('@')[0].replace(/\D/g, '') : '';
+      passos.push({
+        passo: 'Endereço real no WhatsApp',
+        ok: !!jidDigitos,
+        detalhe: !jidDigitos
+          ? 'não foi possível descobrir'
+          : (jidDigitos === numero
+              ? jidDigitos + ' (igual ao número montado)'
+              : jidDigitos + '  ⚠️ DIFERENTE do montado (' + numero + ') — o sistema vai usar este')
+      });
+
+      // Quem esta conectado. Se for o mesmo numero do destino, a mensagem cai
+      // na conversa "Mensagens para mim" e passa despercebida.
+      const instancias = await send.listWhatsAppInstances();
+      const minha = instancias.filter(function (i) { return i.name === nome; })[0] || {};
+      const meuNumero = String(minha.number || '').replace(/\D/g, '');
+      passos.push({
+        passo: 'Não é envio para si mesmo',
+        ok: !meuNumero || meuNumero.slice(-8) !== numero.slice(-8),
+        detalhe: meuNumero
+          ? (meuNumero.slice(-8) === numero.slice(-8)
+              ? 'É O MESMO NÚMERO da instância — a mensagem cai em "Mensagens para mim"'
+              : 'instância: ' + meuNumero)
+          : 'número da instância desconhecido'
+      });
+
       const links = cand ? u.candidateLinks(cand) : { link_disc: u.appUrl() + '/disc?t=TESTE' };
       const r1 = await send.sendWhatsApp({ to: telefone, text: 'Teste 1 de 2 (texto simples, sem link).', instance: nome });
-      passos.push({ passo: 'Envio sem link', ok: r1.status === 'enviado', detalhe: r1.error || 'enviado' });
+      passos.push({
+        passo: 'Envio sem link',
+        ok: r1.status === 'enviado',
+        detalhe: r1.error || ('enviado para ' + (r1.numero || '?') + (r1.estado ? ' · estado: ' + r1.estado : ''))
+      });
 
       const r2 = await send.sendWhatsApp({ to: telefone, text: 'Teste 2 de 2 (com link). ' + links.link_disc, instance: nome });
-      passos.push({ passo: 'Envio com link', ok: r2.status === 'enviado', detalhe: r2.error || 'enviado' });
+      passos.push({
+        passo: 'Envio com link',
+        ok: r2.status === 'enviado',
+        detalhe: r2.error || ('enviado para ' + (r2.numero || '?') + (r2.estado ? ' · estado: ' + r2.estado : ''))
+      });
 
       await db.insert('message_logs', {
         candidate_id: cand ? cand.id : null, channel: 'whatsapp', to_address: telefone,

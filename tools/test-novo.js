@@ -243,11 +243,26 @@ async function webhook(telefone, texto) {
   const diag = await adm('wa_diagnostico', { phone: '13 99600-3897' });
   check('diagnostico roda', diag.ok, diag.error);
   const passos = (diag.data && diag.data.passos) || (diag.passos) || [];
-  check('diagnostico tem 5 passos', passos.length === 5, 'passos: ' + passos.length);
+  check('diagnostico tem 7 passos', passos.length === 7, 'passos: ' + passos.length);
   const pNum = passos.filter(function (p) { return p.passo === 'Número montado'; })[0];
   check('diagnostico monta 5513996003897', !!pNum && /5513996003897/.test(String(pNum.detalhe)), pNum && pNum.detalhe);
   const pLink = passos.filter(function (p) { return p.passo === 'Envio com link'; })[0];
   check('diagnostico envia com link', !!pLink && pLink.ok === true, pLink && pLink.detalhe);
+
+  // Nono digito: numero antigo cadastrado no WhatsApp SEM o 9.
+  // O sistema tem que perceber e mandar para o endereco certo.
+  const diag9 = await adm('wa_diagnostico', { phone: '13 98855-9994' });
+  const p9 = (diag9.data && diag9.data.passos) || diag9.passos || [];
+  const pReal = p9.filter(function (p) { return p.passo === 'Endereço real no WhatsApp'; })[0];
+  check('detecta endereco diferente do montado',
+    !!pReal && /551388559994/.test(String(pReal.detalhe)) && /DIFERENTE/.test(String(pReal.detalhe)),
+    pReal && pReal.detalhe);
+  const pEnv = p9.filter(function (p) { return p.passo === 'Envio sem link'; })[0];
+  check('envia para o endereco corrigido',
+    !!pEnv && /551388559994/.test(String(pEnv.detalhe)),
+    pEnv && pEnv.detalhe);
+  const pEu = p9.filter(function (p) { return p.passo === 'Não é envio para si mesmo'; })[0];
+  check('avisa se for envio para si mesmo', !!pEu && pEu.ok === true, pEu && pEu.detalhe);
 
   const qrNovo = await adm('wa_qr', {});
   check('pede QR novo (renovacao)', qrNovo.ok && !!(qrNovo.data || qrNovo).base64, qrNovo.error);

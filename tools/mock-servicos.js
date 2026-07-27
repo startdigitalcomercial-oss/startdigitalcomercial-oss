@@ -106,7 +106,14 @@ const server = http.createServer(async function (req, res) {
   }
   if (url.pathname.indexOf('/chat/whatsappNumbers/') === 0) {
     const nums = (body && body.numbers) || [];
-    return json(nums.map(function (n) { return { exists: true, jid: n + '@s.whatsapp.net', number: n }; }));
+    return json(nums.map(function (n) {
+      const d = String(n);
+      // Simula o numero brasileiro antigo, cadastrado no WhatsApp SEM o nono
+      // digito. So para o numero de teste terminado em 88559994.
+      let jid = d;
+      if (/88559994$/.test(d) && d.length === 13) jid = d.slice(0, 4) + d.slice(5);
+      return { exists: true, jid: jid + '@s.whatsapp.net', number: d };
+    }));
   }
   if (url.pathname === '/instance/fetchInstances') {
     return json([{ instance: { instanceName: 'start-comercial', connectionStatus: 'open', owner: '5511999999999' } }]);
