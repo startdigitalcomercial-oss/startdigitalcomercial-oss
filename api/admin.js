@@ -846,6 +846,52 @@ module.exports = async function handler(req, res) {
       return r.status === 'enviado' ? u.ok(res, r) : u.fail(res, 400, r.error || 'Não foi enviado.');
     }
 
+    // Manda um SMS de teste para conferir a integracao com a Comtele.
+    if (action === 'sms_teste') {
+      const body = await u.readBody(req);
+      const fone = String(body.phone || '').trim();
+      if (!fone) return u.fail(res, 400, 'Coloque um número com DDD.');
+
+      const texto = body.text || 'StartDigital: teste do sistema de RH. Se voce recebeu, o SMS esta funcionando.';
+      const r = await send.sendSms({ to: fone, text: texto });
+
+      await db.insert('message_logs', {
+        candidate_id: null, channel: 'sms', to_address: fone,
+        subject: null, body: 'teste de sms', status: r.status, provider: r.provider, error: r.error || null
+      });
+
+      if (r.status !== 'enviado') return u.fail(res, 400, r.error || 'Não foi enviado.');
+      return u.ok(res, {
+        numero: r.numero || null,
+        rota: r.rota || null,
+        rota_nome: r.rota_nome || null,
+        provider: r.provider,
+        caracteres: texto.length,
+        creditos: Math.max(1, Math.ceil(texto.length <= 160 ? 1 : texto.length / 153))
+      });
+    }
+
+    // O que a Comtele diz sobre a ENTREGA de cada SMS (nao so o envio).
+    if (action === 'sms_entregas') {
+      const r = await send.comteleEntregas({ dias: params.dias, limite: params.limite });
+      if (!r.ok) return u.fail(res, 400, r.error);
+      const saldo = await send.comteleSaldo();
+      return u.ok(res, {
+        desde: r.desde,
+        mensagens: r.mensagens,
+        saldo: saldo.ok ? saldo.saldo : null,
+        saldo_erro: saldo.ok ? null : saldo.error
+      });
+    }
+
+    // Lista as rotas de envio disponiveis na conta da Comtele.
+    if (action === 'sms_rotas') {
+      const r = await send.comteleRotas();
+      if (!r.ok) return u.fail(res, 400, r.error);
+      const escolhida = await send.comteleRotaEscolhida();
+      return u.ok(res, { rotas: r.rotas, escolhida: escolhida.ok ? escolhida.id : null });
+    }
+
     // Diagnostico completo do WhatsApp de um candidato:
     // numero normalizado -> existe no WhatsApp? -> consegue enviar com link?
     if (action === 'wa_diagnostico') {
