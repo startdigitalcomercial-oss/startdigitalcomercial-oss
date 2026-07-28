@@ -264,6 +264,23 @@ async function webhook(telefone, texto) {
   const pEu = p9.filter(function (p) { return p.passo === 'Não é envio para si mesmo'; })[0];
   check('avisa se for envio para si mesmo', !!pEu && pEu.ok === true, pEu && pEu.detalhe);
 
+  console.log('\n5b) SMS — Comtele (API v4 do painel novo)');
+  const smsCand = await pub('apply', {
+    name: 'Sms Teste ' + SUF, email: 'sms.' + SUF + '@exemplo.com',
+    phone: '13 99600-3897', role_applied: 'Designer',
+    experience: 'Teste de SMS.', why_start: 'Teste.'
+  });
+  const envioSms = await adm('send', {
+    candidate_id: smsCand.id, set: 'welcome', channels: ['sms'], grant_access: false
+  });
+  const rSms = (envioSms.results || []).filter(function (x) { return x.channel === 'sms'; })[0];
+  check('sms sai pela comtele', !!rSms && rSms.status === 'enviado', rSms && rSms.error);
+  const capturado = await (await fetch('http://127.0.0.1:54322/__ultimo-sms')).json().catch(function () { return {}; });
+  check('usa a rota Premium (17)', capturado.route === 17 || capturado.route === '17', capturado.route);
+  check('numero vai com o 55 na frente', String(capturado.receivers && capturado.receivers[0]).indexOf('55') === 0,
+    capturado.receivers);
+  check('mensagem sem acento', !!capturado.message && !/[àáâãéêíóôõúç]/i.test(capturado.message), capturado.message);
+
   const qrNovo = await adm('wa_qr', {});
   check('pede QR novo (renovacao)', qrNovo.ok && !!(qrNovo.data || qrNovo).base64, qrNovo.error);
 

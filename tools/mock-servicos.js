@@ -100,6 +100,40 @@ const server = http.createServer(async function (req, res) {
     return json({ webhook: { enabled: true, url: body.webhook.url } });
   }
 
+  // ---------------- Comtele (API v4 do painel novo) ----------------
+  if (url.pathname === '/__ultimo-sms') {
+    return json(global.__comtele || {});
+  }
+  if (url.pathname === '/routes') {
+    if (req.headers['x-api-key'] !== 'chave-comtele-teste') {
+      res.statusCode = 401;
+      return res.end(JSON.stringify({ hasError: true, message: 'Chave invalida', errors: [], totalRecords: 0 }));
+    }
+    return json({
+      hasError: false, message: null, totalRecords: 2, errors: [],
+      object: [
+        { id: 11, displayName: 'Marketing', productName: 'SMS', productId: 1, farePrice: 0.1, replyFarePrice: 0 },
+        { id: 17, displayName: 'Premium', productName: 'SMS', productId: 2, farePrice: 0.12, replyFarePrice: 0 }
+      ]
+    });
+  }
+  if (url.pathname === '/messages/sms/send') {
+    if (req.headers['x-api-key'] !== 'chave-comtele-teste') {
+      res.statusCode = 401;
+      return res.end(JSON.stringify({ hasError: true, message: 'Chave invalida', errors: [], totalRecords: 0 }));
+    }
+    const b = body || {};
+    const faltando = ['receivers', 'contactGroups', 'message', 'route', 'tag'].filter(function (k) {
+      return b[k] === undefined || b[k] === null || b[k] === '';
+    });
+    if (faltando.length) {
+      res.statusCode = 400;
+      return res.end(JSON.stringify({ hasError: true, message: 'Campos obrigatorios', errors: faltando, totalRecords: 0 }));
+    }
+    global.__comtele = { receivers: b.receivers, route: b.route, message: b.message, tag: b.tag };
+    return json({ hasError: false, message: 'Enfileirado', totalRecords: 1, errors: [], object: { id: 'cmt-1' } });
+  }
+
   // ---------------- Evolution ----------------
   if (url.pathname.indexOf('/message/sendText/') === 0) {
     return json({ key: { id: 'mock-' + Math.random().toString(36).slice(2, 9) } });

@@ -244,41 +244,122 @@ function retratoDaChave(bruta) {
   return partes.join(' · ');
 }
 
-async function sendSmsComtele(opts) {
+function comteleChave() {
   // trim: valor colado na Vercel costuma vir com espaço ou quebra de linha atrás
-  const chave = String(process.env.COMTELE_API_KEY || '').trim();
-  const numero = telefoneNacional(opts.to);
-  if (!numero || numero.length < 10) {
+  return String(process.env.COMTELE_API_KEY || '').trim();
+}
+function comteleBase() {
+  return String(process.env.COMTELE_API_URL || 'https://api.comtele.com.br').replace(/\/+$/, '');
+}
+
+async function comteleFetch(caminho, opts) {
+  opts = opts || {};
+  const res = await fetch(comteleBase() + caminho, {
+    method: opts.method || 'GET',
+    headers: { 'x-api-key': comteleChave(), 'Content-Type': 'application/json' },
+    body: opts.body === undefined ? undefined : JSON.stringify(opts.body)
+  });
+  const bruto = await res.text();
+  let data = null;
+  if (bruto) { try { data = JSON.parse(bruto); } catch (e) { data = bruto; } }
+  return { ok: res.ok, status: res.status, data: data };
+}
+
+// A resposta da Comtele v4 vem em {hasError, message, errors:[...]}
+function erroComtele(data, status) {
+  if (typeof data === 'string' && data) return data.slice(0, 250);
+  const partes = [];
+  if (data && data.message) partes.push(String(data.message));
+  if (data && Array.isArray(data.errors) && data.errors.length) partes.push(data.errors.join(' | '));
+  return partes.filter(Boolean).join(' — ') || ('HTTP ' + status);
+}
+
+// A rota decide o preço e a qualidade da entrega. O painel mostra
+// "Marketing" (mais barata) e "Premium" (melhor entrega). Para mensagem de
+// processo seletivo a gente quer a Premium — marketing costuma ser filtrada.
+let ROTAS_CACHE = null;
+async function comteleRotas() {
+  if (ROTAS_CACHE) return ROTAS_CACHE;
+  const r = await comteleFetch('/routes');
+  if (!r.ok || !r.data || r.data.hasError === true) {
+    return { ok: false, error: erroComtele(r.data, r.status) };
+  }
+  const lista = Array.isArray(r.data.object) ? r.data.object : [];
+  ROTAS_CACHE = { ok: true, rotas: lista };
+  return ROTAS_CACHE;
+}
+
+async function comteleRotaEscolhida() {
+  const fixa = parseInt(process.env.COMTELE_ROUTE || '', 10);
+  if (fixa) return { ok: true, id: fixa, nome: 'definida na variável COMTELE_ROUTE' };
+
+  const r = await comteleRotas();
+  if (!r.ok) return { ok: false, error: 'Não consegui listar as rotas: ' + r.error };
+  if (!r.rotas.length) return { ok: false, error: 'A conta não tem nenhuma rota de envio liberada.' };
+
+  const premium = r.rotas.filter(function (x) { return /premium/i.test(String(x.displayName || x.productName || '')); })[0];
+  const escolhida = premium || r.rotas.slice().sort(function (a, b) {
+    return (Number(b.farePrice) || 0) - (Number(a.farePrice) || 0);
+  })[0];
+  return { ok: true, id: escolhida.id, nome: escolhida.displayName || escolhida.productName || ('rota ' + escolhida.id) };
+}
+
+// Envio pela API nova (painel portal.comtele.com.br, GatewayV4).
+async function sendSmsComtele(opts) {
+  const numero = u.normalizePhone(opts.to); // a v4 quer com o 55 na frente
+  if (!numero || numero.length < 12) {
     return { status: 'erro', provider: 'comtele', error: 'Telefone invalido: ' + (opts.to || '') };
   }
-  const corpo = {
-    Sender: process.env.COMTELE_SENDER || 'StartDigital',
-    Receivers: numero,
-    Content: semAcento(opts.text).slice(0, 460)
-  };
+
+  const rota = await comteleRotaEscolhida();
+  if (!rota.ok) {
+    const pista = /401|chave|unauthor/i.test(String(rota.error))
+      ? ' [chave usada: ' + retratoDaChave(process.env.COMTELE_API_KEY) + ']'
+      : '';
+    return { status: 'erro', provider: 'comtele', error: rota.error + pista };
+  }
+
+  // A especificacao da Comtele se contradiz: no exemplo o numero e a rota vao
+  // como numero, no esquema vao como texto. Mandamos como no exemplo e, se ela
+  // recusar o formato, repetimos como texto.
+  const tag = (process.env.COMTELE_SENDER || 'StartDigital-RH').slice(0, 40);
+  const texto = semAcento(opts.text).slice(0, 460);
+  function montaCorpo(comoTexto) {
+    return {
+      receivers: [comoTexto ? String(numero) : Number(numero)],
+      contactGroups: [],
+      message: texto,
+      route: comoTexto ? String(rota.id) : rota.id,
+      tag: tag,
+      custom: 'start-rh',
+      scheduleDate: null
+    };
+  }
+
   try {
-    const res = await fetch('https://sms.comtele.com.br/api/v2/send', {
-      method: 'POST',
-      headers: { 'auth-key': chave, 'Content-Type': 'application/json' },
-      body: JSON.stringify(corpo)
-    });
-    const bruto = await res.text();
-    let data = null;
-    if (bruto) { try { data = JSON.parse(bruto); } catch (e) { data = bruto; } }
-    const okApi = data && data.Success === true;
-    if (!res.ok || !okApi) {
-      const msg = (data && (data.Message || data.message)) ||
-        (typeof data === 'string' ? data.slice(0, 200) : '') || ('HTTP ' + res.status);
-      // Quando a Comtele recusa a chave, mostramos a "cara" dela para dar
-      // para comparar com o painel sem precisar expor o segredo.
-      const pista = (res.status === 401 || /chave/i.test(String(msg)))
+    let r = await comteleFetch('/messages/sms/send', { method: 'POST', body: montaCorpo(false) });
+    let deuCerto = r.ok && r.data && r.data.hasError !== true;
+
+    if (!deuCerto && (r.status === 400 || r.status === 422)) {
+      const r2 = await comteleFetch('/messages/sms/send', { method: 'POST', body: montaCorpo(true) });
+      if (r2.ok && r2.data && r2.data.hasError !== true) { r = r2; deuCerto = true; }
+      else if (erroComtele(r2.data, r2.status).length > erroComtele(r.data, r.status).length) r = r2;
+    }
+
+    if (!deuCerto) {
+      const msg = erroComtele(r.data, r.status);
+      const pista = (r.status === 401 || /chave|unauthor/i.test(msg))
         ? ' [chave usada: ' + retratoDaChave(process.env.COMTELE_API_KEY) + ']'
         : '';
-      return { status: 'erro', provider: 'comtele', error: msg + ' [numero ' + numero + ']' + pista };
+      return {
+        status: 'erro', provider: 'comtele',
+        error: msg + ' [numero ' + numero + ' · rota ' + rota.id + ' ' + rota.nome + ']' + pista
+      };
     }
     return {
       status: 'enviado', provider: 'comtele',
-      id: (data.Object && data.Object.requestUniqueId) || null
+      id: (r.data && r.data.object && (r.data.object.id || r.data.object.requestUniqueId)) || null,
+      rota: rota.id, rota_nome: rota.nome, numero: numero
     };
   } catch (e) {
     return { status: 'erro', provider: 'comtele', error: e.message };
@@ -286,7 +367,7 @@ async function sendSmsComtele(opts) {
 }
 
 async function sendSms(opts) {
-  if (process.env.COMTELE_API_KEY) return sendSmsComtele(opts);
+  if (comteleChave()) return sendSmsComtele(opts);
 
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
@@ -317,7 +398,7 @@ async function sendSms(opts) {
 }
 
 function providerStatus() {
-  const temComtele = !!process.env.COMTELE_API_KEY;
+  const temComtele = !!comteleChave();
   const temTwilio = !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM);
   return {
     email: !!process.env.RESEND_API_KEY,
@@ -328,7 +409,10 @@ function providerStatus() {
   };
 }
 
-module.exports = { sendEmail, sendWhatsApp, sendSms, listWhatsAppInstances, providerStatus, waNumeroExiste };
+module.exports = {
+  sendEmail, sendWhatsApp, sendSms, listWhatsAppInstances, providerStatus,
+  waNumeroExiste, comteleRotas, comteleRotaEscolhida
+};
 
 // ============================================================
 // GESTÃO DA INSTÂNCIA DO WHATSAPP (Evolution API)
