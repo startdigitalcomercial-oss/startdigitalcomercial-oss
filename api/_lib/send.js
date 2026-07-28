@@ -304,6 +304,49 @@ async function comteleRotaEscolhida() {
   return { ok: true, id: escolhida.id, nome: escolhida.displayName || escolhida.productName || ('rota ' + escolhida.id) };
 }
 
+// "enviado" na Comtele quer dizer "aceitei e coloquei na fila". Quem diz se
+// chegou no celular e o relatorio de entrega — e o unico jeito de saber o
+// motivo real quando o SMS some.
+async function comteleEntregas(opts) {
+  opts = opts || {};
+  const dias = Math.max(1, Math.min(30, parseInt(opts.dias, 10) || 2));
+  const limite = Math.max(1, Math.min(200, parseInt(opts.limite, 10) || 40));
+  const desde = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  const r = await comteleFetch('/reports/messages/sent?startDate=' + desde + '&limit=' + limite);
+  if (!r.ok || !r.data || r.data.hasError === true) {
+    return { ok: false, error: erroComtele(r.data, r.status) };
+  }
+  const lista = Array.isArray(r.data.object) ? r.data.object : [];
+  return {
+    ok: true,
+    desde: desde,
+    mensagens: lista.map(function (m) {
+      return {
+        id: m.id || null,
+        numero: m.receiver || '',
+        quando: m.sentAt || m.createdAt || null,
+        situacao: m.status || '—',
+        detalhe: m.statusDetails || '',
+        rota: m.route || '',
+        trecho: String(m.content || '').slice(0, 60)
+      };
+    })
+  };
+}
+
+async function comteleSaldo() {
+  const r = await comteleFetch('/balance');
+  if (!r.ok || !r.data || r.data.hasError === true) {
+    return { ok: false, error: erroComtele(r.data, r.status) };
+  }
+  const o = r.data.object;
+  const valor = (o && (o.balance !== undefined ? o.balance : o.amount)) !== undefined
+    ? (o.balance !== undefined ? o.balance : o.amount)
+    : o;
+  return { ok: true, saldo: valor };
+}
+
 // Envio pela API nova (painel portal.comtele.com.br, GatewayV4).
 async function sendSmsComtele(opts) {
   const numero = u.normalizePhone(opts.to); // a v4 quer com o 55 na frente
@@ -411,7 +454,7 @@ function providerStatus() {
 
 module.exports = {
   sendEmail, sendWhatsApp, sendSms, listWhatsAppInstances, providerStatus,
-  waNumeroExiste, comteleRotas, comteleRotaEscolhida
+  waNumeroExiste, comteleRotas, comteleRotaEscolhida, comteleEntregas, comteleSaldo
 };
 
 // ============================================================

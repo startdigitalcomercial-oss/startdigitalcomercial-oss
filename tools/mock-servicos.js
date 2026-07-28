@@ -117,6 +117,20 @@ const server = http.createServer(async function (req, res) {
       ]
     });
   }
+  if (url.pathname === '/balance') {
+    return json({ hasError: false, message: null, totalRecords: 1, errors: [], object: { balance: 50.9 } });
+  }
+  if (url.pathname === '/reports/messages/sent') {
+    const env = global.__comtele;
+    return json({
+      hasError: false, message: null, totalRecords: env ? 1 : 0, errors: [],
+      object: env ? [{
+        id: 'cmt-1', receiver: String(env.receivers && env.receivers[0]), content: env.message,
+        createdAt: '2026-07-28T03:36:20Z', sentAt: '2026-07-28T03:36:22Z',
+        status: 'Entregue', statusDetails: '', route: String(env.route), tag: env.tag
+      }] : []
+    });
+  }
   if (url.pathname === '/messages/sms/send') {
     if (req.headers['x-api-key'] !== 'chave-comtele-teste') {
       res.statusCode = 401;
