@@ -193,6 +193,20 @@ async function adm(action, body, query) {
   check('recusa lista vazia', !(await adm('module_reorder', { ids: [] })).ok);
   await adm('module_reorder', { ids: antes }); // devolve a ordem original
 
+  // os SMS nao podem ter link: o link vai por e-mail, e link estoura o limite
+  const tpls = await adm('templates');
+  const smsTpls = tpls.templates.filter(function (t) { return t.channel === 'sms'; });
+  check('existem modelos de sms', smsTpls.length >= 3, smsTpls.length);
+  check('nenhum sms tem link', smsTpls.every(function (t) { return !/https?:|\{\{link_/.test(t.body); }),
+    smsTpls.filter(function (t) { return /https?:|\{\{link_/.test(t.body); }).map(function (t) { return t.key; }));
+  check('todo sms manda olhar o e-mail', smsTpls.every(function (t) { return /e-mail/i.test(t.body); }),
+    smsTpls.filter(function (t) { return !/e-mail/i.test(t.body); }).map(function (t) { return t.key; }));
+  check('todo sms cabe em 1 credito', smsTpls.every(function (t) {
+    return t.body.replace('{{primeiro_nome}}', 'Maria Aparecida').length <= 160;
+  }), smsTpls.map(function (t) { return t.key + ':' + t.body.replace('{{primeiro_nome}}', 'Maria Aparecida').length; }));
+  check('nenhum sms tem acento', smsTpls.every(function (t) { return !/[àáâãéêíóôõúüç]/i.test(t.body); }),
+    smsTpls.filter(function (t) { return /[àáâãéêíóôõúüç]/i.test(t.body); }).map(function (t) { return t.key; }));
+
   check('exclui aula', (await adm('lesson_delete', { id: novaAula.lesson.id })).ok);
   check('exclui modulo', (await adm('module_delete', { id: novoMod.module.id })).ok);
 
@@ -202,8 +216,8 @@ async function adm(action, body, query) {
   const nq = await adm('question_save', { quiz_id: qa.quizzes[0].id, prompt: 'Nova?', kind: 'single', options: [{ id: 'a', text: 'Sim' }, { id: 'b', text: 'Não' }], correct: ['a'] });
   check('cria questao', nq.ok);
   check('exclui questao', (await adm('question_delete', { id: nq.question.id })).ok);
-  const tpls = await adm('templates');
-  check('12 modelos de mensagem', tpls.ok && tpls.templates.length === 12, tpls.templates && tpls.templates.length);
+  const tplsSms = await adm('templates');
+  check('12 modelos de mensagem', tplsSms.ok && tplsSms.templates.length === 12, tplsSms.templates && tplsSms.templates.length);
   const salvo = await adm('template_save', { key: 'welcome_sms', body: 'Texto novo {{primeiro_nome}}' });
   check('salva modelo', salvo.ok && salvo.template.body.indexOf('Texto novo') === 0);
   const stg = await adm('settings');
