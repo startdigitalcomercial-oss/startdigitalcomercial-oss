@@ -20,6 +20,31 @@ const CONJUNTOS = {
   reject: { email: 'reject_email' }
 };
 
+// Um aviso vira tres textos diferentes: cada canal tem o seu jeito.
+// E-mail leva o titulo no assunto. WhatsApp poe o titulo em negrito.
+// SMS nao tem titulo separado nem acento, e tem que caber no credito.
+function montaAviso(titulo, texto, canais) {
+  const quer = (canais && canais.length) ? canais : ['email', 'whatsapp', 'sms'];
+  const itens = [];
+
+  if (quer.indexOf('email') >= 0) {
+    itens.push({ channel: 'email', subject: titulo, body: texto });
+  }
+  if (quer.indexOf('whatsapp') >= 0) {
+    itens.push({ channel: 'whatsapp', subject: null, body: '*' + titulo + '*\n\n' + texto });
+  }
+  if (quer.indexOf('sms') >= 0) {
+    const cru = (titulo + ': ' + texto)
+      .replace(/\s*\n+\s*/g, ' ')
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^\x00-\x7F]/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    itens.push({ channel: 'sms', subject: null, body: cru.slice(0, 320) });
+  }
+  return itens;
+}
+
 async function getSetting(key, fallback) {
   const row = await db.selectOne('settings', { key: 'eq.' + key, select: 'key,value' });
   return row ? row.value : fallback;
@@ -905,6 +930,111 @@ module.exports = async function handler(req, res) {
       const body = await u.readBody(req);
       await db.remove('collaborators', { id: 'eq.' + body.id });
       return u.ok(res, {});
+    }
+
+    // ==========================================================
+    // AVISOS — uma mensagem para o time inteiro, nos canais escolhidos
+    // ==========================================================
+    if (action === 'broadcast_info') {
+      const time = await db.select('collaborators', { active: 'is.true', order: 'name.asc', select: '*' });
+      const historico = await db.select('broadcasts', { order: 'created_at.desc', limit: '15', select: '*' });
+      return u.ok(res, {
+        total: time.length,
+        com_email: time.filter(function (c) { return !!c.email; }).length,
+        com_telefone: time.filter(function (c) { return !!c.phone; }).length,
+        pessoas: time.map(function (c) {
+          return { id: c.id, nome: c.nickname || c.name, area: c.area || '', email: c.email, phone: c.phone };
+        }),
+        historico: historico,
+        providers: send.providerStatus()
+      });
+    }
+
+    // Monta o texto final de cada canal, sem enviar nada.
+    if (action === 'broadcast_preview') {
+      const body = await u.readBody(req);
+      const titulo = String(body.title || '').trim();
+      const texto = String(body.message || '').trim();
+      if (!titulo) return u.fail(res, 400, 'Escreva um título para o aviso.');
+      if (!texto) return u.fail(res, 400, 'Escreva a mensagem.');
+      return u.ok(res, { itens: montaAviso(titulo, texto, body.channels || []) });
+    }
+
+    if (action === 'broadcast_send') {
+      const body = await u.readBody(req);
+      const titulo = String(body.title || '').trim();
+      const texto = String(body.message || '').trim();
+      const canais = (body.channels || []).filter(function (c) {
+        return ['email', 'whatsapp', 'sms'].indexOf(c) >= 0;
+      });
+      if (!titulo) return u.fail(res, 400, 'Escreva um título para o aviso.');
+      if (!texto) return u.fail(res, 400, 'Escreva a mensagem.');
+      if (!canais.length) return u.fail(res, 400, 'Escolha pelo menos um canal.');
+
+      let time = await db.select('collaborators', { active: 'is.true', order: 'name.asc', select: '*' });
+      if (Array.isArray(body.ids) && body.ids.length) {
+        time = time.filter(function (c) { return body.ids.indexOf(c.id) >= 0; });
+      }
+      if (!time.length) return u.fail(res, 400, 'Não há ninguém no time para receber.');
+
+      const waInstance = (await getSetting('whatsapp', {}) || {}).instance || process.env.EVOLUTION_INSTANCE;
+      const modelos = montaAviso(titulo, texto, canais);
+      const porCanal = {};
+      modelos.forEach(function (m) { porCanal[m.channel] = m; });
+
+      let enviados = 0, falhas = 0;
+      const detalhe = [];
+
+      for (const pessoa of time) {
+        const vars = {
+          nome: pessoa.name,
+          primeiro_nome: pessoa.nickname || u.firstName(pessoa.name),
+          email: pessoa.email, telefone: pessoa.phone || '',
+          cargo: pessoa.role_title || '', area: pessoa.area || '', cidade: pessoa.city || ''
+        };
+        for (const canal of canais) {
+          const modelo = porCanal[canal];
+          if (!modelo) continue;
+          const corpo = u.renderTemplate(modelo.body, vars);
+          const assunto = modelo.subject ? u.renderTemplate(modelo.subject, vars) : null;
+
+          let r;
+          if (canal === 'email') {
+            if (!pessoa.email) { r = { status: 'erro', provider: 'nenhum', error: 'sem e-mail cadastrado' }; }
+            else r = await send.sendEmail({ to: pessoa.email, subject: assunto, text: corpo });
+          } else if (canal === 'whatsapp') {
+            if (!pessoa.phone) { r = { status: 'erro', provider: 'nenhum', error: 'sem telefone cadastrado' }; }
+            else r = await send.sendWhatsApp({ to: pessoa.phone, text: corpo, instance: waInstance });
+          } else {
+            if (!pessoa.phone) { r = { status: 'erro', provider: 'nenhum', error: 'sem telefone cadastrado' }; }
+            else r = await send.sendSms({ to: pessoa.phone, text: corpo });
+          }
+
+          if (r.status === 'enviado') enviados++; else falhas++;
+          detalhe.push({
+            pessoa: pessoa.nickname || pessoa.name, canal: canal,
+            status: r.status, erro: r.error || null
+          });
+
+          await db.insert('message_logs', {
+            candidate_id: null, channel: canal,
+            to_address: canal === 'email' ? pessoa.email : pessoa.phone,
+            subject: assunto, body: corpo,
+            status: r.status, provider: r.provider, error: r.error || null
+          });
+        }
+      }
+
+      const registro = await db.insert('broadcasts', {
+        title: titulo, body: texto, channels: canais,
+        total: time.length, sent: enviados, failed: falhas,
+        detail: { itens: detalhe.slice(0, 400) }
+      });
+
+      return u.ok(res, {
+        id: registro && registro.id, pessoas: time.length,
+        enviados: enviados, falhas: falhas, detalhe: detalhe
+      });
     }
 
     // Manda um SMS de teste para conferir a integracao com a Comtele.

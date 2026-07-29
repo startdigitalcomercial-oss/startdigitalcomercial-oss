@@ -184,6 +184,20 @@
   .bolha-msg.aurea .hora { text-align: right; }
   .bolha-msg.cand .txt { background: var(--fill-1); border-bottom-left-radius: 5px; }
 
+  /* ---------- escolha de canais do aviso ---------- */
+  .canais-op { display: flex; flex-wrap: wrap; gap: 10px; }
+  .canal-op { flex: 1; min-width: 150px; text-align: left; padding: 14px 16px; border-radius: var(--r-ctl);
+    border: 1.5px solid var(--hairline-strong); background: var(--surface); cursor: pointer;
+    font-family: inherit; color: var(--label); transition: all .18s cubic-bezier(.32,.72,0,1); }
+  .canal-op:hover:not(:disabled) { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow-2); }
+  .canal-op:active:not(:disabled) { transform: translateY(0) scale(.98); }
+  .canal-op.on { border-color: var(--accent); background: var(--accent-tint); }
+  .canal-op:disabled { opacity: .45; cursor: not-allowed; }
+  .canal-op strong { display: block; font-size: 14.5px; font-weight: 600; letter-spacing: -.012em; }
+  .canal-op.on strong { color: var(--accent); }
+  .canal-op span { display: block; font-size: 12.5px; color: var(--label-3); margin-top: 3px; }
+  @media (prefers-reduced-motion: reduce) { .canal-op:hover:not(:disabled) { transform: none; } }
+
   /* ---------- QR code do WhatsApp ---------- */
   .qr-box { display: grid; grid-template-columns: 240px 1fr; gap: 24px; align-items: start;
             margin-top: 18px; padding: 20px; background: var(--fill-1); border-radius: var(--r-card); }
@@ -267,6 +281,7 @@
       <button data-aba="preonboarding"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M21 3 10.6 13.4"/><path d="M21 3l-6.6 18-3.8-8.6L2 8.6z"/></svg><span>Pré Onboarding</span></button>
       <div class="nav-sec">Time</div>
       <button data-aba="colaboradores"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><circle cx="12" cy="7.6" r="3.3"/><path d="M5.6 19.8c.6-3.4 3.3-5.2 6.4-5.2s5.8 1.8 6.4 5.2"/><path d="M18.4 4.4a2.4 2.4 0 0 1 0 4.5"/><path d="M5.6 4.4a2.4 2.4 0 0 0 0 4.5"/></svg><span>Colaboradores</span></button>
+      <button data-aba="avisos"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M5.4 9.6a6.6 6.6 0 0 1 13.2 0c0 4.2 1.4 5.6 1.4 5.6H4s1.4-1.4 1.4-5.6z"/><path d="M10.3 18.6a2 2 0 0 0 3.4 0"/></svg><span>Avisos</span></button>
       <div class="nav-sec">Conteúdo</div>
       <button data-aba="conteudo"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M10.3 9.1v5.8l4.8-2.9z"/></svg><span>Aulas</span></button>
       <button data-aba="quiz"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="5.5" y="4.2" width="13" height="16.6" rx="2"/><path d="M9.3 4.2V3.2h5.4v1"/><path d="m9.3 13.6 2 2 3.8-4.4"/></svg><span>Quiz</span></button>
@@ -312,6 +327,11 @@
     <!-- ---------- COLABORADORES ---------- -->
     <section data-painel="colaboradores" style="display:none">
       <div style="padding:18px 0 40px" id="painel-colaboradores"><div class="loading-page">Carregando…</div></div>
+    </section>
+
+    <!-- ---------- AVISOS ---------- -->
+    <section data-painel="avisos" style="display:none">
+      <div style="padding:18px 0 40px" id="painel-avisos"><div class="loading-page">Carregando…</div></div>
     </section>
 
     <!-- ---------- PRE QUALIFICACAO ---------- -->
@@ -422,6 +442,7 @@
 <script src="/js/admin-ajustes.js"></script>
 <script src="/js/admin-dados.js"></script>
 <script src="/js/admin-equipe.js"></script>
+<script src="/js/admin-avisos.js"></script>
 <script src="/js/admin-aurea.js"></script>
 <script src="/js/admin-whatsapp.js"></script>
 <script src="/js/admin-inicio.js"></script>

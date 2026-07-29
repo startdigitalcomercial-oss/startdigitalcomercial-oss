@@ -316,6 +316,41 @@ async function webhook(telefone, texto) {
   check('busca por nome funciona', buscou.ok && db2.colaboradores.length >= 1, db2.colaboradores && db2.colaboradores.length);
 
   check('salva anotacao interna', (await adm('team_save', { id: eu.id, notes: 'Prefere reuniao de manha.' })).ok);
+
+  console.log('\n5a2) AVISOS — mensagem para o time inteiro');
+  const infoAv = await adm('broadcast_info');
+  const di = infoAv.data || infoAv;
+  check('avisos sabe o tamanho do time', infoAv.ok && di.total >= 1, infoAv.error);
+
+  const pv = await adm('broadcast_preview', {
+    title: 'Confraternização de fim de ano',
+    message: 'Oi {{primeiro_nome}}! Vai ser dia 15/12, às 19h. Confirme presença até sexta.',
+    channels: ['email', 'whatsapp', 'sms']
+  });
+  const dpv = pv.data || pv;
+  check('previa gera os 3 canais', pv.ok && dpv.itens.length === 3, pv.error);
+  const eml = dpv.itens.filter(function (i) { return i.channel === 'email'; })[0];
+  const wpp = dpv.itens.filter(function (i) { return i.channel === 'whatsapp'; })[0];
+  const smsAv = dpv.itens.filter(function (i) { return i.channel === 'sms'; })[0];
+  check('email leva o titulo no assunto', eml && eml.subject === 'Confraternização de fim de ano', eml && eml.subject);
+  check('whatsapp poe o titulo em negrito', wpp && wpp.body.indexOf('*Confraternização de fim de ano*') === 0, wpp && wpp.body.slice(0, 40));
+  check('sms sai sem acento e numa linha so',
+    smsAv && !/[àáâãéêíóôõúüç]/i.test(smsAv.body) && smsAv.body.indexOf('\n') < 0, smsAv && smsAv.body);
+
+  check('recusa aviso sem titulo', !(await adm('broadcast_preview', { title: '', message: 'oi' })).ok);
+  check('recusa aviso sem canal', !(await adm('broadcast_send', { title: 'x', message: 'y', channels: [] })).ok);
+
+  const disparo = await adm('broadcast_send', {
+    title: 'Aviso de teste', message: 'Oi {{primeiro_nome}}, tudo certo?', channels: ['whatsapp']
+  });
+  const dd = disparo.data || disparo;
+  check('dispara o aviso para o time', disparo.ok && dd.enviados >= 1, disparo.error);
+  check('troca o nome de cada pessoa', dd.detalhe && dd.detalhe.length >= 1, dd.detalhe);
+
+  const depoisAv = await adm('broadcast_info');
+  const dda = depoisAv.data || depoisAv;
+  check('guarda o aviso no historico', dda.historico.length >= 1, dda.historico && dda.historico.length);
+
   check('exclui colaborador', (await adm('team_delete', { id: eu.id })).ok);
 
   console.log('\n5b) SMS — Comtele (API v4 do painel novo)');
