@@ -264,6 +264,60 @@ async function webhook(telefone, texto) {
   const pEu = p9.filter(function (p) { return p.passo === 'Não é envio para si mesmo'; })[0];
   check('avisa se for envio para si mesmo', !!pEu && pEu.ok === true, pEu && pEu.detalhe);
 
+  console.log('\n5a) COLABORADORES — cadastro do time');
+  async function eqp(action, body) {
+    return (await fetch(BASE + '/api/equipe?action=' + action, {
+      method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined
+    })).json();
+  }
+
+  const cfgEq = await eqp('config');
+  check('formulario do time carrega', cfgEq.ok && cfgEq.areas.length > 0, cfgEq.error);
+  check('oferece os tamanhos de camisa', cfgEq.camisas.indexOf('GG') >= 0, cfgEq.camisas);
+
+  const base = {
+    name: 'Joana Ribeiro Alves', nickname: 'Jo', birth_date: '1994-03-12',
+    email: 'jo.' + SUF + '@exemplo.com', phone: '(13) 99600-3897',
+    cpf: '529.982.247-25', area: 'Design', role_title: 'Designer',
+    cep: '11015001', street: 'Rua Amador Bueno', number: '120',
+    district: 'Centro', city: 'Santos', state: 'SP',
+    shirt_size: 'M', shoe_size: '37'
+  };
+  const novoColab = await eqp('cadastrar', base);
+  check('cadastra colaborador', novoColab.ok, novoColab.error);
+  check('trata pelo apelido', novoColab.nome === 'Jo', novoColab.nome);
+  check('dispara os 3 canais', (novoColab.envios || []).length === 3, novoColab.envios);
+
+  check('recusa CPF invalido',
+    !(await eqp('cadastrar', Object.assign({}, base, { email: 'x1.' + SUF + '@ex.com', cpf: '111.111.111-11' }))).ok);
+  check('recusa e-mail torto',
+    !(await eqp('cadastrar', Object.assign({}, base, { email: 'nao-e-email' }))).ok);
+  check('recusa nome sem sobrenome',
+    !(await eqp('cadastrar', Object.assign({}, base, { email: 'x2.' + SUF + '@ex.com', name: 'Jo' }))).ok);
+  check('recusa numero do pe impossivel',
+    !(await eqp('cadastrar', Object.assign({}, base, { email: 'x3.' + SUF + '@ex.com', shoe_size: '99' }))).ok);
+  const rep = await eqp('cadastrar', base);
+  check('bloqueia cadastro repetido', !rep.ok && /Já existe/.test(rep.error || ''), rep.error);
+
+  const time = await adm('team');
+  const dt = time.data || time;
+  check('painel lista o time', time.ok && dt.colaboradores.length >= 1, time.error);
+  const eu = dt.colaboradores.filter(function (c) { return c.email === base.email; })[0];
+  check('guardou camisa e numero do pe', eu && eu.shirt_size === 'M' && String(eu.shoe_size) === '37',
+    eu && { camisa: eu.shirt_size, pe: eu.shoe_size });
+  check('guardou o aniversario', eu && String(eu.birth_date).indexOf('1994-03-12') === 0, eu && eu.birth_date);
+  check('guardou o endereco', eu && eu.city === 'Santos' && eu.cep === '11015001', eu && { cidade: eu.city, cep: eu.cep });
+  check('mostra o link para divulgar', /\/equipe$/.test(dt.link || ''), dt.link);
+  check('calcula aniversarios proximos', Array.isArray(dt.aniversarios), dt.aniversarios);
+
+  const buscou = await adm('team', null, { q: 'Joana' });
+  const db2 = buscou.data || buscou;
+  check('busca por nome funciona', buscou.ok && db2.colaboradores.length >= 1, db2.colaboradores && db2.colaboradores.length);
+
+  check('salva anotacao interna', (await adm('team_save', { id: eu.id, notes: 'Prefere reuniao de manha.' })).ok);
+  check('exclui colaborador', (await adm('team_delete', { id: eu.id })).ok);
+
   console.log('\n5b) SMS — Comtele (API v4 do painel novo)');
   const smsCand = await pub('apply', {
     name: 'Sms Teste ' + SUF, email: 'sms.' + SUF + '@exemplo.com',
@@ -280,6 +334,17 @@ async function webhook(telefone, texto) {
   check('numero vai com o 55 na frente', String(capturado.receivers && capturado.receivers[0]).indexOf('55') === 0,
     capturado.receivers);
   check('mensagem sem acento', !!capturado.message && !/[àáâãéêíóôõúç]/i.test(capturado.message), capturado.message);
+
+  const teste1 = await adm('sms_teste', { phone: '13 99600-3897' });
+  const d1 = teste1.data || teste1;
+  check('botao de teste de sms funciona', teste1.ok, teste1.error);
+  check('teste informa a rota usada', d1.rota === 17, d1.rota);
+  check('teste recusa numero vazio', !(await adm('sms_teste', { phone: '' })).ok);
+
+  const rotas = await adm('sms_rotas');
+  const dr = rotas.data || rotas;
+  check('lista as rotas da conta', rotas.ok && dr.rotas.length === 2, rotas.error);
+  check('marca a Premium como a escolhida', dr.escolhida === 17, dr.escolhida);
 
   const qrNovo = await adm('wa_qr', {});
   check('pede QR novo (renovacao)', qrNovo.ok && !!(qrNovo.data || qrNovo).base64, qrNovo.error);

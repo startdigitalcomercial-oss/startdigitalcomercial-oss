@@ -217,9 +217,12 @@ async function adm(action, body, query) {
   check('cria questao', nq.ok);
   check('exclui questao', (await adm('question_delete', { id: nq.question.id })).ok);
   const tplsSms = await adm('templates');
-  check('12 modelos de mensagem', tplsSms.ok && tplsSms.templates.length === 12, tplsSms.templates && tplsSms.templates.length);
+  check('15 modelos de mensagem', tplsSms.ok && tplsSms.templates.length === 15, tplsSms.templates && tplsSms.templates.length);
+  const originalSms = tplsSms.templates.filter(function (t) { return t.key === 'welcome_sms'; })[0].body;
   const salvo = await adm('template_save', { key: 'welcome_sms', body: 'Texto novo {{primeiro_nome}}' });
   check('salva modelo', salvo.ok && salvo.template.body.indexOf('Texto novo') === 0);
+  // devolve o texto original para o teste poder rodar de novo do zero
+  await adm('template_save', { key: 'welcome_sms', body: originalSms });
   const stg = await adm('settings');
   check('ajustes carregam', stg.ok && !!stg.form.headline);
   check('salva ajustes do formulario', (await adm('settings_save', { key: 'form', value: Object.assign({}, stg.form, { headline: 'Venha para a Start' }) })).ok);

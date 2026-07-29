@@ -63,6 +63,9 @@ const DB = {
     { key: 'welcome_email_senha', channel: 'email', name: 'Boas-vindas com criação de senha', subject: 'Bem-vindo(a) à StartDigital, {{primeiro_nome}}!', body: 'Olá {{primeiro_nome}}!\n\nVocê foi aprovado(a) para {{vaga}}.\n\nCrie a sua senha aqui:\n{{link_senha}}\n\nSeu e-mail de acesso: {{email}}\n\nEquipe StartDigital' },
     { key: 'welcome_email', channel: 'email', name: 'Boas-vindas — E-mail', subject: 'Bem-vindo(a) à StartDigital, {{primeiro_nome}}!', body: 'Olá {{primeiro_nome}}, tudo bem?\n\nVocê foi aprovado(a) para a vaga de {{vaga}}.\n\nAcesse a sua área de integração:\n{{link_portal}}\n\nEquipe StartDigital' },
     { key: 'welcome_whatsapp', channel: 'whatsapp', name: 'Boas-vindas — WhatsApp', subject: null, body: 'Oi {{primeiro_nome}}! *Você foi aprovado(a)* para {{vaga}}.\n\n👉 {{link_portal}}' },
+    { key: 'team_welcome_email', channel: 'email', name: 'Cadastro do colaborador — E-mail', subject: 'Cadastro concluído, {{primeiro_nome}}! Bem-vindo(a) ao time', body: 'Olá {{primeiro_nome}}, tudo bem?\n\nSeu cadastro na StartDigital foi concluído.\n\nO QUE VEM AGORA\nVocê passa a receber por aqui os avisos de eventos, novidades e planos do time.\n\nEquipe StartDigital' },
+    { key: 'team_welcome_whatsapp', channel: 'whatsapp', name: 'Cadastro do colaborador — WhatsApp', subject: null, body: 'Oi {{primeiro_nome}}! Aqui é a equipe da *StartDigital* 💚\n\nSeu cadastro foi concluído com sucesso. Bom ter você com a gente!' },
+    { key: 'team_welcome_sms', channel: 'sms', name: 'Cadastro do colaborador — SMS', subject: null, body: 'StartDigital: {{primeiro_nome}}, cadastro concluido! Enviamos os detalhes por e-mail. Bom ter voce no time.' },
     { key: 'welcome_sms', channel: 'sms', name: 'Boas-vindas — SMS', subject: null, body: 'StartDigital: {{primeiro_nome}}, voce foi aprovado(a)! Enviamos por e-mail o link da sua area de integracao. Confira a caixa de entrada e o spam.' },
     { key: 'disc_invite_email', channel: 'email', name: 'Convite Teste DISC — E-mail', subject: 'Seu teste de perfil — StartDigital', body: 'Olá {{primeiro_nome}}, faça seu teste: {{link_disc}}' },
     { key: 'disc_invite_whatsapp', channel: 'whatsapp', name: 'Convite Teste DISC — WhatsApp', subject: null, body: 'Oi {{primeiro_nome}}! Teste de perfil: {{link_disc}}' },
@@ -133,7 +136,8 @@ const DB = {
   disc_results: [],
   quiz_attempts: [],
   lesson_progress: [],
-  message_logs: []
+  message_logs: [],
+  collaborators: []
 };
 
 /* ---------------- defaults por tabela ---------------- */
@@ -154,7 +158,8 @@ const DEFAULTS = {
   prequal_groups: function () { return { id: uuid(), active: true, is_default: false, auto_on_apply: true, created_at: agora() }; },
   prequal_questions: function () { return { id: uuid(), position: 1, required: true, weight: 1, objective: null }; },
   prequal_sessions: function () { return { id: uuid(), channel: 'whatsapp', status: 'aguardando', current_index: 0, answers: [], score: null, recommendation: null, summary: null, last_message_at: null, started_at: agora(), finished_at: null, error: null }; },
-  prequal_messages: function () { return { id: seq('prequal_messages'), created_at: agora() }; }
+  prequal_messages: function () { return { id: seq('prequal_messages'), created_at: agora() }; },
+  collaborators: function () { return { id: uuid(), token: uuid().replace(/-/g, ''), active: true, source: 'formulario', welcomed_at: null, notes: null, created_at: agora(), updated_at: agora() }; }
 };
 
 const contadores = {};
