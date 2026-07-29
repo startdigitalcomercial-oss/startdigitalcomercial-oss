@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#111214">
+<title>Cadastro do time — StartDigital</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+  html, body { background: var(--canvas); min-height: 100%; }
+  body { overscroll-behavior-y: none; }
+
+  .env { max-width: 620px; margin: 0 auto; padding: 0 20px 40px; }
+
+  /* ---------- barra de progresso grudada no topo ---------- */
+  .topo {
+    position: sticky; top: 0; z-index: 20; background: var(--vidro);
+    -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid var(--hairline);
+  }
+  .topo-int { max-width: 620px; margin: 0 auto; padding: 14px 20px 12px; }
+  .topo-linha { display: flex; align-items: center; gap: 12px; }
+  .marca { display: flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 600; letter-spacing: -.014em; }
+  .marca .pt { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
+  .passo-n { margin-left: auto; font-size: 12.5px; color: var(--label-3); font-variant-numeric: tabular-nums; }
+  .trilho { height: 3px; background: var(--fill-2); border-radius: 99px; margin-top: 11px; overflow: hidden; }
+  .trilho > i {
+    display: block; height: 100%; width: 0%; background: var(--accent); border-radius: 99px;
+    transition: width .45s cubic-bezier(.32,.72,0,1);
+  }
+
+  /* ---------- passo ---------- */
+  .passo { display: none; }
+  .passo.on { display: block; }
+  .passo.entrando { animation: entra .38s cubic-bezier(.32,.72,0,1) both; }
+  .passo.entrando-tras { animation: entraTras .38s cubic-bezier(.32,.72,0,1) both; }
+  @keyframes entra     { from { opacity: 0; transform: translateX(22px); } to { opacity: 1; transform: none; } }
+  @keyframes entraTras { from { opacity: 0; transform: translateX(-22px); } to { opacity: 1; transform: none; } }
+
+  .passo h1 { font-size: clamp(25px, 6vw, 31px); font-weight: 600; letter-spacing: -.026em; margin: 30px 0 6px; line-height: 1.12; }
+  .passo .apoio { font-size: 15.5px; color: var(--label-2); line-height: 1.5; margin: 0 0 26px; }
+
+  /* cada campo entra escalonado */
+  .campo-anim { animation: sobe .42s cubic-bezier(.32,.72,0,1) both; }
+  @keyframes sobe { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+  .field label { font-size: 13.5px; font-weight: 500; }
+  .field input, .field select, .field textarea { font-size: 16px; } /* 16px evita o zoom do iOS */
+  .field input:focus, .field select:focus, .field textarea:focus { transform: translateY(-1px); }
+  .field input, .field select { transition: border-color .16s, box-shadow .16s, transform .16s; }
+
+  .dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .tripla { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  @media (max-width: 520px) { .dupla, .tripla { grid-template-columns: 1fr; } }
+
+  /* ---------- escolhas em cartão (camisa, área) ---------- */
+  .escolhas { display: flex; flex-wrap: wrap; gap: 9px; }
+  .escolha {
+    position: relative; border: 1.5px solid var(--hairline-strong); background: var(--surface);
+    border-radius: var(--r-ctl); padding: 12px 18px; font-size: 15px; font-weight: 500;
+    cursor: pointer; transition: all .18s cubic-bezier(.32,.72,0,1); user-select: none;
+    font-family: inherit; color: var(--label);
+  }
+  .escolha:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow-2); }
+  .escolha:active { transform: translateY(0) scale(.97); }
+  .escolha.on { border-color: var(--accent); background: var(--accent-tint); color: var(--accent); font-weight: 600; }
+  .escolha.on::after {
+    content: ''; position: absolute; top: -6px; right: -6px; width: 18px; height: 18px;
+    border-radius: 50%; background: var(--accent);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12.5 4.6 4.6L19 7.4'/%3E%3C/svg%3E") center/13px no-repeat, linear-gradient(#000,#000);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+    animation: pop .28s cubic-bezier(.34,1.56,.64,1) both;
+  }
+  @keyframes pop { from { transform: scale(0); } to { transform: scale(1); } }
+
+  /* ---------- número do pé ---------- */
+  .pe { display: flex; align-items: center; gap: 16px; }
+  .pe-btn {
+    width: 46px; height: 46px; border-radius: 50%; border: 1.5px solid var(--hairline-strong);
+    background: var(--surface); font-size: 21px; color: var(--label-2); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; flex: none;
+    transition: all .16s; font-family: inherit; line-height: 1;
+  }
+  .pe-btn:hover { border-color: var(--accent); color: var(--accent); transform: scale(1.08); }
+  .pe-btn:active { transform: scale(.92); }
+  .pe-num { font-size: 42px; font-weight: 600; letter-spacing: -.03em; min-width: 74px; text-align: center; font-variant-numeric: tabular-nums; }
+  .pe-num.mudou { animation: bate .3s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes bate { 0% { transform: scale(1); } 45% { transform: scale(1.16); } 100% { transform: scale(1); } }
+
+  /* ---------- rodapé de navegação ---------- */
+  .nav {
+    position: sticky; bottom: 0; background: var(--vidro);
+    -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+    border-top: 1px solid var(--hairline); margin: 30px -20px 0; padding: 14px 20px;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+    display: flex; gap: 12px; align-items: center;
+  }
+  .nav .btn { transition: transform .16s cubic-bezier(.32,.72,0,1), box-shadow .16s, opacity .16s; }
+  .nav .btn:not(:disabled):hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
+  .nav .btn:not(:disabled):active { transform: translateY(0) scale(.98); }
+  .btn-seguir { flex: 1; }
+
+  /* ---------- revisão ---------- */
+  .revisao { background: var(--surface); border-radius: var(--r-card); box-shadow: var(--shadow-1); overflow: hidden; }
+  .rev-linha { display: grid; grid-template-columns: 142px 1fr auto; gap: 12px; align-items: baseline;
+    padding: 13px 18px; border-top: 1px solid var(--hairline); font-size: 14.5px; }
+  .rev-linha:first-child { border-top: 0; }
+  .rev-linha dt { color: var(--label-3); font-size: 13px; }
+  .rev-linha dd { margin: 0; font-weight: 500; word-break: break-word; }
+  .rev-editar { background: none; border: 0; color: var(--accent); font-size: 12.5px; font-family: inherit;
+    cursor: pointer; padding: 0; opacity: 0; transition: opacity .16s; }
+  .rev-linha:hover .rev-editar { opacity: 1; }
+  @media (hover: none) { .rev-editar { opacity: 1; } }
+
+  /* ---------- fim ---------- */
+  .fim { text-align: center; padding: 46px 0 10px; }
+  .selo { width: 76px; height: 76px; border-radius: 50%; background: var(--accent-tint);
+    display: flex; align-items: center; justify-content: center; margin: 0 auto 22px;
+    animation: selo .55s cubic-bezier(.34,1.56,.64,1) both; }
+  @keyframes selo { from { transform: scale(0) rotate(-25deg); opacity: 0; } to { transform: none; opacity: 1; } }
+  .selo svg { stroke: var(--accent); fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .selo svg path { stroke-dasharray: 30; stroke-dashoffset: 30; animation: risca .4s .3s cubic-bezier(.32,.72,0,1) forwards; }
+  @keyframes risca { to { stroke-dashoffset: 0; } }
+  .canais { display: flex; flex-direction: column; gap: 9px; max-width: 330px; margin: 26px auto 0; text-align: left; }
+  .canal { display: flex; align-items: center; gap: 11px; padding: 12px 15px; background: var(--surface);
+    border-radius: var(--r-ctl); box-shadow: var(--shadow-1); font-size: 14px;
+    animation: sobe .4s cubic-bezier(.32,.72,0,1) both; }
+  .canal .ok { color: var(--accent); flex: none; display: flex; }
+  .canal .pend { color: var(--label-3); flex: none; display: flex; }
+
+  .erro-campo { color: var(--red); font-size: 12.5px; margin-top: 6px; display: none; }
+  .field.ruim input, .field.ruim select { border-color: var(--red); }
+  .field.ruim .erro-campo { display: block; animation: treme .3s; }
+  @keyframes treme { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+
+  .dica-lgpd { font-size: 12.5px; color: var(--label-3); line-height: 1.55; margin-top: 22px;
+    padding: 14px 16px; background: var(--fill-1); border-radius: var(--r-ctl); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .passo.entrando, .passo.entrando-tras, .campo-anim, .canal, .selo, .selo svg path { animation: none; }
+    .trilho > i { transition: none; }
+    .escolha:hover, .nav .btn:hover, .pe-btn:hover { transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topo">
+  <div class="topo-int">
+    <div class="topo-linha">
+      <div class="marca"><span class="pt"></span> <span id="marca-nome">StartDigital</span></div>
+      <span class="passo-n" id="passo-n"></span>
+    </div>
+    <div class="trilho"><i id="barra"></i></div>
+  </div>
+</div>
+
+<div class="env">
+  <div id="carregando" class="loading-page">Carregando…</div>
+
+  <div id="fechado" style="display:none">
+    <div class="passo on" style="padding-top:40px">
+      <h1>Cadastro fechado</h1>
+      <p class="apoio">No momento não estamos recebendo novos cadastros. Fale com a sua liderança.</p>
+    </div>
+  </div>
+
+  <form id="form" style="display:none" novalidate>
+
+    <!-- 1 -->
+    <section class="passo" data-passo="0">
+      <h1>Vamos começar pelo básico</h1>
+      <p class="apoio">Só o essencial para a gente saber quem é você.</p>
+      <div class="field"><label for="name">Nome completo</label>
+        <input type="text" id="name" name="name" autocomplete="name" placeholder="Como está no documento" required>
+        <span class="erro-campo">Escreva o nome e o sobrenome.</span></div>
+      <div class="field" style="margin-top:14px"><label for="nickname">Como prefere ser chamado(a)</label>
+        <span class="hint">É assim que vamos te chamar nas mensagens.</span>
+        <input type="text" id="nickname" name="nickname" placeholder="Seu apelido ou primeiro nome"></div>
+      <div class="field" style="margin-top:14px"><label for="birth_date">Data de aniversário</label>
+        <span class="hint">A gente não esquece. Prometido.</span>
+        <input type="date" id="birth_date" name="birth_date" required>
+        <span class="erro-campo">Coloque a sua data de nascimento.</span></div>
+    </section>
+
+    <!-- 2 -->
+    <section class="passo" data-passo="1">
+      <h1>Onde a gente te encontra</h1>
+      <p class="apoio">É por aqui que chegam os avisos de eventos, novidades e planos do time.</p>
+      <div class="field"><label for="email">E-mail</label>
+        <input type="email" id="email" name="email" autocomplete="email" placeholder="voce@exemplo.com" required>
+        <span class="erro-campo">Confira o e-mail — parece que falta algo.</span></div>
+      <div class="field" style="margin-top:14px"><label for="phone">WhatsApp com DDD</label>
+        <input type="tel" id="phone" name="phone" autocomplete="tel" inputmode="numeric" placeholder="(13) 99600-3897" required>
+        <span class="erro-campo">Coloque o número com DDD.</span></div>
+    </section>
+
+    <!-- 3 -->
+    <section class="passo" data-passo="2">
+      <h1>O que você faz por aqui</h1>
+      <p class="apoio">Para a gente mandar o aviso certo para a pessoa certa.</p>
+      <div class="field"><label>Sua área</label>
+        <div class="escolhas" id="areas" style="margin-top:8px"></div>
+        <input type="hidden" id="area" name="area"></div>
+      <div class="field" style="margin-top:18px"><label for="role_title">Cargo</label>
+        <input type="text" id="role_title" name="role_title" placeholder="Gestor de Tráfego, Designer…"></div>
+      <div class="field" style="margin-top:14px"><label for="started_on">Desde quando está na Start</label>
+        <span class="hint">Se não lembrar o dia certo, chuta o mês. Serve para comemorar o seu tempo de casa.</span>
+        <input type="date" id="started_on" name="started_on"></div>
+    </section>
+
+    <!-- 4 -->
+    <section class="passo" data-passo="3">
+      <h1>Seu CPF</h1>
+      <p class="apoio">Usamos só para o cadastro interno e para emitir o que for necessário.</p>
+      <div class="field"><label for="cpf">CPF</label>
+        <input type="text" id="cpf" name="cpf" inputmode="numeric" placeholder="000.000.000-00" maxlength="14">
+        <span class="erro-campo">Esse CPF não confere. Confira os números.</span></div>
+      <div class="dica-lgpd">
+        Seus dados ficam só com a StartDigital, guardados no nosso sistema interno.
+        Não compartilhamos com ninguém de fora e você pode pedir a correção ou a exclusão quando quiser.
+      </div>
+    </section>
+
+    <!-- 5 -->
+    <section class="passo" data-passo="4">
+      <h1>Onde você mora</h1>
+      <p class="apoio">Para mandar brinde, kit e uniforme no endereço certo.</p>
+      <div class="dupla">
+        <div class="field"><label for="cep">CEP</label>
+          <input type="text" id="cep" name="cep" inputmode="numeric" placeholder="00000-000" maxlength="9">
+          <span class="hint" id="cep-status"></span></div>
+        <div class="field"><label for="number">Número</label>
+          <input type="text" id="number" name="number" inputmode="numeric" placeholder="123"></div>
+      </div>
+      <div class="field" style="margin-top:14px"><label for="street">Rua</label>
+        <input type="text" id="street" name="street" autocomplete="address-line1"></div>
+      <div class="dupla" style="margin-top:14px">
+        <div class="field"><label for="complement">Complemento</label>
+          <input type="text" id="complement" name="complement" placeholder="Apto, bloco…"></div>
+        <div class="field"><label for="district">Bairro</label>
+          <input type="text" id="district" name="district"></div>
+      </div>
+      <div class="dupla" style="margin-top:14px">
+        <div class="field"><label for="city">Cidade</label>
+          <input type="text" id="city" name="city"></div>
+        <div class="field"><label for="state">Estado</label>
+          <input type="text" id="state" name="state" maxlength="2" placeholder="SP" style="text-transform:uppercase"></div>
+      </div>
+    </section>
+
+    <!-- 6 -->
+    <section class="passo" data-passo="5">
+      <h1>Camisa e tênis</h1>
+      <p class="apoio">É com isso que a gente acerta o tamanho do seu kit — nada de camisa que não serve.</p>
+      <div class="field"><label>Tamanho da camisa</label>
+        <div class="escolhas" id="camisas" style="margin-top:8px"></div>
+        <input type="hidden" id="shirt_size" name="shirt_size"></div>
+      <div class="field" style="margin-top:26px"><label>Número do pé</label>
+        <div class="pe" style="margin-top:10px">
+          <button type="button" class="pe-btn" id="pe-menos" aria-label="Diminuir">−</button>
+          <span class="pe-num" id="pe-num">40</span>
+          <button type="button" class="pe-btn" id="pe-mais" aria-label="Aumentar">+</button>
+        </div>
+        <input type="hidden" id="shoe_size" name="shoe_size" value="40"></div>
+    </section>
+
+    <!-- 7 -->
+    <section class="passo" data-passo="6">
+      <h1>Confere se está tudo certo</h1>
+      <p class="apoio">Passe o olho. Clicando em qualquer linha você volta para corrigir.</p>
+      <dl class="revisao" id="revisao"></dl>
+      <div id="erro-geral"></div>
+    </section>
+
+    <div class="nav">
+      <button type="button" class="btn btn-ghost" id="btn-voltar" style="display:none">Voltar</button>
+      <button type="button" class="btn btn-lg btn-seguir" id="btn-seguir">Começar</button>
+    </div>
+  </form>
+
+  <!-- fim -->
+  <div id="pronto" style="display:none">
+    <div class="fim">
+      <div class="selo">
+        <svg width="38" height="38" viewBox="0 0 24 24"><path d="m4.5 12.6 5 5L19.5 7"/></svg>
+      </div>
+      <h1 style="font-size:29px;font-weight:600;letter-spacing:-.026em;margin:0 0 8px" id="fim-titulo">Pronto!</h1>
+      <p class="apoio" style="margin:0 auto;max-width:400px" id="fim-texto">
+        Seu cadastro foi concluído. Já estamos te mandando a confirmação.
+      </p>
+      <div class="canais" id="canais"></div>
+      <p class="small muted" style="margin-top:26px">Pode fechar esta página.</p>
+    </div>
+  </div>
+</div>
+
+<script src="/js/equipe.js"></script>
+</body>
+</html>

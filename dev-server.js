@@ -40,7 +40,10 @@ const ROTAS = {
   '/portal': '/portal.html',
   '/integracao': '/portal.html',
   '/entrar': '/entrar.html',
-  '/criar-senha': '/criar-senha.html'
+  '/criar-senha': '/criar-senha.html',
+  '/equipe': '/equipe.html',
+  '/time': '/equipe.html',
+  '/colaborador': '/equipe.html'
 };
 
 const server = http.createServer(async function (req, res) {

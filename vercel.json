@@ -39,6 +39,18 @@
     {
       "source": "/criar-senha",
       "destination": "/criar-senha.html"
+    },
+    {
+      "source": "/equipe",
+      "destination": "/equipe.html"
+    },
+    {
+      "source": "/time",
+      "destination": "/equipe.html"
+    },
+    {
+      "source": "/colaborador",
+      "destination": "/equipe.html"
     }
   ],
   "headers": [
