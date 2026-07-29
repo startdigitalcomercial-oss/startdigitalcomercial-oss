@@ -875,18 +875,8 @@ module.exports = async function handler(req, res) {
     // COLABORADORES (time interno)
     // ==========================================================
     if (action === 'team') {
-      const busca = String(params.q || '').trim();
-      const filtro = { order: 'name.asc', select: '*', limit: '500' };
-      if (params.ativos === 'true') filtro.active = 'is.true';
-      let lista = await db.select('collaborators', filtro);
-
-      if (busca) {
-        const b = busca.toLowerCase();
-        lista = lista.filter(function (c) {
-          return [c.name, c.nickname, c.email, c.role_title, c.area, c.city]
-            .filter(Boolean).join(' ').toLowerCase().indexOf(b) >= 0;
-        });
-      }
+      // A lista inteira vem de uma vez — a busca acontece na tela, sem ida e volta.
+      const lista = await db.select('collaborators', { order: 'name.asc', select: '*', limit: '500' });
 
       // aniversariantes dos proximos 30 dias
       const hoje = new Date();
@@ -896,8 +886,11 @@ module.exports = async function handler(req, res) {
         const inicioHoje = Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth(), hoje.getUTCDate());
         if (prox.getTime() < inicioHoje) prox = new Date(Date.UTC(hoje.getUTCFullYear() + 1, Number(p[1]) - 1, Number(p[2])));
         const dias = Math.round((prox.getTime() - inicioHoje) / 86400000);
-        return { id: c.id, name: c.nickname || c.name, dia: p[2] + '/' + p[1], dias: dias };
-      }).filter(function (x) { return x.dias <= 30; }).sort(function (a, b) { return a.dias - b.dias; });
+        return {
+          id: c.id, name: c.nickname || c.name, nome_completo: c.name,
+          area: c.area || '', dia: p[2] + '/' + p[1], dias: dias
+        };
+      }).filter(function (x) { return x.dias <= 60; }).sort(function (a, b) { return a.dias - b.dias; });
 
       const camisas = {};
       lista.forEach(function (c) { if (c.shirt_size) camisas[c.shirt_size] = (camisas[c.shirt_size] || 0) + 1; });

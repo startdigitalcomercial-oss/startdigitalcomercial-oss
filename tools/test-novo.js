@@ -311,9 +311,13 @@ async function webhook(telefone, texto) {
   check('mostra o link para divulgar', /\/equipe$/.test(dt.link || ''), dt.link);
   check('calcula aniversarios proximos', Array.isArray(dt.aniversarios), dt.aniversarios);
 
-  const buscou = await adm('team', null, { q: 'Joana' });
-  const db2 = buscou.data || buscou;
-  check('busca por nome funciona', buscou.ok && db2.colaboradores.length >= 1, db2.colaboradores && db2.colaboradores.length);
+  // a busca agora acontece na tela; o servidor manda a lista inteira de uma vez
+  check('manda a lista inteira para a busca ser instantanea',
+    dt.colaboradores.length === dt.total, { lista: dt.colaboradores.length, total: dt.total });
+  check('conta quantos estao ativos', typeof dt.ativos === 'number' && dt.ativos >= 1, dt.ativos);
+  const niver = (dt.aniversarios || [])[0];
+  check('aniversario traz nome completo e dias',
+    !niver || (typeof niver.dias === 'number' && !!niver.nome_completo), niver);
 
   check('salva anotacao interna', (await adm('team_save', { id: eu.id, notes: 'Prefere reuniao de manha.' })).ok);
 

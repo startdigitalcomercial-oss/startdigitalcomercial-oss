@@ -2,83 +2,169 @@
    COLABORADORES — o time interno
    ============================================================ */
 let EQUIPE = [];
+let EQUIPE_DADOS = null;
 let EQUIPE_BUSCA = '';
+
+// iniciais para o circulinho: "Maria Souza" -> MS
+function iniciais(nome) {
+  const p = String(nome || '').trim().split(/\s+/);
+  const a = (p[0] || '')[0] || '';
+  const b = p.length > 1 ? (p[p.length - 1] || '')[0] || '' : '';
+  return (a + b).toUpperCase();
+}
+
+function quandoFaz(dias) {
+  if (dias === 0) return 'é hoje';
+  if (dias === 1) return 'é amanhã';
+  if (dias <= 7) return 'em ' + dias + ' dias';
+  if (dias <= 30) return 'em ' + dias + ' dias';
+  return 'em ' + Math.round(dias / 7) + ' semanas';
+}
 
 async function carregaColaboradores() {
   const box = document.getElementById('painel-colaboradores');
   box.innerHTML = '<div class="loading-page">Carregando…</div>';
   let d;
-  try { d = await api('team', { params: { q: EQUIPE_BUSCA } }); }
+  try { d = await api('team'); }
   catch (e) { box.innerHTML = '<div class="alert alert-erro">' + esc(e.message) + '</div>'; return; }
 
+  EQUIPE_DADOS = d;
   EQUIPE = d.colaboradores || [];
-  const camisas = Object.keys(d.camisas || {}).sort();
+  const camisas = Object.keys(d.camisas || {});
+  const ordemCamisa = ['PP', 'P', 'M', 'G', 'GG', 'XG', 'XGG'];
+  camisas.sort(function (a, b) { return ordemCamisa.indexOf(a) - ordemCamisa.indexOf(b); });
+
+  const proximos = (d.aniversarios || []).slice(0, 6);
+  const comAniversario = (d.aniversarios || []).length;
 
   box.innerHTML =
-    // link para divulgar
+    // ---------- destaque: tamanho do time + aniversários ----------
+    '<div class="eq-topo">' +
+
+      '<div class="card eq-time">' +
+        '<div class="eq-time-n">' + d.ativos + '</div>' +
+        '<div class="eq-time-l">' + (d.ativos === 1 ? 'pessoa no time' : 'pessoas no time') + '</div>' +
+        (d.total !== d.ativos
+          ? '<div class="small muted" style="margin-top:8px">' + (d.total - d.ativos) + ' inativo(s)</div>' : '') +
+        '<div class="eq-chips">' +
+          (camisas.length
+            ? camisas.map(function (c) {
+                return '<span class="eq-chip"><b>' + esc(c) + '</b> ' + d.camisas[c] + '</span>';
+              }).join('')
+            : '<span class="small muted">tamanhos de camisa aparecem aqui</span>') +
+        '</div>' +
+      '</div>' +
+
+      '<div class="card eq-niver">' +
+        '<div class="row" style="align-items:baseline;gap:8px;margin-bottom:14px">' +
+          '<h2 style="font-size:15px;margin:0">Próximos aniversários</h2>' +
+          '<span class="small muted">' + (comAniversario ? 'nos próximos 60 dias' : '') + '</span>' +
+        '</div>' +
+        (proximos.length
+          ? '<div class="eq-niver-lista">' + proximos.map(function (a) {
+              const perto = a.dias <= 7;
+              return '<div class="eq-pessoa' + (perto ? ' perto' : '') + '" data-id="' + esc(a.id) + '">' +
+                '<span class="eq-av">' + esc(iniciais(a.nome_completo || a.name)) + '</span>' +
+                '<span class="eq-pessoa-txt">' +
+                  '<strong>' + esc(a.name) + '</strong>' +
+                  '<span class="small muted">' + esc(a.area || 'time') + '</span>' +
+                '</span>' +
+                '<span class="eq-data">' +
+                  '<strong>' + esc(a.dia) + '</strong>' +
+                  '<span class="small ' + (perto ? 'destaque' : 'muted') + '">' + quandoFaz(a.dias) + '</span>' +
+                '</span>' +
+              '</div>';
+            }).join('') + '</div>'
+          : '<p class="small muted" style="margin:0">Nenhum aniversário nos próximos 60 dias. ' +
+            'Quem ainda não preencheu a data não aparece aqui.</p>') +
+      '</div>' +
+
+    '</div>' +
+
+    // ---------- link do cadastro ----------
     '<div class="card">' +
-      '<div class="row row-wrap" style="justify-content:space-between;align-items:flex-start;gap:14px">' +
-        '<div style="flex:1;min-width:240px">' +
-          '<h2 style="margin:0 0 4px">Cadastro do time</h2>' +
-          '<p class="sub" style="margin:0">Mande este link para o colaborador preencher o próprio cadastro. ' +
-          'No fim ele recebe a confirmação por e-mail, WhatsApp e SMS.</p>' +
-          '<p style="margin:12px 0 0"><a href="' + esc(d.link) + '" target="_blank" style="font-size:14.5px">' + esc(d.link) + '</a></p>' +
+      '<div class="row row-wrap" style="justify-content:space-between;align-items:center;gap:14px">' +
+        '<div style="flex:1;min-width:250px">' +
+          '<strong style="font-size:14.5px">Link do cadastro</strong>' +
+          '<div class="small muted" style="margin-top:3px">Mande para quem ainda não preencheu. ' +
+          'No fim, a pessoa recebe a confirmação nos três canais.</div>' +
+          '<div style="margin-top:8px;font-family:ui-monospace,monospace;font-size:12.5px;word-break:break-all">' +
+            esc(d.link) + '</div>' +
         '</div>' +
         '<div class="row" style="gap:8px">' +
-          '<button class="btn btn-sm" id="eq-copiar">Copiar link</button>' +
-          '<button class="btn btn-sm btn-ghost" id="eq-csv">Baixar CSV</button>' +
+          '<button class="btn btn-sm" id="eq-copiar">Copiar</button>' +
+          '<button class="btn btn-sm btn-ghost" id="eq-abrir">Abrir</button>' +
+          '<button class="btn btn-sm btn-ghost" id="eq-csv">CSV</button>' +
         '</div>' +
       '</div>' +
     '</div>' +
 
-    // indicadores
-    '<div class="grid grid-3" style="margin-bottom:16px">' +
-      '<div class="stat"><div class="n">' + d.total + '</div><div class="l">no time</div></div>' +
-      '<div class="stat"><div class="n">' + d.aniversarios.length + '</div><div class="l">aniversários nos próximos 30 dias</div></div>' +
-      '<div class="stat"><div class="n">' + (camisas.length ? camisas.map(function (c) { return c + ':' + d.camisas[c]; }).join('  ') : '—') +
-        '</div><div class="l">camisas por tamanho</div></div>' +
+    // ---------- busca ----------
+    '<div class="eq-busca-wrap">' +
+      '<svg class="eq-lupa" width="18" height="18" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.6"/><path d="m16 16 4.2 4.2"/></svg>' +
+      '<input type="search" id="eq-busca" autocomplete="off" ' +
+        'placeholder="Buscar por nome, apelido, e-mail, cargo, área, cidade ou tamanho…" ' +
+        'value="' + esc(EQUIPE_BUSCA) + '">' +
+      '<button type="button" class="eq-limpar" id="eq-limpar" title="Limpar" style="display:none">✕</button>' +
     '</div>' +
+    '<div class="small muted" id="eq-contagem" style="margin:0 0 12px 4px"></div>' +
 
-    // aniversariantes
-    (d.aniversarios.length
-      ? '<div class="card"><h2 style="font-size:15px;margin:0 0 12px">Aniversários chegando</h2>' +
-        '<div class="row row-wrap" style="gap:8px">' +
-        d.aniversarios.map(function (a) {
-          const quando = a.dias === 0 ? 'hoje' : (a.dias === 1 ? 'amanhã' : 'em ' + a.dias + ' dias');
-          return '<span class="tag ' + (a.dias <= 7 ? 'tag-verde' : '') + '">' +
-            esc(a.name) + ' · ' + esc(a.dia) + ' · ' + quando + '</span>';
-        }).join('') + '</div></div>'
-      : '') +
-
-    // busca
-    '<div class="row row-wrap" style="gap:10px;margin-bottom:14px">' +
-      '<input type="search" id="eq-busca" placeholder="Buscar por nome, e-mail, cargo ou cidade…" ' +
-      'value="' + esc(EQUIPE_BUSCA) + '" style="width:100%;max-width:380px">' +
-    '</div>' +
-
-    // lista
-    (EQUIPE.length
-      ? '<div class="card" style="padding:0;overflow:hidden">' +
-        '<table class="tbl" style="margin:0"><thead><tr>' +
-          '<th style="padding-left:18px">Pessoa</th><th>Área / cargo</th><th>Aniversário</th>' +
-          '<th>Camisa</th><th>Pé</th><th></th></tr></thead><tbody>' +
-        EQUIPE.map(function (c) {
-          return '<tr class="eq-linha" data-id="' + esc(c.id) + '" style="cursor:pointer">' +
-            '<td style="padding-left:18px"><strong>' + esc(c.nickname || c.name.split(' ')[0]) + '</strong>' +
-              '<div class="small muted">' + esc(c.email) + '</div></td>' +
-            '<td>' + esc(c.area || '—') + '<div class="small muted">' + esc(c.role_title || '') + '</div></td>' +
-            '<td>' + (c.birth_date ? esc(dataCurta(c.birth_date)) : '—') + '</td>' +
-            '<td>' + esc(c.shirt_size || '—') + '</td>' +
-            '<td>' + esc(c.shoe_size || '—') + '</td>' +
-            '<td style="padding-right:18px">' + (c.active === false ? '<span class="tag">inativo</span>' : '') + '</td>' +
-          '</tr>';
-        }).join('') +
-        '</tbody></table></div>'
-      : '<div class="card"><p class="sub" style="margin:0">' +
-        (EQUIPE_BUSCA ? 'Ninguém encontrado com esse termo.' : 'Ninguém cadastrado ainda. Mande o link acima para o time.') +
-        '</p></div>');
+    '<div id="eq-tabela"></div>';
 
   ligaColaboradores(d);
+  desenhaTabela();
+}
+
+function filtrados() {
+  const q = EQUIPE_BUSCA.trim().toLowerCase();
+  if (!q) return EQUIPE;
+  // cada palavra digitada precisa aparecer em algum campo
+  const termos = q.split(/\s+/);
+  return EQUIPE.filter(function (c) {
+    const alvo = [c.name, c.nickname, c.email, c.phone, c.role_title, c.area,
+      c.city, c.state, c.district, c.shirt_size, c.shoe_size]
+      .filter(Boolean).join(' ').toLowerCase();
+    return termos.every(function (t) { return alvo.indexOf(t) >= 0; });
+  });
+}
+
+function desenhaTabela() {
+  const lista = filtrados();
+  const cont = document.getElementById('eq-contagem');
+  cont.textContent = EQUIPE_BUSCA
+    ? lista.length + ' de ' + EQUIPE.length + (EQUIPE.length === 1 ? ' pessoa' : ' pessoas')
+    : EQUIPE.length + (EQUIPE.length === 1 ? ' pessoa cadastrada' : ' pessoas cadastradas');
+
+  document.getElementById('eq-tabela').innerHTML = lista.length
+    ? '<div class="card" style="padding:0;overflow:hidden">' +
+      '<table class="tbl" style="margin:0"><thead><tr>' +
+        '<th style="padding-left:18px">Pessoa</th><th>Área e cargo</th><th>Aniversário</th>' +
+        '<th>Camisa</th><th>Pé</th><th></th></tr></thead><tbody>' +
+      lista.map(function (c) {
+        return '<tr class="eq-linha" data-id="' + esc(c.id) + '">' +
+          '<td style="padding-left:18px">' +
+            '<div class="row" style="gap:11px;align-items:center">' +
+              '<span class="eq-av eq-av-sm">' + esc(iniciais(c.name)) + '</span>' +
+              '<span><strong>' + esc(c.nickname || c.name.split(' ')[0]) + '</strong>' +
+              '<div class="small muted">' + esc(c.email) + '</div></span>' +
+            '</div></td>' +
+          '<td>' + esc(c.area || '—') + '<div class="small muted">' + esc(c.role_title || '') + '</div></td>' +
+          '<td>' + (c.birth_date ? esc(dataCurta(c.birth_date)) : '—') + '</td>' +
+          '<td>' + (c.shirt_size ? '<span class="tag">' + esc(c.shirt_size) + '</span>' : '—') + '</td>' +
+          '<td>' + esc(c.shoe_size || '—') + '</td>' +
+          '<td style="padding-right:18px">' + (c.active === false ? '<span class="tag">inativo</span>' : '') + '</td>' +
+        '</tr>';
+      }).join('') +
+      '</tbody></table></div>'
+    : '<div class="card"><p class="sub" style="margin:0">' +
+      (EQUIPE_BUSCA
+        ? 'Ninguém encontrado para <strong>' + esc(EQUIPE_BUSCA) + '</strong>. Tente outra palavra.'
+        : 'Ninguém cadastrado ainda. Mande o link acima para o time.') +
+      '</p></div>';
+
+  document.querySelectorAll('.eq-linha').forEach(function (tr) {
+    tr.addEventListener('click', function () { abreColaborador(tr.dataset.id); });
+  });
 }
 
 function dataCurta(iso) {
@@ -88,10 +174,13 @@ function dataCurta(iso) {
 
 function ligaColaboradores(d) {
   const b = function (id) { return document.getElementById(id); };
+  const busca = b('eq-busca');
+  const limpar = b('eq-limpar');
 
   b('eq-copiar').addEventListener('click', function () {
     navigator.clipboard.writeText(d.link).then(function () { toast('Link copiado'); });
   });
+  b('eq-abrir').addEventListener('click', function () { window.open(d.link, '_blank'); });
 
   b('eq-csv').addEventListener('click', function () {
     const cols = ['name', 'nickname', 'email', 'phone', 'birth_date', 'cpf', 'area', 'role_title',
@@ -99,7 +188,7 @@ function ligaColaboradores(d) {
       'district', 'city', 'state'];
     const cabec = ['Nome', 'Como chamar', 'E-mail', 'Telefone', 'Nascimento', 'CPF', 'Área', 'Cargo',
       'Entrou em', 'Camisa', 'Pé', 'CEP', 'Rua', 'Número', 'Complemento', 'Bairro', 'Cidade', 'UF'];
-    const linhas = [cabec].concat(EQUIPE.map(function (c) {
+    const linhas = [cabec].concat(filtrados().map(function (c) {
       return cols.map(function (k) { return c[k] == null ? '' : String(c[k]); });
     }));
     const csv = '﻿' + linhas.map(function (l) {
@@ -109,17 +198,25 @@ function ligaColaboradores(d) {
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     a.download = 'colaboradores-startdigital.csv';
     a.click();
+    toast('CSV com ' + filtrados().length + ' pessoa(s)');
   });
 
-  let timer = null;
-  b('eq-busca').addEventListener('input', function () {
-    const v = this.value;
-    clearTimeout(timer);
-    timer = setTimeout(function () { EQUIPE_BUSCA = v; carregaColaboradores(); }, 350);
+  // busca instantanea, sem ida e volta no servidor
+  function aplicaBusca() {
+    EQUIPE_BUSCA = busca.value;
+    limpar.style.display = busca.value ? 'flex' : 'none';
+    desenhaTabela();
+  }
+  busca.addEventListener('input', aplicaBusca);
+  busca.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape') { busca.value = ''; aplicaBusca(); }
   });
+  limpar.addEventListener('click', function () { busca.value = ''; busca.focus(); aplicaBusca(); });
+  limpar.style.display = busca.value ? 'flex' : 'none';
 
-  document.querySelectorAll('.eq-linha').forEach(function (tr) {
-    tr.addEventListener('click', function () { abreColaborador(tr.dataset.id); });
+  // clicar no aniversariante abre a ficha dele
+  document.querySelectorAll('.eq-pessoa').forEach(function (el) {
+    el.addEventListener('click', function () { abreColaborador(el.dataset.id); });
   });
 }
 
@@ -160,7 +257,7 @@ function abreColaborador(id) {
       '<label class="row small" style="gap:6px"><input type="checkbox" id="eq-ativo" ' +
       (c.active !== false ? 'checked' : '') + ' style="width:16px;height:16px"> está no time</label>' +
       '<span style="flex:1"></span>' +
-      '<button class="btn btn-sm btn-ghost" id="eq-excluir">Excluir cadastro</button>' +
+      '<button class="btn btn-sm btn-ghost" id="eq-excluir" style="color:var(--red)">Excluir cadastro</button>' +
     '</div>';
 
   document.getElementById('fundo').style.display = 'block';
