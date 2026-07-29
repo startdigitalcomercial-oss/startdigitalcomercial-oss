@@ -177,6 +177,13 @@ async function carregaCandidatos() {
         Object.keys(origens).sort().map(function (o) { return '<option>' + esc(o) + '</option>'; }).join('') +
       '</select>' +
       '<button class="btn btn-sm btn-ghost" id="cl-csv">Baixar CSV</button>' +
+    '</div>' +
+    '<div class="row row-wrap" style="gap:8px;margin-top:12px;align-items:center">' +
+      '<label class="row small" style="gap:6px"><input type="checkbox" id="cl-marcar" style="width:16px;height:16px"> selecionar todos</label>' +
+      '<span class="small muted" id="cl-conta-sel"></span>' +
+      '<span style="flex:1"></span>' +
+      '<button class="btn btn-sm btn-ghost" id="cl-arquivar" disabled>Arquivar</button>' +
+      '<button class="btn btn-sm btn-ghost" id="cl-excluir" disabled style="color:var(--red)">Excluir</button>' +
     '</div></div>' +
     '<div class="card" style="margin-top:14px"><div id="cl-tabela"></div></div>';
 
@@ -193,29 +200,95 @@ async function carregaCandidatos() {
     const nomeEtapa = {}; etapas.forEach(function (e) { nomeEtapa[e.key] = e; });
 
     document.getElementById('cl-tabela').innerHTML = lista.length
-      ? '<table class="tbl"><thead><tr><th>Nome</th><th>Vaga</th><th>Contato</th><th>Origem</th><th>Etapa</th><th>Entrou em</th></tr></thead><tbody>' +
+      ? '<table class="tbl"><thead><tr><th style="width:34px"></th><th>Nome</th><th>Vaga</th><th>Contato</th><th>Origem</th><th>Etapa</th><th>Entrou em</th></tr></thead><tbody>' +
         lista.map(function (c) {
           const e = nomeEtapa[c.stage_key] || {};
-          return '<tr class="linha-cand" data-id="' + c.id + '" style="cursor:pointer">' +
-            '<td><strong>' + esc(c.name) + '</strong>' +
+          return '<tr class="linha-cand" data-id="' + c.id + '">' +
+            '<td><input type="checkbox" class="cl-check" data-id="' + c.id + '" style="width:16px;height:16px;cursor:pointer"></td>' +
+            '<td class="abre" style="cursor:pointer"><strong>' + esc(c.name) + '</strong>' +
             (c.disc ? '<div class="small muted">DISC ' + esc(c.disc) + '</div>' : '') + '</td>' +
-            '<td>' + esc(c.role_applied || '—') + '<div class="small muted">' + esc(c.city || '') + '</div></td>' +
-            '<td class="small">' + esc(c.email || '') + '<div class="muted">' + esc(c.phone || '') + '</div></td>' +
-            '<td class="small">' + esc(c.source_detail || c.source || '—') + '</td>' +
-            '<td><span class="tag"><i class="pt" style="background:' + esc(e.color || '#999') + '"></i>' + esc(e.name || c.stage_key) + '</span></td>' +
-            '<td class="small muted" style="white-space:nowrap">' + dataBr(c.created_at) + '</td></tr>';
+            '<td class="abre" style="cursor:pointer">' + esc(c.role_applied || '—') + '<div class="small muted">' + esc(c.city || '') + '</div></td>' +
+            '<td class="small abre" style="cursor:pointer">' + esc(c.email || '') + '<div class="muted">' + esc(c.phone || '') + '</div></td>' +
+            '<td class="small abre" style="cursor:pointer">' + esc(c.source_detail || c.source || '—') + '</td>' +
+            '<td class="abre" style="cursor:pointer"><span class="tag"><i class="pt" style="background:' + esc(e.color || '#999') + '"></i>' + esc(e.name || c.stage_key) + '</span></td>' +
+            '<td class="small muted abre" style="white-space:nowrap;cursor:pointer">' + dataBr(c.created_at) + '</td></tr>';
         }).join('') + '</tbody></table>' +
-        '<p class="small muted" style="margin:14px 0 0">' + lista.length + ' de ' + dados.candidates.length + ' candidatos. Clique numa linha para abrir a ficha.</p>'
-      : '<p class="muted small" style="margin:0">Nenhum candidato com esses filtros.</p>';
+        '<p class="small muted" style="margin:14px 0 0">' + lista.length + ' de ' + dados.candidates.length +
+        ' candidatos. Clique numa linha para abrir a ficha, ou marque a caixinha para arquivar e excluir em lote.</p>'
+      : '<p class="muted small" style="margin:0">Nenhum candidato com esses filtros. ' +
+        'Confira a busca e os filtros de etapa e origem.</p>';
 
-    document.querySelectorAll('.linha-cand').forEach(function (tr) {
-      tr.addEventListener('click', function () { abreCandidato(tr.dataset.id); });
+    document.querySelectorAll('.linha-cand .abre').forEach(function (td) {
+      td.addEventListener('click', function () { abreCandidato(td.closest('.linha-cand').dataset.id); });
     });
+    document.querySelectorAll('.cl-check').forEach(function (ch) {
+      ch.addEventListener('change', atualizaSelecao);
+    });
+    const marcarTodos = document.getElementById('cl-marcar');
+    if (marcarTodos) marcarTodos.checked = false;
+    atualizaSelecao();
+  }
+
+  function selecionados() {
+    return [].slice.call(document.querySelectorAll('.cl-check:checked')).map(function (c) { return c.dataset.id; });
+  }
+
+  function atualizaSelecao() {
+    const n = selecionados().length;
+    document.getElementById('cl-conta-sel').textContent = n ? n + ' selecionado' + (n > 1 ? 's' : '') : '';
+    document.getElementById('cl-arquivar').disabled = !n;
+    document.getElementById('cl-excluir').disabled = !n;
+  }
+
+  // roda a mesma acao em cada selecionado, um de cada vez
+  async function emLote(ids, acao, corpo) {
+    let feitos = 0, erros = 0;
+    for (const id of ids) {
+      try { await api(acao, { body: Object.assign({ id: id }, corpo || {}) }); feitos++; }
+      catch (e) { erros++; }
+    }
+    return { feitos: feitos, erros: erros };
   }
 
   ['cl-busca', 'cl-etapa', 'cl-origem'].forEach(function (id) {
     document.getElementById(id).addEventListener('input', desenha);
     document.getElementById(id).addEventListener('change', desenha);
+  });
+
+  document.getElementById('cl-marcar').addEventListener('change', function () {
+    const marcar = this.checked;
+    document.querySelectorAll('.cl-check').forEach(function (c) { c.checked = marcar; });
+    atualizaSelecao();
+  });
+
+  document.getElementById('cl-arquivar').addEventListener('click', async function () {
+    const ids = selecionados();
+    if (!ids.length) return;
+    if (!confirm('Arquivar ' + ids.length + ' candidato(s)? Eles saem do quadro mas continuam guardados em Arquivados.')) return;
+    this.disabled = true;
+    const r = await emLote(ids, 'update_candidate', { archived: true });
+    toast(r.feitos + ' arquivado(s)' + (r.erros ? ' · ' + r.erros + ' falharam' : ''), !!r.erros);
+    await carregaBoard();
+    carregaCandidatos();
+  });
+
+  document.getElementById('cl-excluir').addEventListener('click', async function () {
+    const ids = selecionados();
+    if (!ids.length) return;
+    const nomes = ids.map(function (id) {
+      const c = dados.candidates.filter(function (x) { return x.id === id; })[0];
+      return c ? c.name : id;
+    });
+    const lista = nomes.slice(0, 6).join('\n· ') + (nomes.length > 6 ? '\n· e mais ' + (nomes.length - 6) : '');
+    if (!confirm('EXCLUIR PARA SEMPRE ' + ids.length + ' candidato(s)?\n\n· ' + lista +
+      '\n\nIsso apaga a ficha, o teste DISC, o quiz e o histórico. Não tem como desfazer.\n' +
+      'Se você só quer tirar do quadro, use Arquivar.')) return;
+    this.disabled = true;
+    this.innerHTML = '<span class="spinner"></span> Excluindo…';
+    const r = await emLote(ids, 'delete_candidate');
+    toast(r.feitos + ' excluído(s)' + (r.erros ? ' · ' + r.erros + ' falharam' : ''), !!r.erros);
+    await carregaBoard();
+    carregaCandidatos();
   });
   document.getElementById('cl-csv').addEventListener('click', function () {
     const linhas = [['Nome', 'E-mail', 'Telefone', 'Vaga', 'Cidade', 'Origem', 'Etapa', 'Entrou em']];

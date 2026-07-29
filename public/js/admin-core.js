@@ -93,7 +93,7 @@ const TITULOS = {
   dashboard: 'Dashboard', triagem: 'Triagem', candidatos: 'Candidatos',
   prequalificacao: 'Pré Qualificação', aurea: 'Aurea', preonboarding: 'Pré Onboarding',
   conteudo: 'Aulas da integração', quiz: 'Quiz de seleção',
-  colaboradores: 'Colaboradores',
+  colaboradores: 'Colaboradores', avisos: 'Avisos para o time',
   mensagens: 'Modelos de mensagem', ajustes: 'Ajustes'
 };
 document.getElementById('abas').addEventListener('click', function (ev) {
@@ -110,7 +110,7 @@ document.getElementById('abas').addEventListener('click', function (ev) {
   const carregar = {
     dashboard: carregaDashboard, triagem: carregaBoard, candidatos: carregaCandidatos,
     prequalificacao: carregaPrequal, aurea: carregaAurea, preonboarding: carregaBoasVindas,
-    colaboradores: carregaColaboradores,
+    colaboradores: carregaColaboradores, avisos: carregaAvisos,
     conteudo: carregaConteudo, quiz: carregaQuiz, mensagens: carregaTemplates, ajustes: carregaAjustes
   };
   if (carregar[b.dataset.aba]) carregar[b.dataset.aba]();

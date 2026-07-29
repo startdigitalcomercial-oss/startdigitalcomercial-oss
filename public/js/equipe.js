@@ -196,22 +196,8 @@ function terminou(r) {
   $('pronto').style.display = 'block';
   $('barra').style.width = '100%';
   $('passo-n').textContent = 'Concluído';
-  $('fim-titulo').textContent = 'Pronto, ' + (r.nome || '') + '!';
-
-  var nomes = { email: 'E-mail', whatsapp: 'WhatsApp', sms: 'SMS' };
-  var certo = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.4 12.3 2.4 2.4 4.8-5.4"/></svg>';
-  var relogio = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg>';
-
-  var envios = r.envios || [];
-  $('canais').innerHTML = envios.length
-    ? envios.map(function (e, i) {
-        var foi = e.status === 'enviado';
-        return '<div class="canal" style="animation-delay:' + (200 + i * 110) + 'ms">' +
-          '<span class="' + (foi ? 'ok' : 'pend') + '">' + (foi ? certo : relogio) + '</span>' +
-          '<span>' + esc(nomes[e.canal] || e.canal) +
-          (foi ? ' enviado' : ' — vai chegar em instantes') + '</span></div>';
-      }).join('')
-    : '';
+  $('fim-titulo').textContent = 'Parabéns, ' + (r.nome || '') + '!';
+  $('fim-texto').textContent = 'Que bom ter você fazendo parte do time da StartDigital.';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
