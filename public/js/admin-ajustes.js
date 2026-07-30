@@ -139,6 +139,14 @@ async function carregaAjustes() {
         'de ambiente da Vercel e faça <strong>Redeploy</strong>. Esta linha vira verde sozinha quando o sistema enxergar a chave.') +
     '</div>' +
 
+    '<div class="card"><h2>Segurança</h2>' +
+    '<p class="sub" style="margin:2px 0 16px">A sessão de quem entra no painel vale 12 horas. ' +
+    'Depois de 5 senhas erradas seguidas, o sistema trava aquela origem por 15 minutos.</p>' +
+    '<div class="row row-wrap" style="gap:10px;align-items:center">' +
+      '<button class="btn btn-sm btn-ghost" id="btn-sair-todos" style="color:var(--red)">Encerrar todas as sessões</button>' +
+      '<span class="small muted">Desconecta todo mundo, inclusive você. Use se uma senha vazar ou alguém sair do time.</span>' +
+    '</div></div>' +
+
     '<div class="card" id="card-wa"><h2>WhatsApp</h2>' +
     '<p class="sub">Conecte o número escaneando o QR code aqui mesmo. O sistema também liga o webhook sozinho, ' +
     'para a Aurea conseguir <strong>receber</strong> as respostas.</p>' +
@@ -161,6 +169,16 @@ async function carregaAjustes() {
       toast('Formulário salvo');
     } catch (e) { toast(e.message, true); }
   });
+  document.getElementById('btn-sair-todos').addEventListener('click', async function () {
+    if (!confirm('Encerrar TODAS as sessões abertas?\n\nTodo mundo que está usando o painel agora vai ' +
+      'cair na tela de login, inclusive você. Ninguém perde dado nenhum — é só precisar entrar de novo.')) return;
+    try {
+      await api('logout_todos', { body: {} });
+      alert('Pronto. Todas as sessões foram encerradas.');
+      sair();
+    } catch (e) { toast(e.message, true); }
+  });
+
   ligaTesteSms();
   carregaWhatsApp();
 

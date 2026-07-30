@@ -385,6 +385,43 @@ async function webhook(telefone, texto) {
   check('lista as rotas da conta', rotas.ok && dr.rotas.length === 2, rotas.error);
   check('marca a Premium como a escolhida', dr.escolhida === 17, dr.escolhida);
 
+  console.log('\n5c) SEGURANCA — trava de senha e fim de sessao');
+  async function tentaLogin(senha) {
+    return (await fetch(BASE + '/api/admin?action=login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: senha })
+    })).json();
+  }
+
+  // 5 erros seguidos e a origem fica travada
+  let travou = null;
+  for (let i = 0; i < 7; i++) {
+    const r = await tentaLogin('senha-errada-' + i);
+    if (/Muitas tentativas/.test(r.error || '')) { travou = r.error; break; }
+  }
+  check('trava depois de tentativas erradas', !!travou, travou);
+  check('senha certa tambem espera a trava', /Muitas tentativas/.test((await tentaLogin('Start-RH-ioZSqXbN')).error || ''));
+
+  // limpa a trava direto no espelho do banco, senao os proximos testes nao entram
+  await fetch('http://127.0.0.1:54321/rest/v1/settings?key=eq.login_erros', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify({ value: {} })
+  }).catch(function () { return null; });
+  const voltou = await tentaLogin('Start-RH-ioZSqXbN');
+  check('depois de limpar a trava, entra de novo', voltou.ok && !!voltou.token, voltou.error);
+  check('token novo carrega a epoca da sessao', !!voltou.token, voltou.error);
+
+  // a epoca invalida sessoes antigas
+  const tokenAntigo = T;
+  check('encerra todas as sessoes', (await adm('logout_todos', {})).ok);
+  const usandoAntigo = await (await fetch(BASE + '/api/admin?action=board', {
+    headers: { Authorization: 'Bearer ' + tokenAntigo }
+  })).json();
+  check('token antigo para de valer', usandoAntigo.ok === false && /encerrada|expirada/i.test(usandoAntigo.error || ''), usandoAntigo.error);
+  T = (await tentaLogin('Start-RH-ioZSqXbN')).token;
+  check('login novo volta a funcionar', !!T);
+
   const qrNovo = await adm('wa_qr', {});
   check('pede QR novo (renovacao)', qrNovo.ok && !!(qrNovo.data || qrNovo).base64, qrNovo.error);
 

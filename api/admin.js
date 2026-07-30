@@ -45,6 +45,62 @@ function montaAviso(titulo, texto, canais) {
   return itens;
 }
 
+// ============================================================
+// TRAVA CONTRA TENTATIVA DE ADIVINHAR A SENHA
+// Depois de 5 erros da mesma origem, espera 15 minutos.
+// Fica no banco (e nao na memoria) porque cada requisicao da Vercel
+// pode rodar numa maquina diferente — memoria nao serviria.
+// ============================================================
+const MAX_ERROS = 5;
+const CASTIGO_MIN = 15;
+
+// Identifica de onde veio a tentativa, sem guardar o IP inteiro:
+// so um resumo embaralhado, que serve para contar e nao identifica ninguem.
+function quemPede(req) {
+  const ip = String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'desconhecido')
+    .split(',')[0].trim();
+  return require('crypto').createHmac('sha256', process.env.APP_SECRET || 'sem-segredo')
+    .update('login:' + ip).digest('hex').slice(0, 24);
+}
+
+async function travaLogin(chave) {
+  const reg = await getSetting('login_erros', {});
+  const dados = reg[chave];
+  if (!dados) return { bloqueado: false };
+  const passou = (Date.now() - dados.ultimo) / 60000;
+  if (passou >= CASTIGO_MIN) return { bloqueado: false };
+  if (dados.erros < MAX_ERROS) return { bloqueado: false };
+  return { bloqueado: true, espere_min: Math.max(1, Math.ceil(CASTIGO_MIN - passou)) };
+}
+
+async function registraErroLogin(chave) {
+  const reg = await getSetting('login_erros', {}) || {};
+  const agora = Date.now();
+  // limpa o que ja venceu, para o registro nao crescer para sempre
+  Object.keys(reg).forEach(function (k) {
+    if (!reg[k] || (agora - reg[k].ultimo) / 60000 > CASTIGO_MIN * 4) delete reg[k];
+  });
+  const atual = reg[chave] || { erros: 0 };
+  reg[chave] = { erros: atual.erros + 1, ultimo: agora };
+  await db.upsert('settings', { key: 'login_erros', value: reg }, 'key');
+}
+
+async function limpaErrosLogin(chave) {
+  const reg = await getSetting('login_erros', {}) || {};
+  if (!reg[chave]) return;
+  delete reg[chave];
+  await db.upsert('settings', { key: 'login_erros', value: reg }, 'key');
+}
+
+// "Epoca" da sessao: um numero que, ao mudar, invalida todos os tokens antigos.
+async function epocaSessao() {
+  const s = await getSetting('session_epoch', null);
+  if (s && s.valor) return s.valor;
+  const valor = Date.now();
+  await db.upsert('settings', { key: 'session_epoch', value: { valor: valor } }, 'key');
+  return valor;
+}
+
 async function getSetting(key, fallback) {
   const row = await db.selectOne('settings', { key: 'eq.' + key, select: 'key,value' });
   return row ? row.value : fallback;
@@ -86,16 +142,46 @@ module.exports = async function handler(req, res) {
       const senha = String(body.password || '');
       const esperada = process.env.ADMIN_PASSWORD || process.env.ADMIN_SECRET || '';
       if (!esperada) return u.fail(res, 500, 'ADMIN_PASSWORD nao configurada na Vercel.');
+
+      const deOnde = quemPede(req);
+      const trava = await travaLogin(deOnde);
+      if (trava.bloqueado) {
+        return u.fail(res, 429, 'Muitas tentativas erradas. Espere ' + trava.espere_min +
+          ' minuto(s) antes de tentar de novo.');
+      }
+
       if (!senha || !u.safeEqual(senha, esperada)) {
+        await registraErroLogin(deOnde);
         return u.fail(res, 401, 'Senha incorreta.');
       }
-      const token = u.signSession({ role: 'admin', exp: Date.now() + SESSION_HOURS * 3600 * 1000 });
+      await limpaErrosLogin(deOnde);
+
+      const token = u.signSession({
+        role: 'admin',
+        epoca: await epocaSessao(),
+        exp: Date.now() + SESSION_HOURS * 3600 * 1000
+      });
       return u.ok(res, { token: token, expires_in_hours: SESSION_HOURS });
+    }
+
+    // Desliga TODAS as sessoes abertas, inclusive a de quem clicou.
+    // Serve para quando alguem sai do time ou uma senha vaza.
+    if (action === 'logout_todos') {
+      const antes = await u.requireAdmin(req, res);
+      if (!antes) return;
+      await db.upsert('settings', { key: 'session_epoch', value: { valor: Date.now() } }, 'key');
+      return u.ok(res, { aviso: 'Todas as sessoes foram encerradas. Todo mundo precisa entrar de novo.' });
     }
 
     // ---------------------------------------------------- daqui pra baixo exige login
     const session = u.requireAdmin(req, res);
     if (!session) return;
+
+    // Sessao assinada antes do ultimo "encerrar todas" nao vale mais.
+    const epocaAtual = await epocaSessao();
+    if (session.epoca && session.epoca < epocaAtual) {
+      return u.fail(res, 401, 'Sua sessao foi encerrada. Faca login novamente.');
+    }
 
     // ---------------------------------------------------- QUADRO (KANBAN)
     if (action === 'board') {
