@@ -230,6 +230,28 @@
 
   @media (prefers-reduced-motion: reduce) { .eq-pessoa, .eq-linha, .eq-limpar { transition: none; } }
 
+  /* ---------- quem recebe o aviso ---------- */
+  .av-filtro { border: 1.5px solid var(--hairline-strong); background: var(--surface); color: var(--label-2);
+    border-radius: var(--r-pill); padding: 6px 14px; font-family: inherit; font-size: 13px;
+    cursor: pointer; transition: all .16s; }
+  .av-filtro b { font-weight: 600; color: var(--label-3); margin-left: 3px; font-variant-numeric: tabular-nums; }
+  .av-filtro:hover { border-color: var(--accent); }
+  .av-filtro.on { border-color: var(--accent); background: var(--accent-tint); color: var(--accent); font-weight: 600; }
+  .av-filtro.on b { color: var(--accent); }
+
+  .av-pessoas { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px;
+    max-height: 300px; overflow-y: auto; padding: 4px; background: var(--fill-1); border-radius: var(--r-ctl); }
+  .av-pessoa { display: flex; align-items: center; gap: 9px; padding: 9px 12px; border-radius: 9px;
+    background: var(--surface); cursor: pointer; opacity: .5; transition: opacity .14s, box-shadow .14s; }
+  .av-pessoa.on { opacity: 1; box-shadow: var(--shadow-1); }
+  .av-pessoa:hover { box-shadow: var(--shadow-2); }
+  .av-pessoa input { width: 16px; height: 16px; flex: none; cursor: pointer; }
+  .av-pessoa-nome { font-size: 14px; font-weight: 500; flex: 1 1 auto; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .av-pessoa-tag { font-size: 11.5px; color: var(--label-3); flex: 0 0 auto;
+    margin-left: auto; padding-left: 10px; white-space: nowrap; }
+  @media (prefers-reduced-motion: reduce) { .av-pessoa, .av-filtro { transition: none; } }
+
   /* ---------- escolha de canais do aviso ---------- */
   .canais-op { display: flex; flex-wrap: wrap; gap: 10px; }
   .canal-op { flex: 1; min-width: 150px; text-align: left; padding: 14px 16px; border-radius: var(--r-ctl);
