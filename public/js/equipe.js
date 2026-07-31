@@ -122,6 +122,7 @@ function desenhaRevisao() {
     ['WhatsApp', $('phone').value, 1],
     ['Área', $('area').value, 2],
     ['Cargo', $('role_title').value, 2],
+    ['Como trabalha', { presencial: 'Presencial', remoto: 'Remoto', hibrido: 'Híbrido' }[$('work_mode').value] || '', 2],
     ['Na Start desde', dataBonita($('started_on').value), 2],
     ['CPF', $('cpf').value, 3],
     ['Endereço', montaEndereco(), 4],
@@ -164,7 +165,7 @@ function envia() {
 
   var dados = {};
   ['name', 'nickname', 'birth_date', 'cpf', 'email', 'phone', 'role_title', 'area',
-    'started_on', 'cep', 'street', 'number', 'complement', 'district', 'city', 'state',
+    'work_mode', 'started_on', 'cep', 'street', 'number', 'complement', 'district', 'city', 'state',
     'shirt_size', 'shoe_size'].forEach(function (c) {
       var el = $(c);
       if (el && el.value.trim()) dados[c] = el.value.trim();
@@ -204,8 +205,11 @@ function terminou(r) {
 /* ---------------- escolhas em cartao ---------------- */
 function montaEscolhas(caixaId, campoId, itens) {
   var caixa = $(caixaId);
+  if (!caixa) return;
   caixa.innerHTML = itens.map(function (i) {
-    return '<button type="button" class="escolha" data-v="' + esc(i) + '">' + esc(i) + '</button>';
+    var valor = (i && i.valor !== undefined) ? i.valor : i;
+    var rotulo = (i && i.rotulo !== undefined) ? i.rotulo : i;
+    return '<button type="button" class="escolha" data-v="' + esc(valor) + '">' + esc(rotulo) + '</button>';
   }).join('');
   var bts = caixa.querySelectorAll('.escolha');
   for (var k = 0; k < bts.length; k++) {
@@ -247,6 +251,9 @@ function buscaCep() {
 
     $('form').style.display = 'block';
     montaEscolhas('areas', 'area', c.areas || []);
+    montaEscolhas('modos', 'work_mode', (c.modos || ['presencial', 'remoto', 'hibrido']).map(function (m) {
+      return { valor: m, rotulo: { presencial: 'Presencial', remoto: 'Remoto', hibrido: 'Híbrido' }[m] || m };
+    }));
     montaEscolhas('camisas', 'shirt_size', c.camisas || ['P', 'M', 'G', 'GG']);
 
     document.querySelector('.passo[data-passo="0"] h1').textContent = c.titulo || 'Vamos começar pelo básico';

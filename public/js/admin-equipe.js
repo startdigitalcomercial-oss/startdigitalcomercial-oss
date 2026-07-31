@@ -4,6 +4,8 @@
 let EQUIPE = [];
 let EQUIPE_DADOS = null;
 let EQUIPE_BUSCA = '';
+let EQUIPE_MODO = 'todos';
+const MODOS_NOME = { presencial: 'Presencial', remoto: 'Remoto', hibrido: 'Híbrido', sem: 'Não informou' };
 
 // iniciais para o circulinho: "Maria Souza" -> MS
 function iniciais(nome) {
@@ -47,6 +49,11 @@ async function carregaColaboradores() {
         (d.total !== d.ativos
           ? '<div class="small muted" style="margin-top:8px">' + (d.total - d.ativos) + ' inativo(s)</div>' : '') +
         '<div class="eq-chips">' +
+          (d.modos && (d.modos.presencial || d.modos.remoto || d.modos.hibrido)
+            ? '<span class="eq-chip"><b>' + (d.modos.presencial || 0) + '</b> presencial</span>' +
+              '<span class="eq-chip"><b>' + (d.modos.remoto || 0) + '</b> remoto</span>' +
+              (d.modos.hibrido ? '<span class="eq-chip"><b>' + d.modos.hibrido + '</b> híbrido</span>' : '')
+            : '') +
           (camisas.length
             ? camisas.map(function (c) {
                 return '<span class="eq-chip"><b>' + esc(c) + '</b> ' + d.camisas[c] + '</span>';
@@ -99,6 +106,9 @@ async function carregaColaboradores() {
       '</div>' +
     '</div>' +
 
+    // ---------- filtro por modo de trabalho ----------
+    '<div class="row row-wrap" style="gap:7px;margin-bottom:10px" id="eq-modos"></div>' +
+
     // ---------- busca ----------
     '<div class="eq-busca-wrap">' +
       '<svg class="eq-lupa" width="18" height="18" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.6"/><path d="m16 16 4.2 4.2"/></svg>' +
@@ -116,13 +126,17 @@ async function carregaColaboradores() {
 }
 
 function filtrados() {
+  let base = EQUIPE;
+  if (EQUIPE_MODO === 'sem') base = base.filter(function (c) { return !c.work_mode; });
+  else if (EQUIPE_MODO !== 'todos') base = base.filter(function (c) { return c.work_mode === EQUIPE_MODO; });
+
   const q = EQUIPE_BUSCA.trim().toLowerCase();
-  if (!q) return EQUIPE;
+  if (!q) return base;
   // cada palavra digitada precisa aparecer em algum campo
   const termos = q.split(/\s+/);
-  return EQUIPE.filter(function (c) {
+  return base.filter(function (c) {
     const alvo = [c.name, c.nickname, c.email, c.phone, c.role_title, c.area,
-      c.city, c.state, c.district, c.shirt_size, c.shoe_size]
+      c.city, c.state, c.district, c.shirt_size, c.shoe_size, c.work_mode]
       .filter(Boolean).join(' ').toLowerCase();
     return termos.every(function (t) { return alvo.indexOf(t) >= 0; });
   });
@@ -131,14 +145,15 @@ function filtrados() {
 function desenhaTabela() {
   const lista = filtrados();
   const cont = document.getElementById('eq-contagem');
-  cont.textContent = EQUIPE_BUSCA
+  const filtrando = !!EQUIPE_BUSCA || EQUIPE_MODO !== 'todos';
+  cont.textContent = filtrando
     ? lista.length + ' de ' + EQUIPE.length + (EQUIPE.length === 1 ? ' pessoa' : ' pessoas')
     : EQUIPE.length + (EQUIPE.length === 1 ? ' pessoa cadastrada' : ' pessoas cadastradas');
 
   document.getElementById('eq-tabela').innerHTML = lista.length
     ? '<div class="card" style="padding:0;overflow:hidden">' +
       '<table class="tbl" style="margin:0"><thead><tr>' +
-        '<th style="padding-left:18px">Pessoa</th><th>Área e cargo</th><th>Aniversário</th>' +
+        '<th style="padding-left:18px">Pessoa</th><th>Área e cargo</th><th>Trabalho</th><th>Aniversário</th>' +
         '<th>Camisa</th><th>Pé</th><th></th></tr></thead><tbody>' +
       lista.map(function (c) {
         return '<tr class="eq-linha" data-id="' + esc(c.id) + '">' +
@@ -149,6 +164,7 @@ function desenhaTabela() {
               '<div class="small muted">' + esc(c.email) + '</div></span>' +
             '</div></td>' +
           '<td>' + esc(c.area || '—') + '<div class="small muted">' + esc(c.role_title || '') + '</div></td>' +
+          '<td>' + (c.work_mode ? '<span class="tag">' + esc(MODOS_NOME[c.work_mode] || c.work_mode) + '</span>' : '—') + '</td>' +
           '<td>' + (c.birth_date ? esc(dataCurta(c.birth_date)) : '—') + '</td>' +
           '<td>' + (c.shirt_size ? '<span class="tag">' + esc(c.shirt_size) + '</span>' : '—') + '</td>' +
           '<td>' + esc(c.shoe_size || '—') + '</td>' +
@@ -201,6 +217,29 @@ function ligaColaboradores(d) {
     toast('CSV com ' + filtrados().length + ' pessoa(s)');
   });
 
+  // filtro por jeito de trabalhar
+  function desenhaModos() {
+    const conta = function (m) {
+      if (m === 'todos') return EQUIPE.length;
+      if (m === 'sem') return EQUIPE.filter(function (c) { return !c.work_mode; }).length;
+      return EQUIPE.filter(function (c) { return c.work_mode === m; }).length;
+    };
+    const opcoes = [['todos', 'Todos'], ['presencial', 'Presencial'], ['remoto', 'Remoto'],
+      ['hibrido', 'Híbrido'], ['sem', 'Não informou']]
+      .filter(function (o) { return o[0] === 'todos' || conta(o[0]) > 0; });
+    b('eq-modos').innerHTML = opcoes.map(function (o) {
+      return '<button type="button" class="av-filtro' + (EQUIPE_MODO === o[0] ? ' on' : '') + '" ' +
+        'data-m="' + o[0] + '">' + o[1] + ' <b>' + conta(o[0]) + '</b></button>';
+    }).join('');
+    b('eq-modos').querySelectorAll('.av-filtro').forEach(function (bt) {
+      bt.addEventListener('click', function () {
+        EQUIPE_MODO = bt.dataset.m;
+        desenhaModos(); desenhaTabela();
+      });
+    });
+  }
+  desenhaModos();
+
   // busca instantanea, sem ida e volta no servidor
   function aplicaBusca() {
     EQUIPE_BUSCA = busca.value;
@@ -241,6 +280,7 @@ function abreColaborador(id) {
       linha('Como chamar', c.nickname) +
       linha('E-mail', c.email) +
       linha('WhatsApp', c.phone) +
+      linha('Como trabalha', MODOS_NOME[c.work_mode] || '') +
       linha('Aniversário', c.birth_date ? dataBr(c.birth_date) : '') +
       linha('CPF', c.cpf) +
       linha('Na Start desde', c.started_on ? dataBr(c.started_on) : '') +

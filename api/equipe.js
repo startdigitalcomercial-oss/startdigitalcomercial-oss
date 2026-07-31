@@ -14,12 +14,13 @@ const send = require('./_lib/send');
 const CAMPOS = [
   'name', 'nickname', 'birth_date', 'cpf',
   'email', 'phone',
-  'role_title', 'area', 'started_on',
+  'role_title', 'area', 'started_on', 'work_mode',
   'cep', 'street', 'number', 'complement', 'district', 'city', 'state',
   'shirt_size', 'shoe_size'
 ];
 
 const CAMISAS = ['PP', 'P', 'M', 'G', 'GG', 'XG', 'XGG'];
+const MODOS = ['presencial', 'remoto', 'hibrido'];
 
 function soDigitos(v) { return String(v || '').replace(/\D/g, ''); }
 
@@ -56,6 +57,7 @@ function limpa(body) {
     if (c === 'cep') v = soDigitos(v);
     if (c === 'state') v = v.toUpperCase().slice(0, 2);
     if (c === 'shirt_size') v = v.toUpperCase();
+    if (c === 'work_mode') v = v.toLowerCase();
     dados[c] = v.slice(0, 400);
   });
   return dados;
@@ -76,6 +78,9 @@ function valida(d) {
   if (d.cep && d.cep.length !== 8) erros.push('O CEP precisa ter 8 numeros.');
   if (d.shirt_size && CAMISAS.indexOf(d.shirt_size) < 0) {
     erros.push('Tamanho de camisa desconhecido.');
+  }
+  if (d.work_mode && MODOS.indexOf(d.work_mode) < 0) {
+    erros.push('Modo de trabalho desconhecido.');
   }
   if (d.shoe_size) {
     const n = Number(String(d.shoe_size).replace(',', '.'));
@@ -151,6 +156,7 @@ module.exports = async function (req, res) {
         texto: cfg.subhead || 'Leva menos de 3 minutos. É com esses dados que a gente organiza eventos, brindes e avisos do time.',
         areas: cfg.areas || ['Tráfego', 'Social Media', 'Design', 'Redação', 'Atendimento / CS', 'Comercial', 'Administrativo', 'Liderança'],
         camisas: CAMISAS,
+        modos: MODOS,
         empresa: (company && company.name) || 'StartDigital'
       });
     }

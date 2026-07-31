@@ -3,6 +3,20 @@
    ============================================================ */
 let AVISO_CANAIS = { email: true, whatsapp: true, sms: false };
 let AVISO_INFO = null;
+let AVISO_FORA = {};      // quem foi tirado do disparo
+let AVISO_FILTRO = 'todos';
+const MODO_NOME = { presencial: 'Presencial', remoto: 'Remoto', hibrido: 'Híbrido', '': 'não informou' };
+
+// quem sobra depois do filtro de modo de trabalho
+function avisoElegiveis() {
+  const pes = (AVISO_INFO && AVISO_INFO.pessoas) || [];
+  if (AVISO_FILTRO === 'todos') return pes;
+  if (AVISO_FILTRO === 'sem') return pes.filter(function (p) { return !p.modo; });
+  return pes.filter(function (p) { return p.modo === AVISO_FILTRO; });
+}
+function avisoSelecionados() {
+  return avisoElegiveis().filter(function (p) { return !AVISO_FORA[p.id]; });
+}
 
 async function carregaAvisos() {
   const box = document.getElementById('painel-avisos');
@@ -32,6 +46,16 @@ async function carregaAvisos() {
       '<span class="hint">Pode usar <code>{{primeiro_nome}}</code> para chamar cada um pelo nome.</span>' +
       '<textarea id="av-msg" style="min-height:150px" placeholder="Oi {{primeiro_nome}}! Nossa confraternização vai ser dia 15/12, às 19h…"></textarea>' +
       '<span class="hint" id="av-conta"></span></div>' +
+
+      '<div class="field" style="margin-top:22px"><label>Quem vai receber</label>' +
+      '<span class="hint">Filtre pelo jeito de trabalhar e desmarque quem não deve receber.</span>' +
+      '<div class="row row-wrap" style="gap:7px;margin:10px 0 12px" id="av-filtros"></div>' +
+      '<div class="av-pessoas" id="av-pessoas"></div>' +
+      '<div class="row row-wrap" style="gap:12px;margin-top:10px;align-items:center">' +
+        '<button type="button" class="btn btn-sm btn-ghost" id="av-todos">Marcar todos</button>' +
+        '<button type="button" class="btn btn-sm btn-ghost" id="av-nenhum">Desmarcar todos</button>' +
+        '<span class="small muted" id="av-quantos"></span>' +
+      '</div></div>' +
 
       '<div class="field" style="margin-top:20px"><label>Por onde enviar</label>' +
       '<div class="canais-op" style="margin-top:8px">' +
@@ -69,14 +93,77 @@ function ligaAvisos(d) {
 
   function resumo() {
     const escolhidos = Object.keys(AVISO_CANAIS).filter(function (k) { return AVISO_CANAIS[k]; });
-    const alvo = AVISO_CANAIS.email ? d.com_email : 0;
-    const alvo2 = (AVISO_CANAIS.whatsapp || AVISO_CANAIS.sms) ? d.com_telefone : 0;
-    const pessoas = Math.max(alvo, alvo2);
-    b('av-resumo').textContent = escolhidos.length
-      ? 'vai para ' + pessoas + (pessoas === 1 ? ' pessoa' : ' pessoas')
-      : 'escolha um canal';
-    b('av-enviar').disabled = !escolhidos.length;
+    const n = avisoSelecionados().length;
+    b('av-resumo').textContent = !escolhidos.length
+      ? 'escolha um canal'
+      : (!n ? 'ninguém marcado' : 'vai para ' + n + (n === 1 ? ' pessoa' : ' pessoas'));
+    b('av-enviar').disabled = !escolhidos.length || !n;
   }
+
+  // ---- lista de quem recebe ----
+  function desenhaFiltros() {
+    const c = [
+      ['todos', 'Todos', (d.pessoas || []).length],
+      ['presencial', 'Presencial', d.presencial],
+      ['remoto', 'Remoto', d.remoto],
+      ['hibrido', 'Híbrido', d.hibrido],
+      ['sem', 'Não informou', d.sem_modo]
+    ].filter(function (x) { return x[0] === 'todos' || x[2] > 0; });
+    b('av-filtros').innerHTML = c.map(function (x) {
+      return '<button type="button" class="av-filtro' + (AVISO_FILTRO === x[0] ? ' on' : '') + '" ' +
+        'data-f="' + x[0] + '">' + esc(x[1]) + ' <b>' + x[2] + '</b></button>';
+    }).join('');
+    b('av-filtros').querySelectorAll('.av-filtro').forEach(function (bt) {
+      bt.addEventListener('click', function () {
+        AVISO_FILTRO = bt.dataset.f;
+        desenhaFiltros(); desenhaPessoas(); resumo();
+      });
+    });
+  }
+
+  function desenhaPessoas() {
+    const lista = avisoElegiveis();
+    b('av-pessoas').innerHTML = lista.length
+      ? lista.map(function (p) {
+          const dentro = !AVISO_FORA[p.id];
+          const semContato = !p.email && !p.phone;
+          return '<label class="av-pessoa' + (dentro ? ' on' : '') + '">' +
+            '<input type="checkbox" data-id="' + esc(p.id) + '"' + (dentro ? ' checked' : '') + '>' +
+            '<span class="av-pessoa-nome">' + esc(p.nome) +
+              (semContato ? ' <span class="tag tag-ambar">sem contato</span>' : '') + '</span>' +
+            '<span class="av-pessoa-tag">' + esc(MODO_NOME[p.modo || '']) +
+              (p.area ? ' · ' + esc(p.area) : '') + '</span>' +
+          '</label>';
+        }).join('')
+      : '<p class="small muted" style="margin:0">Ninguém com esse filtro.</p>';
+
+    b('av-pessoas').querySelectorAll('input[type=checkbox]').forEach(function (ch) {
+      ch.addEventListener('change', function () {
+        if (ch.checked) delete AVISO_FORA[ch.dataset.id];
+        else AVISO_FORA[ch.dataset.id] = true;
+        ch.closest('.av-pessoa').classList.toggle('on', ch.checked);
+        contaPessoas(); resumo();
+      });
+    });
+    contaPessoas();
+  }
+
+  function contaPessoas() {
+    const n = avisoSelecionados().length, t = avisoElegiveis().length;
+    b('av-quantos').textContent = n + ' de ' + t + ' marcado' + (n === 1 ? '' : 's');
+  }
+
+  desenhaFiltros();
+  desenhaPessoas();
+
+  b('av-todos').addEventListener('click', function () {
+    avisoElegiveis().forEach(function (p) { delete AVISO_FORA[p.id]; });
+    desenhaPessoas(); resumo();
+  });
+  b('av-nenhum').addEventListener('click', function () {
+    avisoElegiveis().forEach(function (p) { AVISO_FORA[p.id] = true; });
+    desenhaPessoas(); resumo();
+  });
 
   function conta() {
     const t = b('av-titulo').value, m = b('av-msg').value;
@@ -125,9 +212,14 @@ function ligaAvisos(d) {
     if (!titulo) return toast('Escreva um título', true);
     if (!b('av-msg').value.trim()) return toast('Escreva a mensagem', true);
 
+    const escolhidas = avisoSelecionados();
+    if (!escolhidas.length) return toast('Marque pelo menos uma pessoa', true);
+
     const nomes = { email: 'e-mail', whatsapp: 'WhatsApp', sms: 'SMS' };
+    const primeiros = escolhidas.slice(0, 5).map(function (p) { return p.nome; }).join(', ') +
+      (escolhidas.length > 5 ? ' e mais ' + (escolhidas.length - 5) : '');
     const aviso = 'Enviar "' + titulo + '" por ' + canais.map(function (c) { return nomes[c]; }).join(' e ') +
-      ' para ' + d.total + ' pessoa(s) do time?' +
+      ' para ' + escolhidas.length + ' pessoa(s)?\n\n' + primeiros +
       (AVISO_CANAIS.sms ? '\n\nO SMS gasta crédito — um por pessoa, no mínimo.' : '');
     if (!confirm(aviso)) return;
 
@@ -136,7 +228,10 @@ function ligaAvisos(d) {
     b('av-saida').innerHTML = '';
     try {
       const r = await api('broadcast_send', {
-        body: { title: titulo, message: b('av-msg').value, channels: canais }
+        body: {
+          title: titulo, message: b('av-msg').value, channels: canais,
+          ids: escolhidas.map(function (p) { return p.id; })
+        }
       });
       b('av-saida').innerHTML =
         '<div class="alert ' + (r.falhas ? 'alert-aviso' : 'alert-ok') + '" style="margin-top:18px">' +
