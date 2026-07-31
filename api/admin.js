@@ -135,6 +135,18 @@ module.exports = async function handler(req, res) {
   const action = params.action || '';
 
   try {
+    // Mostra a senha na tela de login — SO enquanto a variavel
+    // MOSTRAR_SENHA_LOGIN estiver como "true" na Vercel.
+    // Para desligar: troque para false (ou apague) e faca Redeploy.
+    if (action === 'dica_senha') {
+      const ligado = String(process.env.MOSTRAR_SENHA_LOGIN || '').toLowerCase() === 'true';
+      if (!ligado) return u.ok(res, { mostrar: false });
+      return u.ok(res, {
+        mostrar: true,
+        senha: process.env.ADMIN_PASSWORD || process.env.ADMIN_SECRET || ''
+      });
+    }
+
     // ---------------------------------------------------- LOGIN
     if (action === 'login') {
       if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');

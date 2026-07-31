@@ -386,6 +386,12 @@ async function webhook(telefone, texto) {
   check('marca a Premium como a escolhida', dr.escolhida === 17, dr.escolhida);
 
   console.log('\n5c) SEGURANCA — trava de senha e fim de sessao');
+  // a dica da senha na tela de login so aparece se a variavel estiver ligada
+  const dica = await (await fetch(BASE + '/api/admin?action=dica_senha')).json();
+  check('dica da senha responde sem precisar de login', dica.ok === true, dica.error);
+  check('dica so mostra a senha quando esta ligada',
+    dica.mostrar === false || (dica.mostrar === true && !!dica.senha), dica);
+
   async function tentaLogin(senha) {
     return (await fetch(BASE + '/api/admin?action=login', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
