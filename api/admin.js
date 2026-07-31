@@ -992,6 +992,11 @@ module.exports = async function handler(req, res) {
 
       const camisas = {};
       lista.forEach(function (c) { if (c.shirt_size) camisas[c.shirt_size] = (camisas[c.shirt_size] || 0) + 1; });
+      const modos = { presencial: 0, remoto: 0, hibrido: 0, sem: 0 };
+      lista.forEach(function (c) {
+        if (c.active === false) return;
+        modos[c.work_mode || 'sem'] = (modos[c.work_mode || 'sem'] || 0) + 1;
+      });
 
       return u.ok(res, {
         colaboradores: lista,
@@ -999,6 +1004,7 @@ module.exports = async function handler(req, res) {
         ativos: lista.filter(function (c) { return c.active !== false; }).length,
         aniversarios: emBreve,
         camisas: camisas,
+        modos: modos,
         link: u.appUrl() + '/equipe'
       });
     }
@@ -1008,7 +1014,7 @@ module.exports = async function handler(req, res) {
       const patch = {};
       ['name', 'nickname', 'birth_date', 'cpf', 'email', 'phone', 'role_title', 'area',
         'started_on', 'cep', 'street', 'number', 'complement', 'district', 'city', 'state',
-        'shirt_size', 'shoe_size', 'active', 'notes'].forEach(function (k) {
+        'shirt_size', 'shoe_size', 'work_mode', 'active', 'notes'].forEach(function (k) {
           if (body[k] !== undefined) patch[k] = body[k];
         });
       patch.updated_at = new Date().toISOString();
@@ -1034,8 +1040,16 @@ module.exports = async function handler(req, res) {
         com_email: time.filter(function (c) { return !!c.email; }).length,
         com_telefone: time.filter(function (c) { return !!c.phone; }).length,
         pessoas: time.map(function (c) {
-          return { id: c.id, nome: c.nickname || c.name, area: c.area || '', email: c.email, phone: c.phone };
+          return {
+            id: c.id, nome: c.nickname || c.name, nome_completo: c.name,
+            area: c.area || '', modo: c.work_mode || '',
+            email: c.email, phone: c.phone
+          };
         }),
+        presencial: time.filter(function (c) { return c.work_mode === 'presencial'; }).length,
+        remoto: time.filter(function (c) { return c.work_mode === 'remoto'; }).length,
+        hibrido: time.filter(function (c) { return c.work_mode === 'hibrido'; }).length,
+        sem_modo: time.filter(function (c) { return !c.work_mode; }).length,
         historico: historico,
         providers: send.providerStatus()
       });
