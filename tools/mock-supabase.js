@@ -161,7 +161,7 @@ const DEFAULTS = {
   prequal_sessions: function () { return { id: uuid(), channel: 'whatsapp', status: 'aguardando', current_index: 0, answers: [], score: null, recommendation: null, summary: null, last_message_at: null, started_at: agora(), finished_at: null, error: null }; },
   prequal_messages: function () { return { id: seq('prequal_messages'), created_at: agora() }; },
   broadcasts: function () { return { id: uuid(), total: 0, sent: 0, failed: 0, detail: {}, created_at: agora() }; },
-  collaborators: function () { return { id: uuid(), token: uuid().replace(/-/g, ''), active: true, source: 'formulario', welcomed_at: null, notes: null, created_at: agora(), updated_at: agora() }; }
+  collaborators: function () { return { id: uuid(), token: uuid().replace(/-/g, ''), active: true, source: 'formulario', work_mode: null, welcomed_at: null, notes: null, created_at: agora(), updated_at: agora() }; }
 };
 
 const contadores = {};

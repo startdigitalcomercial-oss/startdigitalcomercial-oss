@@ -282,7 +282,7 @@ async function webhook(telefone, texto) {
     cpf: '529.982.247-25', area: 'Design', role_title: 'Designer',
     cep: '11015001', street: 'Rua Amador Bueno', number: '120',
     district: 'Centro', city: 'Santos', state: 'SP',
-    shirt_size: 'M', shoe_size: '37'
+    shirt_size: 'M', shoe_size: '37', work_mode: 'remoto'
   };
   const novoColab = await eqp('cadastrar', base);
   check('cadastra colaborador', novoColab.ok, novoColab.error);
@@ -308,6 +308,10 @@ async function webhook(telefone, texto) {
     eu && { camisa: eu.shirt_size, pe: eu.shoe_size });
   check('guardou o aniversario', eu && String(eu.birth_date).indexOf('1994-03-12') === 0, eu && eu.birth_date);
   check('guardou o endereco', eu && eu.city === 'Santos' && eu.cep === '11015001', eu && { cidade: eu.city, cep: eu.cep });
+  check('guardou presencial ou remoto', eu && eu.work_mode === 'remoto', eu && eu.work_mode);
+  check('conta o time por modo de trabalho', dt.modos && dt.modos.remoto >= 1, dt.modos);
+  check('recusa modo de trabalho inventado',
+    !(await eqp('cadastrar', Object.assign({}, base, { email: 'x9.' + SUF + '@ex.com', work_mode: 'astral' }))).ok);
   check('mostra o link para divulgar', /\/equipe$/.test(dt.link || ''), dt.link);
   check('calcula aniversarios proximos', Array.isArray(dt.aniversarios), dt.aniversarios);
 
@@ -325,6 +329,10 @@ async function webhook(telefone, texto) {
   const infoAv = await adm('broadcast_info');
   const di = infoAv.data || infoAv;
   check('avisos sabe o tamanho do time', infoAv.ok && di.total >= 1, infoAv.error);
+  check('avisos separa presencial de remoto', typeof di.remoto === 'number' && di.remoto >= 1,
+    { presencial: di.presencial, remoto: di.remoto, hibrido: di.hibrido });
+  check('cada pessoa vem com o modo de trabalho',
+    (di.pessoas || []).some(function (p) { return p.modo === 'remoto'; }), (di.pessoas || [])[0]);
 
   const pv = await adm('broadcast_preview', {
     title: 'Confraternização de fim de ano',
@@ -343,6 +351,13 @@ async function webhook(telefone, texto) {
 
   check('recusa aviso sem titulo', !(await adm('broadcast_preview', { title: '', message: 'oi' })).ok);
   check('recusa aviso sem canal', !(await adm('broadcast_send', { title: 'x', message: 'y', channels: [] })).ok);
+
+  // dispara so para quem foi escolhido na lista
+  const soUm = await adm('broadcast_send', {
+    title: 'So para um', message: 'Oi {{primeiro_nome}}', channels: ['whatsapp'], ids: [eu.id]
+  });
+  const ds1 = soUm.data || soUm;
+  check('dispara so para os escolhidos', soUm.ok && ds1.pessoas === 1, ds1.pessoas);
 
   const disparo = await adm('broadcast_send', {
     title: 'Aviso de teste', message: 'Oi {{primeiro_nome}}, tudo certo?', channels: ['whatsapp']
