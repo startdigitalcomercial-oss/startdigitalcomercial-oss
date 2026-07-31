@@ -65,6 +65,25 @@ function sair() {
 }
 document.getElementById('btn-sair').addEventListener('click', sair);
 
+// Enquanto durar a fase de testes, a senha aparece na tela e o campo ja vem
+// preenchido. Quem manda nisso e a variavel MOSTRAR_SENHA_LOGIN na Vercel —
+// trocar para false e fazer Redeploy faz este bloco sumir, sem mexer no codigo.
+(async function dicaDaSenha() {
+  try {
+    const r = await (await fetch('/api/admin?action=dica_senha')).json();
+    if (!r.ok || !r.mostrar || !r.senha) return;
+    const campo = document.getElementById('senha');
+    if (campo && !campo.value) campo.value = r.senha;
+    const alvo = document.getElementById('login-erro');
+    if (!alvo) return;
+    alvo.insertAdjacentHTML('beforebegin',
+      '<div class="alert alert-info small" style="margin-bottom:16px">' +
+      'Fase de testes — senha: <code>' + esc(r.senha) + '</code><br>' +
+      '<span class="muted">O campo já vem preenchido. Para esconder isto: variável ' +
+      '<code>MOSTRAR_SENHA_LOGIN</code> como <code>false</code> na Vercel + Redeploy.</span></div>');
+  } catch (e) { /* se nao der, a tela de login funciona igual */ }
+})();
+
 document.getElementById('form-login').addEventListener('submit', async function (ev) {
   ev.preventDefault();
   const btn = document.getElementById('btn-login');
