@@ -62,19 +62,48 @@ function sair() {
   TOKEN = '';
   document.getElementById('app').style.display = 'none';
   document.getElementById('tela-login').style.display = 'block';
+  // Recarrega para a tela de login se montar do zero: assim ela sempre sabe
+  // se ainda estamos no primeiro acesso (senha mestra) ou ja e por e-mail.
+  setTimeout(function () { location.reload(); }, 60);
 }
 document.getElementById('btn-sair').addEventListener('click', sair);
 
 // Enquanto durar a fase de testes, a senha aparece na tela e o campo ja vem
 // preenchido. Quem manda nisso e a variavel MOSTRAR_SENHA_LOGIN na Vercel —
 // trocar para false e fazer Redeploy faz este bloco sumir, sem mexer no codigo.
+let PRIMEIRO_ACESSO = false;
+
 (async function dicaDaSenha() {
   try {
     const r = await (await fetch('/api/admin?action=dica_senha')).json();
-    if (!r.ok || !r.mostrar || !r.senha) return;
+    if (!r.ok) return;
+    const alvo = document.getElementById('login-erro');
+
+    // Enquanto nao existe nenhum Dono cadastrado, quem entra e a senha mestra —
+    // e ela SO funciona com o campo de e-mail vazio. Entao o campo some da tela,
+    // para o navegador nao preencher sozinho e travar a entrada.
+    PRIMEIRO_ACESSO = r.primeiro_acesso === true;
+    if (PRIMEIRO_ACESSO) {
+      const campoEmail = document.getElementById('campo-email');
+      const inputEmail = document.getElementById('email-login');
+      if (inputEmail) { inputEmail.value = ''; inputEmail.disabled = true; }
+      if (campoEmail) campoEmail.style.display = 'none';
+      const sub = document.getElementById('login-sub');
+      if (sub) sub.textContent = 'Primeiro acesso: entre com a senha do painel.';
+      const senhaEl = document.getElementById('senha');
+      if (senhaEl) senhaEl.focus();
+      if (alvo) {
+        alvo.insertAdjacentHTML('beforebegin',
+          '<div class="alert alert-info small" style="margin-bottom:16px">' +
+          '<strong>Ninguém foi cadastrado ainda.</strong> Por isso a entrada é só pela senha do painel. ' +
+          'Depois de entrar, vá em <strong>Usuários</strong> e crie o seu acesso de Dono — ' +
+          'a partir daí cada pessoa entra com o próprio e-mail.</div>');
+      }
+    }
+
+    if (!r.mostrar || !r.senha) return;
     const campo = document.getElementById('senha');
     if (campo && !campo.value) campo.value = r.senha;
-    const alvo = document.getElementById('login-erro');
     if (!alvo) return;
     alvo.insertAdjacentHTML('beforebegin',
       '<div class="alert alert-info small" style="margin-bottom:16px">' +
