@@ -221,6 +221,7 @@ const COR = {
 // O texto do botao muda conforme o destino do link.
 function rotuloBotao(url) {
   const u = String(url || '');
+  if (u.indexOf('/criar-senha-painel') >= 0) return 'Criar a minha senha do painel';
   if (u.indexOf('/criar-senha') >= 0) return 'Criar a minha senha';
   if (u.indexOf('/portal') >= 0) return 'Abrir a área de integração';
   if (u.indexOf('/disc') >= 0) return 'Fazer o teste de perfil';
@@ -330,7 +331,16 @@ function corpoEmail(text) {
 }
 
 // Texto simples -> HTML de e-mail
-function textToEmailHtml(text, title) {
+// opts.etiqueta = a palavrinha cinza ao lado da marca no topo
+// opts.rodape    = as duas linhas discretas do rodape
+// Sem opts, continua exatamente como era: "Recrutamento" e o aviso do
+// processo seletivo — que e o certo para os e-mails de candidato.
+function textToEmailHtml(text, title, opts) {
+  opts = opts || {};
+  const etiqueta = opts.etiqueta || 'Recrutamento';
+  const rodape = opts.rodape ||
+    ('Mensagem automática do processo seletivo da StartDigital.<br>' +
+     'Se você não se candidatou a nenhuma vaga, pode ignorar este e-mail.');
   const previa = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 110);
   const fonte = '-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Helvetica,Arial,sans-serif';
 
@@ -375,7 +385,7 @@ function textToEmailHtml(text, title) {
       '</td>' +
       '<td style="font-family:' + fonte + ';font-size:16px;font-weight:600;letter-spacing:-.015em;color:#ffffff">' +
         'StartDigital' +
-        '<span style="font-weight:400;color:#8e8e93;margin-left:8px;font-size:13.5px">Recrutamento</span>' +
+        '<span style="font-weight:400;color:#8e8e93;margin-left:8px;font-size:13.5px">' + escapeHtml(etiqueta) + '</span>' +
       '</td>' +
     '</tr></table>' +
   '</td></tr>' +
@@ -391,8 +401,7 @@ function textToEmailHtml(text, title) {
 '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:100%;max-width:600px">' +
   '<tr><td align="center" style="padding:20px 24px 0">' +
     '<p class="txt2" style="margin:0;font-family:' + fonte + ';font-size:12px;line-height:1.65;color:' + COR.tinta3 + '">' +
-      'Mensagem automática do processo seletivo da StartDigital.<br>' +
-      'Se você não se candidatou a nenhuma vaga, pode ignorar este e-mail.' +
+      rodape +
     '</p>' +
   '</td></tr>' +
 '</table>' +

@@ -25,7 +25,10 @@ async function sendEmail(opts) {
   if (process.env.MAIL_BCC) payload.bcc = [process.env.MAIL_BCC];
 
   try {
-    const res = await fetch('https://api.resend.com/emails', {
+    // RESEND_API_URL so existe para os testes apontarem para o espelho local.
+    // Em producao fica vazia e vale o endereco de verdade do Resend.
+    const base = (process.env.RESEND_API_URL || 'https://api.resend.com').replace(/\/+$/, '');
+    const res = await fetch(base + '/emails', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)

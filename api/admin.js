@@ -149,12 +149,104 @@ async function anota(sessao, acao, alvo, detalhe) {
   } catch (e) { console.error('[auditoria]', e.message); }
 }
 
-// Uma senha inicial legivel, para o dono passar por WhatsApp.
-function senhaInicial() {
-  const c = require('crypto');
-  const pal = ['Aurora', 'Farol', 'Bussola', 'Vertice', 'Orbita', 'Pilar', 'Marco', 'Cume'];
-  return pal[c.randomInt(pal.length)] + c.randomInt(100, 1000) +
-    c.randomBytes(4).toString('base64').replace(/[+/=]/g, '').slice(0, 4);
+// ------------------------------------------------------------
+// CONVITE POR E-MAIL
+// Ninguem recebe senha pronta. Quem entra no painel recebe um
+// e-mail com um link e escolhe a propria senha por la.
+//
+// O link nao precisa de tabela nova: ele e assinado com o segredo
+// do sistema e carrega dentro (1) quem e a pessoa, (2) um pedaco
+// da senha atual dela e (3) a validade. Assim que a pessoa cria a
+// senha, aquele pedaco muda — e o link velho morre sozinho.
+// ------------------------------------------------------------
+const CONVITE_HORAS = 72;
+
+// Uma senha aleatoria que ninguem sabe. Serve so para deixar a conta
+// fechada enquanto a pessoa nao criar a dela pelo link do e-mail.
+function senhaTrancada() {
+  return u.hashPassword(require('crypto').randomBytes(24).toString('hex'));
+}
+
+function conviteToken(pessoa) {
+  return u.signSession({
+    role: 'convite_painel',
+    uid: pessoa.id,
+    pw: String(pessoa.password_hash || '').slice(0, 16),
+    exp: Date.now() + CONVITE_HORAS * 3600 * 1000
+  });
+}
+
+function conviteLink(pessoa) {
+  return u.appUrl() + '/criar-senha-painel?t=' + conviteToken(pessoa);
+}
+
+async function conviteValido(t) {
+  const s = u.verifySession(t);
+  if (!s || s.role !== 'convite_painel' || !s.uid) {
+    return { erro: 'Este link não vale mais. Peça ao Dono do painel para enviar um convite novo.' };
+  }
+  const pessoa = await db.selectOne('panel_users', { id: 'eq.' + s.uid, select: '*' });
+  if (!pessoa) return { erro: 'Este acesso não existe mais no painel.' };
+  if (pessoa.active === false) return { erro: 'Este acesso está desativado. Fale com o Dono do painel.' };
+  if (String(pessoa.password_hash || '').slice(0, 16) !== s.pw) {
+    return { erro: 'Este link já foi usado. Se precisar trocar a senha, peça um convite novo ao Dono do painel.' };
+  }
+  return { pessoa: pessoa };
+}
+
+function escapaSimples(s) { return u.escapeHtml(s); }
+
+// Monta e dispara o e-mail do convite. Nunca derruba a criacao do
+// usuario: se o e-mail falhar, devolve o erro e o link para o Dono
+// copiar e mandar na mao.
+async function enviaConvite(pessoa, tipo) {
+  const link = conviteLink(pessoa);
+  const empresa = await getSetting('company', {});
+  const nomeEmpresa = (empresa && empresa.name) || 'StartDigital';
+  const primeiro = u.firstName(pessoa.name) || pessoa.name;
+  const papelNome = perms.NOMES[pessoa.role] || pessoa.role;
+
+  const assunto = tipo === 'reset'
+    ? 'Crie uma senha nova para o painel da ' + nomeEmpresa
+    : 'Seu acesso ao painel da ' + nomeEmpresa;
+
+  const texto = tipo === 'reset'
+    ? ('Olá, ' + primeiro + '!\n\n' +
+       'Pediram uma senha nova para o seu acesso ao painel da ' + nomeEmpresa + '. ' +
+       'Clique no botão abaixo e escolha a senha que você quiser.\n\n' +
+       link + '\n\n' +
+       'SEU ACESSO\n' +
+       'E-mail: ' + pessoa.email + '\n' +
+       'Nível: ' + papelNome + '\n\n' +
+       'O link vale por ' + CONVITE_HORAS + ' horas e só funciona uma vez. ' +
+       'Sua senha antiga já parou de valer.\n\n' +
+       'Se não foi você que pediu, avise o responsável pelo painel.\n\n' +
+       'Equipe ' + nomeEmpresa)
+    : ('Olá, ' + primeiro + '!\n\n' +
+       'Você acaba de ganhar acesso ao painel da ' + nomeEmpresa + '. ' +
+       'Clique no botão abaixo para escolher a sua senha — quem cria é você, ninguém mais vê.\n\n' +
+       link + '\n\n' +
+       'SEU ACESSO\n' +
+       'E-mail: ' + pessoa.email + '\n' +
+       'Nível: ' + papelNome + '\n\n' +
+       'O link vale por ' + CONVITE_HORAS + ' horas e só funciona uma vez. ' +
+       'Depois de criar a senha, é com ela e com o seu e-mail que você entra.\n\n' +
+       'Equipe ' + nomeEmpresa);
+
+  // Este e-mail nao e de candidato: o topo e o rodape mudam.
+  const html = u.textToEmailHtml(texto, assunto, {
+    etiqueta: 'Painel interno',
+    rodape: 'Mensagem automática do painel interno da ' + escapaSimples(nomeEmpresa) + '.<br>' +
+      'Se você não esperava este e-mail, ignore — sem clicar no link ele não vira nada.'
+  });
+
+  try {
+    const r = await send.sendEmail({ to: pessoa.email, subject: assunto, text: texto, html: html });
+    const deuCerto = r && (r.status === 'enviado' || r.status === 'sent');
+    return { enviado: !!deuCerto, erro: deuCerto ? null : (r && r.error) || 'não foi possível enviar', link: link };
+  } catch (e) {
+    return { enviado: false, erro: e.message, link: link };
+  }
 }
 
 async function renderSet(candidate, setName, channels) {
@@ -201,6 +293,51 @@ module.exports = async function handler(req, res) {
         mostrar: true,
         primeiro_acesso: primeiro,
         senha: process.env.ADMIN_PASSWORD || process.env.ADMIN_SECRET || ''
+      });
+    }
+
+    // ------------------------------------------ CONVITE (sem login)
+    // A pessoa clicou no link do e-mail. Estas duas rotas sao publicas
+    // de proposito — quem manda e a assinatura do link, nao a sessao.
+    if (action === 'convite_info') {
+      const v = await conviteValido(String(params.t || ''));
+      if (v.erro) return u.fail(res, 400, v.erro);
+      return u.ok(res, {
+        nome: v.pessoa.name,
+        primeiro_nome: u.firstName(v.pessoa.name),
+        email: v.pessoa.email,
+        papel_nome: perms.NOMES[v.pessoa.role] || v.pessoa.role
+      });
+    }
+
+    if (action === 'convite_senha') {
+      if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
+      const body = await u.readBody(req);
+      const v = await conviteValido(String(body.t || ''));
+      if (v.erro) return u.fail(res, 400, v.erro);
+
+      const nova = String(body.password || '');
+      if (nova.length < 8) return u.fail(res, 400, 'A senha precisa ter pelo menos 8 caracteres.');
+      if (/^\d+$/.test(nova)) return u.fail(res, 400, 'Não use só números. Misture letras.');
+
+      const cifra = u.hashPassword(nova);
+      const pessoa = await db.update('panel_users', {
+        password_hash: cifra.hash, password_salt: cifra.salt,
+        must_change: false, last_login_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }, { id: 'eq.' + v.pessoa.id });
+
+      const sessao = {
+        role: 'admin', papel: v.pessoa.role, uid: v.pessoa.id,
+        nome: v.pessoa.name, email: v.pessoa.email,
+        epoca: await epocaSessao(),
+        exp: Date.now() + SESSION_HOURS * 3600 * 1000
+      };
+      await anota(sessao, 'senha_criada', v.pessoa.email, {});
+      return u.ok(res, {
+        token: u.signSession(sessao),
+        usuario: usuarioLimpo(pessoa || v.pessoa),
+        menu: perms.menuDoPapel(v.pessoa.role)
       });
     }
 
@@ -1215,8 +1352,9 @@ module.exports = async function handler(req, res) {
       const jaTem = await db.selectOne('panel_users', { email: 'eq.' + email, select: 'id' });
       if (jaTem) return u.fail(res, 409, 'Já existe um usuário com este e-mail.');
 
-      const senha = senhaInicial();
-      const cifra = u.hashPassword(senha);
+      // A conta nasce trancada: ninguem sabe a senha, nem eu. A pessoa
+      // recebe um e-mail com o link e escolhe a dela.
+      const cifra = senhaTrancada();
       const novo = await db.insert('panel_users', {
         name: nome, email: email, role: papelNovo,
         password_hash: cifra.hash, password_salt: cifra.salt,
@@ -1225,25 +1363,29 @@ module.exports = async function handler(req, res) {
       });
       await anota(session, 'usuario_criado', email, { papel: papelNovo });
 
-      return u.ok(res, {
-        usuario: usuarioLimpo(novo),
-        senha_inicial: senha,
-        aviso: 'Anote e passe esta senha para a pessoa. Ela não aparece de novo.'
-      });
+      const convite = await enviaConvite(novo, 'novo');
+      await anota(session, convite.enviado ? 'convite_enviado' : 'convite_falhou', email, { erro: convite.erro });
+
+      return u.ok(res, { usuario: usuarioLimpo(novo), convite: convite });
     }
 
+    // Reenvia o convite: tranca a conta de novo (a senha atual para de
+    // valer na hora) e manda outro link por e-mail.
     if (action === 'usuario_senha') {
       const body = await u.readBody(req);
       const alvo = await db.selectOne('panel_users', { id: 'eq.' + body.id, select: '*' });
       if (!alvo) return u.fail(res, 404, 'Usuário não encontrado.');
-      const senha = senhaInicial();
-      const cifra = u.hashPassword(senha);
+      const cifra = senhaTrancada();
       await db.update('panel_users', {
         password_hash: cifra.hash, password_salt: cifra.salt,
         must_change: true, updated_at: new Date().toISOString()
       }, { id: 'eq.' + alvo.id });
       await anota(session, 'senha_redefinida', alvo.email, {});
-      return u.ok(res, { senha_inicial: senha, nome: alvo.name });
+
+      const atualizado = Object.assign({}, alvo, { password_hash: cifra.hash, password_salt: cifra.salt });
+      const convite = await enviaConvite(atualizado, 'reset');
+      await anota(session, convite.enviado ? 'convite_enviado' : 'convite_falhou', alvo.email, { erro: convite.erro });
+      return u.ok(res, { nome: alvo.name, email: alvo.email, convite: convite });
     }
 
     if (action === 'usuario_excluir') {

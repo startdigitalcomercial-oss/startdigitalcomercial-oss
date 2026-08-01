@@ -56,6 +56,12 @@ if (!SENHA_PAINEL) {
 }
 
 (async function () {
+
+// O painel so aceita a senha mestra enquanto nao existir nenhum Dono
+// cadastrado. Entao a bateria comeca com a lista de usuarios vazia —
+// senao um usuario deixado por um teste anterior tranca tudo.
+await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
+  .catch(function () { return null; });
   const login = await (await fetch(BASE + '/api/admin?action=login', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ password: SENHA_PAINEL })
@@ -430,9 +436,41 @@ if (!SENHA_PAINEL) {
   check('oferece os 4 papeis', dlu.papeis.length === 4, dlu.papeis && dlu.papeis.length);
   check('senha mestra vale enquanto nao ha dono', dlu.senha_mestra_vale === true, dlu.senha_mestra_vale);
 
+  // Ninguem recebe senha pronta: o sistema manda um convite por e-mail e a
+  // pessoa cria a senha dela. Estes ajudantes fazem o papel do e-mail.
+  function tokenDoConvite(c) {
+    return ((c && c.link) || '').split('t=')[1] || '';
+  }
+  async function vejaConvite(t) {
+    return (await fetch(BASE + '/api/admin?action=convite_info&t=' + encodeURIComponent(t))).json();
+  }
+  async function criaSenha(t, senha) {
+    return (await fetch(BASE + '/api/admin?action=convite_senha', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ t: t, password: senha })
+    })).json();
+  }
+
   const rh = await adm('usuario_salvar', { name: 'Marina do RH', email: 'marina.' + SUF + '@ex.com', role: 'rh' });
   const drh = rh.data || rh;
-  check('cria usuario de RH', rh.ok && !!drh.senha_inicial, rh.error);
+  check('cria usuario de RH', rh.ok, rh.error);
+  check('nao devolve senha nenhuma', drh.senha_inicial === undefined, drh.senha_inicial);
+  check('manda o convite por e-mail', drh.convite && drh.convite.enviado === true, drh.convite);
+  check('convite aponta para a pagina de criar senha',
+    /\/criar-senha-painel\?t=/.test((drh.convite || {}).link || ''), (drh.convite || {}).link);
+
+  // o que saiu de verdade pelo Resend (espelho local)
+  const mail = await (await fetch('http://127.0.0.1:54322/__ultimo-email')).json();
+  check('e-mail foi para o endereco certo',
+    (mail.to || [])[0] === 'marina.' + SUF + '@ex.com', mail.to);
+  check('assunto fala do acesso ao painel', /painel/i.test(mail.subject || ''), mail.subject);
+  check('o link vai dentro do e-mail',
+    String(mail.text || '').indexOf((drh.convite || {}).link) >= 0);
+  check('o e-mail nao leva senha nenhuma',
+    !/senha inicial|sua senha e|sua senha:/i.test(String(mail.text || '')), mail.text);
+  check('o e-mail vira HTML com botao',
+    /criar-senha-painel/.test(String(mail.html || '')) && /<a /.test(String(mail.html || '')));
+
   const aval = await adm('usuario_salvar', { name: 'Pedro Avaliador', email: 'pedro.' + SUF + '@ex.com', role: 'avaliador' });
   const dav = aval.data || aval;
   check('cria usuario avaliador', aval.ok, aval.error);
@@ -444,13 +482,31 @@ if (!SENHA_PAINEL) {
   check('recusa papel inventado',
     !(await adm('usuario_salvar', { name: 'X Y', email: 'xy.' + SUF + '@ex.com', role: 'chefe' })).ok);
 
-  const loginRh = await entra('marina.' + SUF + '@ex.com', drh.senha_inicial);
+  // ---- a pessoa abre o link e escolhe a senha ----
+  const tRh = tokenDoConvite(drh.convite);
+  const infoRh = await vejaConvite(tRh);
+  check('o link mostra de quem e o acesso', infoRh.ok && infoRh.email === 'marina.' + SUF + '@ex.com', infoRh.error);
+  check('o link diz o nivel de acesso', infoRh.papel_nome === 'RH', infoRh.papel_nome);
+  check('link torto nao abre', !(await vejaConvite(tRh.slice(0, -3) + 'xxx')).ok);
+  check('enquanto nao criar a senha, ninguem entra na conta',
+    !(await entra('marina.' + SUF + '@ex.com', 'qualquer-coisa')).ok);
+
+  check('recusa senha curta', !(await criaSenha(tRh, 'abc12')).ok);
+  check('recusa senha so de numeros', !(await criaSenha(tRh, '12345678')).ok);
+
+  const feitaRh = await criaSenha(tRh, 'MarinaRH2026');
+  check('cria a senha e ja entra', feitaRh.ok && !!feitaRh.token, feitaRh.error);
+  check('o link so funciona uma vez', !(await criaSenha(tRh, 'OutraSenha99')).ok);
+
+  const loginRh = await entra('marina.' + SUF + '@ex.com', 'MarinaRH2026');
   check('RH entra com o proprio e-mail', loginRh.ok && !!loginRh.token, loginRh.error);
-  check('RH ja sabe que precisa trocar a senha', loginRh.trocar_senha === true);
+  check('nao pede mais para trocar a senha', loginRh.trocar_senha === false, loginRh.trocar_senha);
   check('senha errada nao entra', !(await entra('marina.' + SUF + '@ex.com', 'chute')).ok);
 
-  const loginAval = await entra('pedro.' + SUF + '@ex.com', dav.senha_inicial);
-  const loginLeit = await entra('ana.' + SUF + '@ex.com', dle.senha_inicial);
+  await criaSenha(tokenDoConvite(dav.convite), 'PedroAval2026');
+  await criaSenha(tokenDoConvite(dle.convite), 'AnaLeitura2026');
+  const loginAval = await entra('pedro.' + SUF + '@ex.com', 'PedroAval2026');
+  const loginLeit = await entra('ana.' + SUF + '@ex.com', 'AnaLeitura2026');
   check('avaliador entra', loginAval.ok);
   check('leitura entra', loginLeit.ok);
 
@@ -485,12 +541,17 @@ if (!SENHA_PAINEL) {
   check('quem foi desligado perde o acesso na hora',
     !depoisDesligar.ok && /desativado/.test(depoisDesligar.error || ''), depoisDesligar.error);
 
-  // ---- senha nova ----
+  // ---- esqueci a senha: o dono reenvia o convite ----
   const nova = await adm('usuario_senha', { id: dav.usuario.id });
   const dn = nova.data || nova;
-  check('gera senha nova', nova.ok && !!dn.senha_inicial, nova.error);
-  check('senha antiga para de valer', !(await entra('pedro.' + SUF + '@ex.com', dav.senha_inicial)).ok);
-  check('senha nova funciona', (await entra('pedro.' + SUF + '@ex.com', dn.senha_inicial)).ok);
+  check('reenvia o convite por e-mail', nova.ok && dn.convite && dn.convite.enviado === true, nova.error);
+  check('reenvio tambem nao devolve senha', dn.senha_inicial === undefined, dn.senha_inicial);
+  check('senha antiga para de valer na hora', !(await entra('pedro.' + SUF + '@ex.com', 'PedroAval2026')).ok);
+  const refeita = await criaSenha(tokenDoConvite(dn.convite), 'PedroNovo2026');
+  check('o link novo cria outra senha', refeita.ok, refeita.error);
+  check('senha nova funciona', (await entra('pedro.' + SUF + '@ex.com', 'PedroNovo2026')).ok);
+  check('convite antigo do avaliador morreu',
+    !(await criaSenha(tokenDoConvite(dav.convite), 'TentandoDeNovo1')).ok);
 
   // ---- o dono nao pode sumir ----
   const dono = await adm('usuario_salvar', { name: 'Clovis Dono', email: 'dono.' + SUF + '@ex.com', role: 'dono' });

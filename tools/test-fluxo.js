@@ -38,6 +38,12 @@ if (!SENHA_PAINEL) {
 }
 
 (async function () {
+
+// O painel so aceita a senha mestra enquanto nao existir nenhum Dono
+// cadastrado. Entao a bateria comeca com a lista de usuarios vazia —
+// senao um usuario deixado por um teste anterior tranca tudo.
+await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
+  .catch(function () { return null; });
   console.log('\n1) FORMULARIO PUBLICO');
   const cfg = await pub('config');
   check('config carrega', cfg.ok && cfg.form.roles.length > 0);
