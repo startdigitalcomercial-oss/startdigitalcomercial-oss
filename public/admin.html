@@ -230,6 +230,24 @@
 
   @media (prefers-reduced-motion: reduce) { .eq-pessoa, .eq-linha, .eq-limpar { transition: none; } }
 
+  /* ---------- quem esta logado ---------- */
+  .eu-sou { padding: 10px 14px; margin: 0 10px 6px; border-radius: 10px; background: rgba(255,255,255,.06); }
+  .eu-sou strong { display: block; font-size: 13px; font-weight: 600; color: #fff; letter-spacing: -.01em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .eu-sou span { display: block; font-size: 11.5px; color: rgba(255,255,255,.5); margin-top: 2px; }
+
+  /* ---------- usuarios do painel ---------- */
+  .papel-op { display: block; width: 100%; text-align: left; padding: 12px 14px; border-radius: var(--r-ctl);
+    border: 1.5px solid var(--hairline-strong); background: var(--surface); cursor: pointer;
+    font-family: inherit; color: var(--label); transition: all .16s; margin-bottom: 8px; }
+  .papel-op:hover { border-color: var(--accent); }
+  .papel-op.on { border-color: var(--accent); background: var(--accent-tint); }
+  .papel-op strong { display: block; font-size: 14px; font-weight: 600; }
+  .papel-op.on strong { color: var(--accent); }
+  .papel-op span { display: block; font-size: 12.5px; color: var(--label-3); margin-top: 2px; line-height: 1.45; }
+  .senha-nova { font-family: ui-monospace, monospace; font-size: 19px; font-weight: 600; letter-spacing: .5px;
+    background: var(--fill-1); padding: 12px 16px; border-radius: var(--r-ctl); display: inline-block; margin: 8px 0; }
+
   /* ---------- quem recebe o aviso ---------- */
   .av-filtro { border: 1.5px solid var(--hairline-strong); background: var(--surface); color: var(--label-2);
     border-radius: var(--r-pill); padding: 6px 14px; font-family: inherit; font-size: 13px;
@@ -314,12 +332,16 @@
     </div>
     <div class="card">
       <h2>Painel de Recrutamento</h2>
-      <p class="sub">Entre com a senha do painel.</p>
+      <p class="sub" id="login-sub">Entre com o seu e-mail e senha.</p>
       <div id="login-erro"></div>
       <form id="form-login">
-        <div class="field">
+        <div class="field" id="campo-email">
+          <label>E-mail</label>
+          <input type="email" id="email-login" autocomplete="username" autofocus>
+        </div>
+        <div class="field" style="margin-top:12px">
           <label>Senha</label>
-          <input type="password" id="senha" autocomplete="current-password" autofocus>
+          <input type="password" id="senha" autocomplete="current-password">
         </div>
         <button class="btn btn-block" style="margin-top:14px" id="btn-login">Entrar</button>
       </form>
@@ -350,6 +372,7 @@
       <button data-aba="quiz"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="5.5" y="4.2" width="13" height="16.6" rx="2"/><path d="M9.3 4.2V3.2h5.4v1"/><path d="m9.3 13.6 2 2 3.8-4.4"/></svg><span>Quiz</span></button>
       <button data-aba="mensagens"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3.6" y="5.4" width="16.8" height="13.2" rx="2"/><path d="m4.6 7 7.4 5.8L19.4 7"/></svg><span>Mensagens</span></button>
       <div class="nav-sec">Administração</div>
+      <button data-aba="usuarios"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><circle cx="9.2" cy="8" r="3.4"/><path d="M3.4 19.6c.6-3.3 3-5 5.8-5s5.2 1.7 5.8 5"/><path d="M17 9.4h4M19 7.4v4"/></svg><span>Usuários</span></button>
       <button data-aba="ajustes"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M4.5 8.2h7.7M16.8 8.2h2.7M4.5 15.8h2.7M12 15.8h7.5"/><circle cx="14.6" cy="8.2" r="2.1"/><circle cx="9.3" cy="15.8" r="2.1"/></svg><span>Ajustes</span></button>
     </nav>
     <div class="fim">
@@ -390,6 +413,11 @@
     <!-- ---------- COLABORADORES ---------- -->
     <section data-painel="colaboradores" style="display:none">
       <div style="padding:18px 0 40px" id="painel-colaboradores"><div class="loading-page">Carregando…</div></div>
+    </section>
+
+    <!-- ---------- USUARIOS ---------- -->
+    <section data-painel="usuarios" style="display:none">
+      <div style="padding:18px 0 40px" id="painel-usuarios"><div class="loading-page">Carregando…</div></div>
     </section>
 
     <!-- ---------- AVISOS ---------- -->
@@ -506,6 +534,7 @@
 <script src="/js/admin-dados.js"></script>
 <script src="/js/admin-equipe.js"></script>
 <script src="/js/admin-avisos.js"></script>
+<script src="/js/admin-usuarios.js"></script>
 <script src="/js/admin-aurea.js"></script>
 <script src="/js/admin-whatsapp.js"></script>
 <script src="/js/admin-inicio.js"></script>
