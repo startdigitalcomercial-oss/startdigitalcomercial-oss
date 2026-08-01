@@ -33,7 +33,7 @@ async function comoCandidato(action, token, body, query) {
     body: body ? JSON.stringify(body) : undefined
   })).json();
 }
-async function webhook(telefone, texto) {
+async function webhook(telefone, texto, nome) {
   const k = (await adm('aurea')).webhook_url.split('k=')[1];
   return (await fetch(BASE + '/api/webhook?k=' + k, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -41,6 +41,7 @@ async function webhook(telefone, texto) {
       event: 'messages.upsert',
       data: {
         key: { remoteJid: telefone + '@s.whatsapp.net', fromMe: false, id: 'm' + Math.random() },
+        pushName: nome || undefined,
         message: { conversation: texto }
       }
     })
@@ -145,6 +146,87 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   const fichaA = await adm('candidate', null, { id: cand.id });
   check('pre-qualificacao aparece na ficha', fichaA.ok && !!fichaA.prequal, fichaA.prequal);
 
+  // ============================================================
+  console.log('\n4b) LANDING → WHATSAPP → CADASTRO');
+  // O funil novo: a pessoa ve a vaga na landing, aperta o botao, cai no
+  // WhatsApp, a Aurea reconhece a vaga, faz o roteiro e manda o cadastro.
+
+  await adm('aurea_config_save', { value: { atende_desconhecido: true, enviar_link_cadastro: 'aprovados' } });
+
+  const pub1 = await pub('vagas');
+  check('landing lista as vagas', pub1.ok && pub1.vagas.length === 2, pub1.error);
+  check('landing devolve os filtros por area', pub1.areas.indexOf('Tráfego Pago') >= 0, pub1.areas);
+  const vagaPleno = pub1.vagas.filter(function (v) { return v.slug === 'gestor-de-trafego-pleno'; })[0];
+  check('vaga tem salario', vagaPleno && vagaPleno.salary === 'R$ 2.200 + Comissões', vagaPleno && vagaPleno.salary);
+  check('botao leva pro whatsapp certo',
+    /^https:\/\/wa\.me\/5513996003897\?text=/.test(vagaPleno.link_whatsapp), vagaPleno.link_whatsapp);
+  check('mensagem do botao cita a vaga',
+    decodeURIComponent(vagaPleno.link_whatsapp.split('text=')[1]).indexOf('Gestor de Tráfego Pleno') >= 0);
+  check('landing nao vaza o roteiro de perguntas', vagaPleno.prequal_group_id === undefined);
+  check('vaga sozinha pelo apelido', (await pub('vaga', null, { slug: 'gestor-de-trafego-jr' })).ok);
+  check('apelido que nao existe da 404', !(await pub('vaga', null, { slug: 'nao-existe' })).ok);
+
+  // --- a pessoa manda a mensagem do botao ---
+  const foneL = '11 9' + String(Date.now() + 7).slice(-8);
+  const digL = '55' + foneL.replace(/\D/g, '');
+  const bate = await webhook(digL, 'Olá! Tenho interesse na vaga de Gestor de Tráfego Pleno.', 'Rafaela Souza');
+  check('webhook atende numero novo', bate.ok && bate.resultado && bate.resultado.novo === true, bate.resultado);
+  check('reconheceu a vaga pela mensagem',
+    bate.resultado && bate.resultado.vaga === 'Gestor de Tráfego Pleno', bate.resultado);
+
+  function achaRafaela(bd) {
+    return (bd.candidates || []).filter(function (c) { return c.name === 'Rafaela Souza'; });
+  }
+  const leadR = achaRafaela(await adm('board'))[0];
+  check('criou o contato com o nome do WhatsApp', !!leadR, leadR);
+  check('contato marcado como vindo do whatsapp', leadR && leadR.source === 'whatsapp', leadR && leadR.source);
+
+  // --- roteiro do gestor de trafego: 5 perguntas ---
+  const respTrafego = [
+    'Uns 4 anos como gestor de trafego.',
+    'Meta Ads tem 4 anos, Google Ads uns 2 anos.',
+    'Tenho sim, sem problema nenhum.',
+    'Ja rodei uns 3 milhoes em ads no total.',
+    'Bohemian Rhapsody, do Queen.'
+  ];
+  for (const r of respTrafego) await webhook(digL, r);
+
+  const aL = await adm('aurea');
+  const sessL = aL.sessoes.filter(function (s) { return s.candidato === 'Rafaela Souza'; })[0];
+  check('conversa da landing concluiu', sessL && sessL.status === 'concluida', sessL && sessL.status);
+  check('capturou as 5 respostas do roteiro', sessL && sessL.total_respostas === 5, sessL && sessL.total_respostas);
+
+  const detL = await adm('aurea_session', null, { id: sessL.id });
+  const textos = (detL.mensagens || []).map(function (m) { return m.text; }).join('\n');
+  check('a Aurea perguntou da musica favorita', /m[uú]sica favorita/i.test(textos));
+  check('mandou o link do cadastro no fim', /\/vaga\?t=/.test(textos), textos.slice(-200));
+  check('link do cadastro leva a vaga junto', /v=gestor-de-trafego-pleno/.test(textos));
+
+  // --- a pessoa preenche o cadastro: completa o contato, nao cria outro ---
+  const antesL = achaRafaela(await adm('board')).length;
+  const fichaLead = await adm('candidate', null, { id: leadR.id });
+  check('ficha do contato traz o link pessoal', fichaLead.ok && !!fichaLead.candidate.token, fichaLead.error);
+  const cadastro = await pub('apply', {
+    t: fichaLead.candidate.token, vaga: 'gestor-de-trafego-pleno',
+    name: 'Rafaela Souza', email: 'rafaela.' + SUF + '@exemplo.com', phone: foneL,
+    experience: 'Quatro anos de agencia.'
+  });
+  check('cadastro completo aceito', cadastro.ok, cadastro.error);
+  const depois = achaRafaela(await adm('board'));
+  check('nao duplicou a pessoa', depois.length === antesL, { antes: antesL, depois: depois.length });
+  check('agora tem e-mail', depois[0] && !!depois[0].email, depois[0] && depois[0].email);
+  check('nao chamou a Aurea de novo', cadastro.aurea === false, cadastro.aurea);
+
+  // --- quem chega sem dizer a vaga ---
+  const foneQ = '11 9' + String(Date.now() + 33).slice(-8);
+  const digQ = '55' + foneQ.replace(/\D/g, '');
+  const vago = await webhook(digQ, 'oi, bom dia', 'Pessoa Sem Vaga');
+  check('quando nao sabe a vaga, pergunta',
+    vago.resultado && vago.resultado.perguntou_vaga === true, vago.resultado);
+  const escolha = await webhook(digQ, '2');
+  check('aceita a vaga escolhida pelo numero',
+    escolha.resultado && escolha.resultado.vaga === 'Gestor de Tráfego Jr', escolha.resultado);
+
   console.log('\n5) WEBHOOK — casos que deve ignorar');
   const k = a2.webhook_url.split('k=')[1];
   const semChave = await (await fetch(BASE + '/api/webhook?k=errada', {
@@ -161,8 +243,18 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
     body: JSON.stringify({ event: 'messages.upsert', data: { key: { remoteJid: '5511999@s.whatsapp.net', fromMe: true }, message: { conversation: 'oi' } } })
   })).json();
   check('ignora mensagem nossa', nossa.ignorado === 'mensagem nossa', nossa);
-  const desconhecido = await webhook('5511000000000', 'oi');
-  check('ignora numero nao cadastrado', desconhecido.ignorado === 'numero nao cadastrado', desconhecido);
+  // Numero novo NAO e mais ignorado: e assim que chega quem vem da landing.
+  // Quem quiser o comportamento antigo desliga em Ajustes da Aurea.
+  await adm('aurea_config_save', { value: { atende_desconhecido: false } });
+  const foneFechado = '5511' + String(Date.now() + 101).slice(-9);
+  const desconhecido = await webhook(foneFechado, 'oi');
+  check('com a porta fechada, ignora numero novo',
+    desconhecido.resultado && desconhecido.resultado.ignorado === true, desconhecido);
+  await adm('aurea_config_save', { value: { atende_desconhecido: true } });
+  const foneAberto = '5511' + String(Date.now() + 202).slice(-9);
+  const abriu = await webhook(foneAberto, 'oi');
+  check('com a porta aberta, atende numero novo',
+    abriu.resultado && abriu.resultado.novo === true, abriu);
 
   console.log('\n6) IMPORTAR LISTA');
   const imp = await adm('import_candidates', {

@@ -11,6 +11,7 @@ const send = require('./_lib/send');
 const aurea = require('./_lib/aurea');
 const webhook = require('./webhook');
 const perms = require('./_lib/perms');
+const vagas = require('./_lib/vagas');
 
 const SESSION_HOURS = 12;
 
@@ -471,7 +472,7 @@ module.exports = async function handler(req, res) {
       const stages = await db.select('stages', { order: 'position.asc', select: '*' });
       const candidates = await db.select('candidates', {
         archived: 'eq.false', order: 'created_at.desc',
-        select: 'id,name,email,phone,role_applied,stage_key,rating,city,state,member_access,created_at,updated_at'
+        select: 'id,name,email,phone,role_applied,stage_key,rating,city,state,member_access,source,source_detail,job_id,created_at,updated_at'
       });
       const discRows = await db.select('disc_results', { select: 'candidate_id,primary_profile,secondary_profile' });
       const attempts = await db.select('quiz_attempts', {
@@ -854,9 +855,10 @@ module.exports = async function handler(req, res) {
       const company = await getSetting('company', {});
       const form = await getSetting('form', {});
       const whatsapp = await getSetting('whatsapp', {});
+      const landing = await getSetting('landing', {});
       const instances = await send.listWhatsAppInstances();
       return u.ok(res, {
-        company: company, form: form, whatsapp: whatsapp,
+        company: company, form: form, whatsapp: whatsapp, landing: landing,
         wa_instances: instances, providers: send.providerStatus(), app_url: u.appUrl()
       });
     }
@@ -935,6 +937,97 @@ module.exports = async function handler(req, res) {
         funil: funil,
         origens: listaOrigens
       });
+    }
+
+    // ==========================================================
+    // VAGAS — o que aparece na landing page
+    // ==========================================================
+    if (action === 'vagas') {
+      const lista = await vagas.todas();
+      const grupos = await db.select('prequal_groups', { order: 'name.asc', select: 'id,name,is_default' });
+      const landing = await getSetting('landing', {});
+      // quantos candidatos cada vaga ja trouxe
+      const cands = await db.select('candidates', { archived: 'eq.false', select: 'job_id' });
+      const porVaga = {};
+      cands.forEach(function (c) { if (c.job_id) porVaga[c.job_id] = (porVaga[c.job_id] || 0) + 1; });
+
+      return u.ok(res, {
+        vagas: lista.map(function (v) {
+          return Object.assign({}, v, {
+            candidatos: porVaga[v.id] || 0,
+            texto_botao: vagas.textoDoBotao(v),
+            link_publico: u.appUrl() + '/vagas#' + v.slug
+          });
+        }),
+        grupos: grupos,
+        landing: landing,
+        modos: vagas.MODOS
+      });
+    }
+
+    if (action === 'vaga_salvar') {
+      const body = await u.readBody(req);
+      const titulo = String(body.title || '').trim();
+
+      const patch = {};
+      ['summary', 'description', 'salary', 'employment_type', 'location', 'schedule',
+       'area', 'seniority', 'whatsapp_message'].forEach(function (k) {
+        if (body[k] !== undefined) patch[k] = String(body[k] || '').trim() || null;
+      });
+      ['requirements', 'responsibilities', 'benefits'].forEach(function (k) {
+        if (body[k] !== undefined) patch[k] = vagas.paraLista(body[k]);
+      });
+      if (body.work_mode !== undefined) {
+        const m = String(body.work_mode || '');
+        patch.work_mode = vagas.MODOS.indexOf(m) >= 0 ? m : null;
+      }
+      if (body.prequal_group_id !== undefined) {
+        patch.prequal_group_id = body.prequal_group_id || null;
+      }
+      if (body.active !== undefined) patch.active = !!body.active;
+      if (body.featured !== undefined) patch.featured = !!body.featured;
+      if (body.position !== undefined) patch.position = Number(body.position) || 1;
+
+      let row;
+      if (body.id) {
+        const antiga = await vagas.porId(body.id);
+        if (!antiga) return u.fail(res, 404, 'Vaga nao encontrada.');
+        if (titulo && titulo !== antiga.title) {
+          patch.title = titulo;
+          patch.slug = await vagas.apelidoLivre(titulo, antiga.id);
+        }
+        patch.updated_at = new Date().toISOString();
+        row = await db.update('jobs', patch, { id: 'eq.' + body.id });
+        await anota(session, 'vaga_alterada', titulo || antiga.title, {});
+      } else {
+        if (titulo.length < 3) return u.fail(res, 400, 'Escreva o titulo da vaga.');
+        patch.title = titulo;
+        patch.slug = await vagas.apelidoLivre(titulo, null);
+        if (patch.position === undefined) {
+          patch.position = (await db.count('jobs', {})) + 1;
+        }
+        row = await db.insert('jobs', patch);
+        await anota(session, 'vaga_criada', titulo, {});
+      }
+      return u.ok(res, { vaga: row });
+    }
+
+    if (action === 'vaga_excluir') {
+      const body = await u.readBody(req);
+      const alvo = await vagas.porId(body.id);
+      if (!alvo) return u.fail(res, 404, 'Vaga nao encontrada.');
+      await db.remove('jobs', { id: 'eq.' + alvo.id });
+      await anota(session, 'vaga_excluida', alvo.title, {});
+      return u.ok(res, {});
+    }
+
+    if (action === 'vaga_ordem') {
+      const body = await u.readBody(req);
+      const ids = Array.isArray(body.ids) ? body.ids : [];
+      for (let i = 0; i < ids.length; i++) {
+        await db.update('jobs', { position: i + 1 }, { id: 'eq.' + ids[i] });
+      }
+      return u.ok(res, {});
     }
 
     // ==========================================================

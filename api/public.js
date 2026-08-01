@@ -9,6 +9,7 @@ const u = require('./_lib/util');
 const disc = require('./_lib/disc');
 const send = require('./_lib/send');
 const aurea = require('./_lib/aurea');
+const vagas = require('./_lib/vagas');
 
 const CAMPOS_FORM = [
   'name', 'email', 'phone', 'cpf', 'birth_date', 'city', 'state', 'role_applied',
@@ -53,6 +54,36 @@ module.exports = async function handler(req, res) {
       return u.ok(res, { form: form, company: company });
     }
 
+    // ---------------------------------------------------- vagas da landing
+    // Tudo que a pagina publica precisa em uma chamada so.
+    if (action === 'vagas') {
+      const landing = await getSetting('landing', {});
+      const company = await getSetting('company', {});
+      const zap = landing.whatsapp || (await getSetting('whatsapp', {})).numero || '';
+      const lista = await vagas.ativas();
+      const areas = [];
+      lista.forEach(function (v) {
+        if (v.area && areas.indexOf(v.area) < 0) areas.push(v.area);
+      });
+      return u.ok(res, {
+        vagas: lista.map(function (v) { return vagas.paraPublico(v, u.appUrl(), zap); }),
+        areas: areas,
+        landing: landing,
+        empresa: { nome: company.name || 'StartDigital', site: company.site || '' },
+        whatsapp: zap
+      });
+    }
+
+    // uma vaga so, pela URL bonita
+    if (action === 'vaga') {
+      const v = await vagas.porApelido(String(q.slug || ''));
+      if (!v) return u.fail(res, 404, 'Vaga nao encontrada ou ja encerrada.');
+      const landing = await getSetting('landing', {});
+      const zap = landing.whatsapp || (await getSetting('whatsapp', {})).numero || '';
+      db.update('jobs', { views: (v.views || 0) + 1 }, { id: 'eq.' + v.id }).catch(function () { });
+      return u.ok(res, { vaga: vagas.paraPublico(v, u.appUrl(), zap) });
+    }
+
     // ---------------------------------------------------- enviar candidatura
     if (action === 'apply') {
       if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
@@ -78,7 +109,30 @@ module.exports = async function handler(req, res) {
         return u.fail(res, 409, 'Ja recebemos uma candidatura com este e-mail. Se precisar atualizar alguma informacao, responda o e-mail de confirmacao que enviamos.');
       }
 
-      const row = { token: u.candidateToken(), stage_key: 'triagem', source: 'formulario', source_detail: 'Formulário do site' };
+      // Quem veio pela landing ja conversou com a Aurea no WhatsApp e existe
+      // aqui dentro so como contato. Nesse caso a gente COMPLETA o cadastro
+      // dele em vez de criar um segundo — senao a mesma pessoa vira dois.
+      let lead = null;
+      if (body.t) {
+        const porToken = await candidateByToken(String(body.t));
+        if (porToken && porToken.source === 'whatsapp' && !porToken.email) lead = porToken;
+      }
+      if (!lead) {
+        const tail = u.phoneTail(phone);
+        if (tail) {
+          lead = await db.selectOne('candidates', {
+            phone_digits: 'like.*' + tail, source: 'eq.whatsapp', email: 'eq.',
+            archived: 'eq.false', order: 'created_at.desc', select: '*'
+          });
+        }
+      }
+
+      // a vaga escolhida na landing
+      let vagaEscolhida = null;
+      if (body.vaga) vagaEscolhida = await vagas.porApelido(String(body.vaga));
+      if (!vagaEscolhida && lead && lead.job_id) vagaEscolhida = await vagas.porId(lead.job_id);
+
+      const row = { stage_key: 'triagem', source: 'formulario', source_detail: 'Formulário do site' };
       CAMPOS_FORM.forEach(function (c) {
         if (body[c] !== undefined && body[c] !== null) {
           row[c] = c === 'email' ? email : String(body[c]).trim().slice(0, 4000);
@@ -88,12 +142,29 @@ module.exports = async function handler(req, res) {
       row.name = nome;
       row.phone = phone;
       if (body.extra && typeof body.extra === 'object') row.extra = body.extra;
+      if (vagaEscolhida) {
+        row.job_id = vagaEscolhida.id;
+        if (!row.role_applied) row.role_applied = vagaEscolhida.title;
+      }
 
-      const cand = await db.insert('candidates', row);
-      await db.insert('stage_history', {
-        candidate_id: cand.id, from_stage: null, to_stage: 'triagem',
-        note: 'Formulario recebido'
-      });
+      let cand;
+      if (lead) {
+        row.source = 'whatsapp';
+        row.source_detail = 'Landing → WhatsApp → cadastro';
+        row.updated_at = new Date().toISOString();
+        cand = await db.update('candidates', row, { id: 'eq.' + lead.id }) || lead;
+        await db.insert('stage_history', {
+          candidate_id: cand.id, from_stage: lead.stage_key, to_stage: cand.stage_key,
+          note: 'Cadastro completo enviado (veio do WhatsApp)'
+        });
+      } else {
+        row.token = u.candidateToken();
+        cand = await db.insert('candidates', row);
+        await db.insert('stage_history', {
+          candidate_id: cand.id, from_stage: null, to_stage: 'triagem',
+          note: 'Formulario recebido'
+        });
+      }
 
       // confirmacao automatica por e-mail (se o Resend estiver configurado)
       const company = await getSetting('company', {});
@@ -113,7 +184,7 @@ module.exports = async function handler(req, res) {
       let aureaOk = false;
       try {
         const cfgA = await aurea.config();
-        if (cfgA.ativa && cfgA.auto_ao_receber_formulario) {
+        if (cfgA.ativa && cfgA.auto_ao_receber_formulario && !lead) {
           const ra = await aurea.iniciar(cand, null, {});
           aureaOk = !!ra.ok;
         }

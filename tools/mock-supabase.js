@@ -56,6 +56,7 @@ const DB = {
     { key: 'company', value: { name: 'StartDigital', primary_color: '#22c55e', logo_url: '', site: '', support_email: 'startdigitalcomercial@gmail.com' } },
     { key: 'aurea', value: { nome: 'Aurea', ativa: true, auto_ao_receber_formulario: true, horario_comercial: false, hora_inicio: 8, hora_fim: 20, modelo: 'claude-sonnet-4-6', instancia_whatsapp: '', personalidade: 'Você é a Aurea, assistente de recrutamento da StartDigital. Fale em português do Brasil, informal e curto.' } },
     { key: 'origens', value: { lista: ['Formulário do site', 'Indeed', 'LinkedIn', 'Catho'] } },
+    { key: 'landing', value: { whatsapp: '5513996003897', badge: 'Estamos contratando', headline_1: 'Se o seu trabalho é', headline_destaque: 'extraordinário,', headline_2: 'seu lugar é aqui.', sub: 'Somos um time movido por resultado, cultura e gente boa de verdade!', sobre_titulo_1: 'Uma agência que', sobre_destaque: 'transforma negócios', sobre_titulo_2: 'de verdade', sobre_texto: 'A Start é uma agência digital focada em performance, construída para entregar o que realmente importa: resultado.\n\nSomos um time com 💜 sangue roxo, que joga em alta performance, evolui rápido e cresce junto.\n\nSe você curte desafio, evolução constante o seu lugar é aqui.' } },
     { key: 'form', value: { headline: 'Trabalhe na StartDigital', subhead: 'Preencha o formulário abaixo. Levamos o seu tempo a sério: leia com calma e responda com sinceridade.', roles: ['Social Media', 'Gestor de Tráfego', 'Designer', 'Redator / Copywriter', 'Comercial / SDR', 'Atendimento / CS', 'Outra'], open: true } }
   ],
 
@@ -113,6 +114,13 @@ const DB = {
     opening_message: 'Oi {{primeiro_nome}}! Aqui é a Aurea, da *StartDigital*. Posso te fazer umas perguntas rápidas?',
     closing_message: 'Prontinho, {{primeiro_nome}}! Obrigada. Já encaminhei tudo para o time.',
     created_at: agora()
+  }, {
+    id: 'gggg1111-1111-4111-8111-111111111111', name: 'Gestor de Tráfego',
+    description: 'Roteiro curto de quem chega pelo WhatsApp.', role_target: 'Gestor de Tráfego',
+    active: true, is_default: false, auto_on_apply: false, job_id: null,
+    opening_message: 'Boa! Aqui é a Aurea, da StartDigital. Vou te fazer 5 perguntinhas rápidas sobre a vaga de {{vaga}}, leva 2 minutos.',
+    closing_message: 'Show, {{primeiro_nome}}! Era isso. Obrigada pelas respostas — se você passar nesta primeira etapa, a gente entra em contato para agendar a conversa com o time.',
+    created_at: agora()
   }],
 
   prequal_questions: [
@@ -127,7 +135,46 @@ const DB = {
       id: 'q' + (i + 1), group_id: 'g-padrao', position: i + 1,
       question: q[0], objective: q[1], required: true, weight: q[2]
     };
-  }),
+  }).concat([
+    ['Quanto tempo de experiência você tem como gestor de tráfego?', 'Tempo na função.', 2],
+    ['Quanto tempo de experiência em Meta Ads e Google Ads?', 'Precisa ter rodado nas duas.', 2],
+    ['Você tem disponibilidade para trabalhar presencial, no horário comercial, das 08h45 às 18h?', 'ELIMINATÓRIO: a vaga é presencial.', 3],
+    ['Já rodou quanto em Ads? (soma aproximada de verba investida)', 'Volume de verba já gerenciada.', 2],
+    ['Última e mais importante: qual é a sua música favorita?', 'Quebra-gelo, sem peso na nota.', 0]
+  ].map(function (q, i) {
+    return {
+      id: 'gt' + (i + 1), group_id: 'gggg1111-1111-4111-8111-111111111111', position: i + 1,
+      question: q[0], objective: q[1], required: true, weight: q[2]
+    };
+  })),
+
+  jobs: [
+    {
+      id: 'aaaa1111-1111-4111-8111-111111111111',
+      slug: 'gestor-de-trafego-pleno', title: 'Gestor de Tráfego Pleno',
+      summary: 'Gestão e otimização de campanhas no Meta Ads e Google Ads para nossa carteira de clientes.',
+      description: 'Você vai cuidar de uma carteira de clientes de ponta a ponta.',
+      salary: 'R$ 2.200 + Comissões', employment_type: 'PJ', work_mode: 'presencial',
+      location: 'Praia Grande, SP', schedule: '08h45 às 18h', area: 'Tráfego Pago', seniority: 'Pleno',
+      requirements: ['Experiência como gestor de tráfego', 'Meta Ads e Google Ads'],
+      responsibilities: ['Planejar e subir campanhas'], benefits: ['Comissão por resultado'],
+      prequal_group_id: 'gggg1111-1111-4111-8111-111111111111', whatsapp_message: null,
+      active: true, featured: true, position: 1, views: 0,
+      created_at: agora(), updated_at: agora()
+    },
+    {
+      id: 'aaaa2222-2222-4222-8222-222222222222',
+      slug: 'gestor-de-trafego-jr', title: 'Gestor de Tráfego Jr',
+      summary: 'Apoio na criação e gestão de campanhas, com foco em aprendizado.',
+      description: 'Vaga para quem está começando.',
+      salary: 'R$ 1.500 + Comissões', employment_type: 'PJ', work_mode: 'presencial',
+      location: 'Praia Grande, SP', schedule: '08h45 às 18h', area: 'Tráfego Pago', seniority: 'Júnior',
+      requirements: ['Noções de Meta Ads'], responsibilities: ['Apoiar as campanhas'], benefits: ['Treinamento'],
+      prequal_group_id: 'gggg1111-1111-4111-8111-111111111111', whatsapp_message: null,
+      active: true, featured: false, position: 2, views: 0,
+      created_at: agora(), updated_at: agora()
+    }
+  ],
 
   prequal_sessions: [],
   prequal_messages: [],
@@ -158,9 +205,10 @@ const DEFAULTS = {
   disc_questions: function () { return { id: seq('disc_questions'), active: true }; },
   settings: function () { return { value: {} }; },
   message_templates: function () { return { id: seq('message_templates'), updated_at: agora() }; },
-  prequal_groups: function () { return { id: uuid(), active: true, is_default: false, auto_on_apply: true, created_at: agora() }; },
+  jobs: function () { return { id: uuid(), requirements: [], responsibilities: [], benefits: [], active: true, featured: false, position: 1, views: 0, prequal_group_id: null, created_at: agora(), updated_at: agora() }; },
+  prequal_groups: function () { return { id: uuid(), active: true, is_default: false, auto_on_apply: true, job_id: null, created_at: agora() }; },
   prequal_questions: function () { return { id: uuid(), position: 1, required: true, weight: 1, objective: null }; },
-  prequal_sessions: function () { return { id: uuid(), channel: 'whatsapp', status: 'aguardando', current_index: 0, answers: [], score: null, recommendation: null, summary: null, last_message_at: null, started_at: agora(), finished_at: null, error: null }; },
+  prequal_sessions: function () { return { id: uuid(), channel: 'whatsapp', status: 'aguardando', current_index: 0, answers: [], score: null, recommendation: null, summary: null, job_id: null, last_message_at: null, started_at: agora(), finished_at: null, error: null }; },
   prequal_messages: function () { return { id: seq('prequal_messages'), created_at: agora() }; },
   panel_users: function () { return { id: uuid(), role: 'leitura', active: true, must_change: true, password_hash: null, password_salt: null, last_login_at: null, created_by: null, created_at: agora(), updated_at: agora() }; },
   audit_log: function () { return { id: seq('audit_log'), detail: {}, created_at: agora() }; },

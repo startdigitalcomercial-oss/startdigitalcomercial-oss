@@ -34,11 +34,17 @@ const server = http.createServer(async function (req, res) {
       const total = todas.length ? Math.max.apply(null, todas) : 1;
       const ultima = String((body.messages || []).slice(-1)[0] && (body.messages || []).slice(-1)[0].content || '');
       const fim = atual >= total;
+      // devolve a PROXIMA pergunta do roteiro, igual a IA de verdade faria
+      function perguntaDeNumero(n) {
+        const re = new RegExp('^\\s*' + n + '\\.[^\\n]*\\n\\s*Pergunta:\\s*(.+)$', 'm');
+        const achou = sys.match(re);
+        return achou ? achou[1].trim() : ('Próxima pergunta ' + n + '?');
+      }
       return json({
         content: [{
           type: 'tool_use', name: tool.name,
           input: {
-            mensagem: fim ? 'Prontinho! Obrigada pelas respostas.' : 'Entendi. Próxima pergunta ' + (atual + 1) + '?',
+            mensagem: fim ? 'Prontinho! Obrigada pelas respostas.' : perguntaDeNumero(atual + 1),
             resposta_capturada: ultima.slice(0, 200),
             avancar: true,
             encerrar: fim,

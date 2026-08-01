@@ -88,19 +88,33 @@ module.exports = async function handler(req, res) {
       phone_digits: 'like.*' + tail, archived: 'eq.false',
       order: 'created_at.desc', select: '*', limit: 5
     });
+
+    // Número novo: veio do botão da landing. A Aurea abre a porta,
+    // descobre a vaga pela mensagem e começa a pré-qualificação.
     if (!achados.length) {
-      return responder({ ok: true, ignorado: 'numero nao cadastrado' });
+      const r = await aurea.receberDeDesconhecido({
+        telefone: jid.split('@')[0],
+        nome: d.pushName || d.pushname || (body.data && body.data.pushName) || '',
+        texto: texto
+      });
+      return responder({ ok: true, resultado: r });
     }
 
-    // se houver mais de um, prioriza quem tem conversa em andamento
+    // se houver mais de um, prioriza quem tem conversa aberta
     let candidato = achados[0];
-    if (achados.length > 1) {
-      for (const c of achados) {
-        const s = await db.selectOne('prequal_sessions', {
-          candidate_id: 'eq.' + c.id, status: 'eq.em_andamento', select: 'id'
-        });
-        if (s) { candidato = c; break; }
-      }
+    let sessaoAberta = null;
+    for (const c of achados) {
+      const s = await db.selectOne('prequal_sessions', {
+        candidate_id: 'eq.' + c.id, status: 'in.(em_andamento,escolhendo_vaga)',
+        order: 'started_at.desc', select: '*'
+      });
+      if (s) { candidato = c; sessaoAberta = s; break; }
+    }
+
+    // ainda estava decidindo qual vaga quer
+    if (sessaoAberta && sessaoAberta.status === 'escolhendo_vaga') {
+      const r = await aurea.receberEscolhaDeVaga(candidato, sessaoAberta, texto);
+      return responder({ ok: true, resultado: r });
     }
 
     const r = await aurea.receber(candidato, texto);

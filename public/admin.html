@@ -323,6 +323,18 @@
   @media (prefers-reduced-motion: reduce) {
     .mod-corpo, .mod-toggle .seta, .qr-box img, .mod-pega { transition: none; }
   }
+
+  /* ---------- Vagas ---------- */
+  .vg-item { display: flex; align-items: flex-start; gap: 14px; padding: 16px 18px; border-bottom: 1px solid var(--fio); }
+  .vg-item:last-child { border-bottom: 0; }
+  .vg-item.off { opacity: .55; }
+  .vg-pega { cursor: grab; color: var(--label-3); padding-top: 3px; flex: none; user-select: none; }
+  .vg-pega:active { cursor: grabbing; }
+  .vg-item.arrastando { opacity: .4; }
+  .vg-item.alvo { box-shadow: inset 0 2px 0 var(--accent); }
+  .vg-info { flex: 1; min-width: 0; }
+  .vg-info h3 { margin: 0 0 3px; font-size: 15.5px; font-weight: 600; }
+  .vg-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
 </style>
 </head>
 <body>
@@ -361,6 +373,7 @@
     <nav id="abas">
       <div class="nav-sec">Principal</div>
       <button data-aba="dashboard" class="on"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3.6" y="3.6" width="7" height="6" rx="1.6"/><rect x="3.6" y="12.4" width="7" height="8" rx="1.6"/><rect x="13.4" y="3.6" width="7" height="10" rx="1.6"/><rect x="13.4" y="16.4" width="7" height="4" rx="1.6"/></svg><span>Dashboard</span></button>
+      <button data-aba="vagas"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3.4" y="7.2" width="17.2" height="12.4" rx="2"/><path d="M8.8 7.2V5.6a1.8 1.8 0 0 1 1.8-1.8h2.8a1.8 1.8 0 0 1 1.8 1.8v1.6"/><path d="M3.4 12.4h17.2"/></svg><span>Vagas</span></button>
       <button data-aba="triagem"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="16" rx="1.8"/><rect x="13.5" y="4" width="6.5" height="10" rx="1.8"/></svg><span>Triagem</span></button>
       <button data-aba="candidatos"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><circle cx="9" cy="8.6" r="3.4"/><path d="M3.6 19.4c.6-3 2.9-4.5 5.4-4.5s4.8 1.5 5.4 4.5"/><path d="M15.4 5.7a3.4 3.4 0 0 1 0 6M16.9 15.2c1.9.6 3.1 2 3.5 4.2"/></svg><span>Candidatos</span></button>
       <div class="nav-sec">Automação</div>
@@ -406,6 +419,11 @@
     <!-- ---------- DASHBOARD ---------- -->
     <section data-painel="dashboard">
       <div id="painel-dashboard" style="padding:18px 0 40px"><div class="loading-page">Carregando…</div></div>
+    </section>
+
+    <!-- ---------- VAGAS ---------- -->
+    <section data-painel="vagas" style="display:none">
+      <div style="padding:18px 0 40px" id="painel-vagas"><div class="loading-page">Carregando…</div></div>
     </section>
 
     <!-- ---------- CANDIDATOS ---------- -->
@@ -538,6 +556,7 @@
 <script src="/js/admin-equipe.js"></script>
 <script src="/js/admin-avisos.js"></script>
 <script src="/js/admin-usuarios.js"></script>
+<script src="/js/admin-vagas.js"></script>
 <script src="/js/admin-aurea.js"></script>
 <script src="/js/admin-whatsapp.js"></script>
 <script src="/js/admin-inicio.js"></script>

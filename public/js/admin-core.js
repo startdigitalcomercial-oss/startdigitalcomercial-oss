@@ -145,7 +145,7 @@ document.getElementById('form-login').addEventListener('submit', async function 
    abas
    ============================================================ */
 const TITULOS = {
-  dashboard: 'Dashboard', triagem: 'Triagem', candidatos: 'Candidatos',
+  dashboard: 'Dashboard', vagas: 'Vagas abertas', triagem: 'Triagem', candidatos: 'Candidatos',
   prequalificacao: 'Pré Qualificação', aurea: 'Aurea', preonboarding: 'Pré Onboarding',
   conteudo: 'Aulas da integração', quiz: 'Quiz de seleção',
   colaboradores: 'Colaboradores', avisos: 'Avisos para o time', usuarios: 'Usuários do painel',
@@ -163,7 +163,7 @@ document.getElementById('abas').addEventListener('click', function (ev) {
     if (ativa) { void s.offsetWidth; s.classList.add('enter'); }
   });
   const carregar = {
-    dashboard: carregaDashboard, triagem: carregaBoard, candidatos: carregaCandidatos,
+    dashboard: carregaDashboard, vagas: carregaVagas, triagem: carregaBoard, candidatos: carregaCandidatos,
     prequalificacao: carregaPrequal, aurea: carregaAurea, preonboarding: carregaBoasVindas,
     colaboradores: carregaColaboradores, avisos: carregaAvisos, usuarios: carregaUsuarios,
     conteudo: carregaConteudo, quiz: carregaQuiz, mensagens: carregaTemplates, ajustes: carregaAjustes

@@ -1,6 +1,18 @@
 {
   "rewrites": [
     {
+      "source": "/trabalhe-conosco",
+      "destination": "/vagas.html"
+    },
+    {
+      "source": "/carreiras",
+      "destination": "/vagas.html"
+    },
+    {
+      "source": "/vagas",
+      "destination": "/vagas.html"
+    },
+    {
       "source": "/vaga",
       "destination": "/vaga.html"
     },

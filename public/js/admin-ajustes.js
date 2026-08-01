@@ -99,7 +99,7 @@ async function carregaAjustes() {
   const box = document.getElementById('painel-ajustes');
   box.innerHTML = '<div class="loading-page">Carregando…</div>';
   const d = await api('settings');
-  const f = d.form || {}, c = d.company || {}, w = d.whatsapp || {};
+  const f = d.form || {}, c = d.company || {}, w = d.whatsapp || {}, L = d.landing || {};
   const p = d.providers || {};
   box.innerHTML =
     '<div class="card"><h2>Formulário público</h2>' +
@@ -110,6 +110,40 @@ async function carregaAjustes() {
     '<textarea id="f-roles" style="min-height:110px">' + esc((f.roles || []).join('\n')) + '</textarea></div>' +
     '<div class="row" style="margin-top:12px"><button class="btn btn-sm" id="btn-form-salvar">Salvar</button>' +
     '<label class="row small" style="gap:6px"><input type="checkbox" id="f-open" ' + (f.open !== false ? 'checked' : '') + ' style="width:16px;height:16px"> inscrições abertas</label></div>' +
+    '</div>' +
+
+    // ---------- landing page ----------
+    '<div class="card"><h2>Landing page de vagas</h2>' +
+    '<p class="sub">É a página que você divulga: <a href="' + esc((d.app_url || location.origin) + '/vagas') +
+      '" target="_blank">' + esc((d.app_url || location.origin) + '/vagas') + '</a><br>' +
+      'As vagas em si você cadastra no menu <strong>Vagas</strong>.</p>' +
+
+    '<div class="field"><label>WhatsApp que recebe os candidatos</label>' +
+    '<span class="hint">Só números, com DDI e DDD. Ex.: 5513996003897. É para este número que o botão da vaga leva — ' +
+    'e é nele que a Aurea precisa estar conectada.</span>' +
+    '<input type="text" id="l-zap" value="' + esc(L.whatsapp || '') + '" placeholder="5513996003897"></div>' +
+
+    '<hr class="sep"><h3 style="font-size:14px;margin:0 0 4px">Topo da página</h3>' +
+    '<p class="small muted" style="margin:0 0 12px">O título fica em três pedaços. O do meio sai colorido.</p>' +
+    '<div class="field"><label>Selo</label><input type="text" id="l-badge" value="' + esc(L.badge || '') + '" placeholder="Estamos contratando"></div>' +
+    '<div class="grid grid-3" style="gap:12px;margin-top:12px">' +
+      '<div class="field"><label>Título — 1ª linha</label><input type="text" id="l-h1" value="' + esc(L.headline_1 || '') + '"></div>' +
+      '<div class="field"><label>Palavra colorida</label><input type="text" id="l-hd" value="' + esc(L.headline_destaque || '') + '"></div>' +
+      '<div class="field"><label>Título — última linha</label><input type="text" id="l-h2" value="' + esc(L.headline_2 || '') + '"></div>' +
+    '</div>' +
+    '<div class="field" style="margin-top:12px"><label>Frase de apoio</label>' +
+    '<input type="text" id="l-sub" value="' + esc(L.sub || '') + '"></div>' +
+
+    '<hr class="sep"><h3 style="font-size:14px;margin:0 0 12px">Bloco "Sobre a Start"</h3>' +
+    '<div class="grid grid-3" style="gap:12px">' +
+      '<div class="field"><label>1ª parte</label><input type="text" id="l-s1" value="' + esc(L.sobre_titulo_1 || '') + '"></div>' +
+      '<div class="field"><label>Parte colorida</label><input type="text" id="l-sd" value="' + esc(L.sobre_destaque || '') + '"></div>' +
+      '<div class="field"><label>Última parte</label><input type="text" id="l-s2" value="' + esc(L.sobre_titulo_2 || '') + '"></div>' +
+    '</div>' +
+    '<div class="field" style="margin-top:12px"><label>Texto</label>' +
+    '<span class="hint">Deixe uma linha em branco entre um parágrafo e outro.</span>' +
+    '<textarea id="l-stexto" style="min-height:130px">' + esc(L.sobre_texto || '') + '</textarea></div>' +
+    '<div class="row" style="margin-top:14px"><button class="btn btn-sm" id="btn-landing-salvar">Salvar a landing</button></div>' +
     '</div>' +
 
     '<div class="card"><h2>Canais de envio</h2>' +
@@ -169,6 +203,27 @@ async function carregaAjustes() {
       toast('Formulário salvo');
     } catch (e) { toast(e.message, true); }
   });
+  document.getElementById('btn-landing-salvar').addEventListener('click', async function () {
+    const v = function (i) { return document.getElementById(i).value.trim(); };
+    const zap = v('l-zap').replace(/\D/g, '');
+    if (zap && zap.length < 12) return toast('O WhatsApp precisa do DDI e do DDD. Ex.: 5513996003897', true);
+    this.disabled = true;
+    try {
+      await api('settings_save', {
+        body: {
+          key: 'landing', value: {
+            whatsapp: zap, badge: v('l-badge'),
+            headline_1: v('l-h1'), headline_destaque: v('l-hd'), headline_2: v('l-h2'), sub: v('l-sub'),
+            sobre_titulo_1: v('l-s1'), sobre_destaque: v('l-sd'), sobre_titulo_2: v('l-s2'),
+            sobre_texto: document.getElementById('l-stexto').value
+          }
+        }
+      });
+      toast('Landing salva');
+    } catch (e) { toast(e.message, true); }
+    this.disabled = false;
+  });
+
   document.getElementById('btn-sair-todos').addEventListener('click', async function () {
     if (!confirm('Encerrar TODAS as sessões abertas?\n\nTodo mundo que está usando o painel agora vai ' +
       'cair na tela de login, inclusive você. Ninguém perde dado nenhum — é só precisar entrar de novo.')) return;

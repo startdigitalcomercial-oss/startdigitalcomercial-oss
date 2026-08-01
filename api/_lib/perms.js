@@ -71,7 +71,8 @@ const ACOES = {
 
   // --- gestao de usuarios: so o dono ---
   usuarios: 'usuarios', usuario_salvar: 'usuarios', usuario_excluir: 'usuarios',
-  usuario_senha: 'usuarios', auditoria: 'usuarios'
+  usuario_senha: 'usuarios', auditoria: 'usuarios',
+  vagas: 'ver', vaga_salvar: 'mexer', vaga_excluir: 'mexer', vaga_ordem: 'mexer'
 };
 
 function papelValido(p) { return PAPEIS.indexOf(p) >= 0; }
@@ -112,17 +113,17 @@ function recado(papel, acao) {
 // mas quem realmente barra e o servidor.
 function menuDoPapel(papel) {
   if (papel === 'dono') {
-    return ['dashboard', 'triagem', 'candidatos', 'prequalificacao', 'aurea', 'preonboarding',
+    return ['dashboard', 'vagas', 'triagem', 'candidatos', 'prequalificacao', 'aurea', 'preonboarding',
       'colaboradores', 'avisos', 'conteudo', 'quiz', 'mensagens', 'ajustes', 'usuarios'];
   }
   if (papel === 'rh') {
-    return ['dashboard', 'triagem', 'candidatos', 'prequalificacao', 'aurea', 'preonboarding',
+    return ['dashboard', 'vagas', 'triagem', 'candidatos', 'prequalificacao', 'aurea', 'preonboarding',
       'colaboradores', 'avisos', 'conteudo', 'quiz', 'mensagens', 'ajustes'];
   }
   if (papel === 'avaliador') {
-    return ['dashboard', 'triagem', 'candidatos', 'quiz', 'conteudo'];
+    return ['dashboard', 'vagas', 'triagem', 'candidatos', 'quiz', 'conteudo'];
   }
-  return ['dashboard', 'triagem', 'candidatos', 'colaboradores', 'conteudo', 'quiz'];
+  return ['dashboard', 'vagas', 'triagem', 'candidatos', 'colaboradores', 'conteudo', 'quiz'];
 }
 
 module.exports = { PAPEIS, NOMES, DESCRICOES, ACOES, permite, recado, menuDoPapel, papelValido };

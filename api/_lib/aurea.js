@@ -8,6 +8,7 @@
 const db = require('./db');
 const u = require('./util');
 const send = require('./send');
+const vagas = require('./vagas');
 
 // Aceita tanto a base (https://api.anthropic.com) quanto o endpoint completo.
 function endpointIA() {
@@ -29,7 +30,12 @@ async function config() {
     hora_fim: 20,
     modelo: MODELO_PADRAO,
     instancia_whatsapp: '',
-    personalidade: ''
+    personalidade: '',
+    // quem chega pelo botao da landing cai direto no WhatsApp
+    atende_desconhecido: true,
+    // 'aprovados' = so quem a Aurea recomendou | 'todos' | 'nunca'
+    enviar_link_cadastro: 'aprovados',
+    nota_minima: 6
   }, (row && row.value) || {});
 }
 
@@ -180,6 +186,25 @@ async function grupoComPerguntas(groupId) {
   return { grupo: grupo, perguntas: perguntas };
 }
 
+// O roteiro certo para a vaga: primeiro o que está preso nela,
+// depois um grupo marcado com o id dela, e por último o padrão.
+async function grupoDaVaga(vaga) {
+  if (vaga && vaga.prequal_group_id) {
+    const p = await grupoComPerguntas(vaga.prequal_group_id);
+    if (p && p.perguntas.length) return p;
+  }
+  if (vaga && vaga.id) {
+    const g = await db.selectOne('prequal_groups', {
+      job_id: 'eq.' + vaga.id, active: 'eq.true', select: '*'
+    });
+    if (g) {
+      const p = await grupoComPerguntas(g.id);
+      if (p && p.perguntas.length) return p;
+    }
+  }
+  return await grupoComPerguntas(null);
+}
+
 async function registrar(sessionId, role, texto) {
   await db.insert('prequal_messages', { session_id: sessionId, role: role, text: texto });
 }
@@ -240,6 +265,162 @@ async function iniciar(candidato, groupId, opcoes) {
   });
 
   return { ok: true, session_id: sessao.id };
+}
+
+// ============================================================
+// FUNIL NOVO: a pessoa vem da landing e cai direto no WhatsApp.
+// Ela ainda não é candidata — vira uma "porta de entrada" que só
+// se transforma em cadastro completo depois de passar aqui.
+// ============================================================
+
+// Abre o roteiro daquela vaga e manda a primeira pergunta.
+async function abrirRoteiro(candidato, vaga, cfg, sessaoExistente) {
+  const pacote = await grupoDaVaga(vaga);
+  if (!pacote || !pacote.perguntas.length) {
+    return { ok: false, error: 'Nenhum roteiro de pré-qualificação configurado.' };
+  }
+
+  const patch = {
+    group_id: pacote.grupo.id,
+    job_id: vaga ? vaga.id : null,
+    status: 'em_andamento',
+    current_index: 0,
+    answers: [],
+    last_message_at: new Date().toISOString()
+  };
+
+  let sessao;
+  if (sessaoExistente) {
+    sessao = await db.update('prequal_sessions', patch, { id: 'eq.' + sessaoExistente.id })
+      || Object.assign({}, sessaoExistente, patch);
+  } else {
+    sessao = await db.insert('prequal_sessions', Object.assign({ candidate_id: candidato.id }, patch));
+  }
+
+  if (vaga) {
+    await db.update('candidates', {
+      job_id: vaga.id, role_applied: vaga.title, updated_at: new Date().toISOString()
+    }, { id: 'eq.' + candidato.id });
+    candidato.role_applied = vaga.title;
+  }
+
+  const vars = u.templateVars(candidato, {});
+  const abertura = u.renderTemplate(
+    pacote.grupo.opening_message || 'Boa! Vou te fazer algumas perguntas rápidas sobre a vaga, tudo bem?',
+    Object.assign({ vaga: vaga ? vaga.title : (candidato.role_applied || 'a vaga') }, vars));
+
+  await enviarWhats(candidato, abertura, cfg);
+  await registrar(sessao.id, 'aurea', abertura);
+  await enviarWhats(candidato, pacote.perguntas[0].question, cfg);
+  await registrar(sessao.id, 'aurea', pacote.perguntas[0].question);
+
+  return { ok: true, session_id: sessao.id, vaga: vaga ? vaga.title : null };
+}
+
+// Lista as vagas abertas quando a Aurea não entendeu qual é.
+function perguntaQualVaga(lista) {
+  if (!lista.length) {
+    return 'Oi! No momento não temos vaga aberta, mas guardo seu contato para quando abrir. ' +
+      'Obrigada pelo interesse!';
+  }
+  if (lista.length === 1) {
+    return 'Oi! Você está falando da vaga de ' + lista[0].title + '? Responde sim que a gente começa.';
+  }
+  return 'Oi! Aqui é a Aurea, da StartDigital. Para qual vaga você quer se candidatar?\n\n' +
+    lista.map(function (v, i) { return (i + 1) + '. ' + v.title; }).join('\n') +
+    '\n\nÉ só me dizer o nome ou o número.';
+}
+
+// Aceita "1", "2"... além do nome da vaga.
+function vagaPeloNumero(texto, lista) {
+  const m = String(texto || '').trim().match(/^\s*(\d{1,2})\s*[.)]?\s*$/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return n >= 1 && n <= lista.length ? lista[n - 1] : null;
+}
+
+// Chamado pelo webhook quando o número não está cadastrado.
+async function receberDeDesconhecido(info) {
+  const cfg = await config();
+  if (!cfg.ativa) return { ok: false, ignorado: true, error: 'Aurea desligada.' };
+  if (cfg.atende_desconhecido === false) {
+    return { ok: false, ignorado: true, error: 'Aurea não atende número novo.' };
+  }
+
+  const abertas = await vagas.ativas();
+  const vaga = vagas.reconhecer(info.texto, abertas);
+
+  // cria a porta de entrada: ainda não é candidatura, é um contato
+  const candidato = await db.insert('candidates', {
+    token: u.candidateToken(),
+    name: String(info.nome || '').trim().slice(0, 120) || 'Contato do WhatsApp',
+    email: '',
+    phone: info.telefone,
+    stage_key: 'triagem',
+    source: 'whatsapp',
+    source_detail: 'Landing page → WhatsApp',
+    role_applied: vaga ? vaga.title : null,
+    job_id: vaga ? vaga.id : null
+  });
+  await db.insert('stage_history', {
+    candidate_id: candidato.id, from_stage: null, to_stage: 'triagem',
+    note: 'Chegou pelo WhatsApp' + (vaga ? ' — vaga de ' + vaga.title : '')
+  });
+
+  if (vaga) {
+    const r = await abrirRoteiro(candidato, vaga, cfg, null);
+    return Object.assign({ ok: true, novo: true, candidate_id: candidato.id }, r);
+  }
+
+  // não deu para saber a vaga: pergunta e espera
+  const sessao = await db.insert('prequal_sessions', {
+    candidate_id: candidato.id,
+    status: 'escolhendo_vaga',
+    current_index: 0,
+    answers: [],
+    last_message_at: new Date().toISOString()
+  });
+  await registrar(sessao.id, 'candidato', info.texto);
+  const pergunta = perguntaQualVaga(abertas);
+  await enviarWhats(candidato, pergunta, cfg);
+  await registrar(sessao.id, 'aurea', pergunta);
+  return { ok: true, novo: true, candidate_id: candidato.id, perguntou_vaga: true };
+}
+
+// A pessoa respondeu qual vaga quer.
+async function receberEscolhaDeVaga(candidato, sessao, texto) {
+  const cfg = await config();
+  await registrar(sessao.id, 'candidato', texto);
+
+  const abertas = await vagas.ativas();
+  let vaga = vagaPeloNumero(texto, abertas) || vagas.reconhecer(texto, abertas);
+
+  // "sim" quando só existe uma vaga aberta
+  if (!vaga && abertas.length === 1 && /^\s*(sim|isso|essa|é|e|claro|quero|pode)\b/i.test(texto)) {
+    vaga = abertas[0];
+  }
+
+  if (!vaga) {
+    const tentativas = (sessao.answers || []).length + 1;
+    await db.update('prequal_sessions', { answers: new Array(tentativas).fill({ tentativa: true }) },
+      { id: 'eq.' + sessao.id });
+    if (tentativas >= 3) {
+      const desiste = 'Sem problema. Vou passar seu contato para o time dar uma olhada e alguém te chama por aqui. Obrigada!';
+      await enviarWhats(candidato, desiste, cfg);
+      await registrar(sessao.id, 'aurea', desiste);
+      await db.update('prequal_sessions', {
+        status: 'desistiu', finished_at: new Date().toISOString()
+      }, { id: 'eq.' + sessao.id });
+      return { ok: true, encerrou: true };
+    }
+    const denovo = perguntaQualVaga(abertas);
+    await enviarWhats(candidato, denovo, cfg);
+    await registrar(sessao.id, 'aurea', denovo);
+    return { ok: true, perguntou_vaga: true };
+  }
+
+  const r = await abrirRoteiro(candidato, vaga, cfg, sessao);
+  return Object.assign({ ok: true }, r);
 }
 
 // ---------------------------------------------------------------- receber
@@ -357,9 +538,52 @@ async function finalizar(sessao, pacote, candidato, cfg) {
       note: 'Aurea concluiu a pré-qualificação — nota ' + r.nota + '/10, ' + (rot[r.recomendacao] || r.recomendacao)
     });
     await db.update('candidates', { updated_at: new Date().toISOString() }, { id: 'eq.' + candidato.id });
+
+    // passou? entao mandamos o link do cadastro completo
+    await talvezMandarCadastro(candidato, sessao, r, cfg);
   } catch (e) {
     await db.update('prequal_sessions', { error: 'Falha ao resumir: ' + e.message }, { id: 'eq.' + sessao.id });
   }
+}
+
+// ---------------------------------------------------------------- link do cadastro
+// Só quem passa na conversa recebe o formulário. Quem não passa recebe
+// um "obrigado" e fica guardado no sistema para o time olhar depois.
+async function talvezMandarCadastro(candidato, sessao, analise, cfg) {
+  const regra = cfg.enviar_link_cadastro || 'aprovados';
+  if (regra === 'nunca') return { enviado: false, motivo: 'desligado' };
+  if (sessao.status !== 'concluida') return { enviado: false, motivo: 'nao concluiu' };
+
+  if (regra === 'aprovados') {
+    const nota = Number(analise && analise.nota);
+    const rec = analise && analise.recomendacao;
+    const passou = rec === 'avancar' || (rec === 'talvez' && nota >= Number(cfg.nota_minima || 6));
+    if (!passou) return { enviado: false, motivo: 'nao passou' };
+  }
+
+  const base = u.appUrl();
+  if (!base) return { enviado: false, motivo: 'sem APP_URL' };
+
+  const vaga = sessao.job_id ? await vagas.porId(sessao.job_id) : null;
+  const link = base + '/vaga?t=' + candidato.token + (vaga ? '&v=' + vaga.slug : '');
+  const primeiro = u.firstName(candidato.name) || '';
+
+  const texto = 'Boa, ' + primeiro + '! Você passou na primeira etapa. 🎉\n\n' +
+    'Agora é só preencher seu cadastro completo neste link — leva uns 3 minutinhos:\n' + link +
+    '\n\nAssim que você enviar, o time analisa e a gente te chama para os próximos passos.';
+
+  const r = await enviarWhats(candidato, texto, cfg);
+  await registrar(sessao.id, 'aurea', texto);
+  await db.insert('message_logs', {
+    candidate_id: candidato.id, channel: 'whatsapp', to_address: candidato.phone,
+    subject: 'Link do cadastro', body: texto,
+    status: r.status, provider: r.provider, error: r.error || null
+  });
+  await db.insert('stage_history', {
+    candidate_id: candidato.id, from_stage: candidato.stage_key, to_stage: candidato.stage_key,
+    note: 'Aurea enviou o link do cadastro completo'
+  });
+  return { enviado: r.status === 'enviado', link: link };
 }
 
 // ---------------------------------------------------------------- teste
@@ -374,4 +598,8 @@ async function testar() {
   return { modelo: cfg.modelo, resposta: texto };
 }
 
-module.exports = { config, instancia, dentroDoHorario, iniciar, receber, testar, chamarIA, grupoComPerguntas };
+module.exports = {
+  config, instancia, dentroDoHorario, iniciar, receber, testar, chamarIA,
+  grupoComPerguntas, grupoDaVaga,
+  receberDeDesconhecido, receberEscolhaDeVaga, abrirRoteiro, perguntaQualVaga
+};
