@@ -246,6 +246,20 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   check('agora tem e-mail', depois[0] && !!depois[0].email, depois[0] && depois[0].email);
   check('nao chamou a Aurea de novo', cadastro.aurea === false, cadastro.aurea);
 
+  // --- quem JA esta cadastrado e aperta o botao da landing ---
+  // Este era o buraco: a pessoa preencheu o formulario semanas atras,
+  // hoje clica na vaga, e a Aurea ficava muda porque so sabia continuar
+  // conversa ja comecada.
+  const jaTinha = await webhook(digitos, 'Olá! Tenho interesse na vaga de Gestor de Tráfego Jr.');
+  check('quem ja e cadastrado tambem e atendido',
+    jaTinha.resultado && jaTinha.resultado.recomecou === true, jaTinha.resultado);
+  check('e comeca pelo roteiro da vaga citada',
+    jaTinha.resultado && jaTinha.resultado.vaga === 'Gestor de Tráfego Jr', jaTinha.resultado);
+
+  // logo depois, um "obrigado" solto nao pode reiniciar tudo
+  const aberta = (await adm('aurea')).sessoes.filter(function (x) { return x.candidato.indexOf(SUF) >= 0; })[0];
+  check('a conversa nova ficou em andamento', aberta && aberta.status === 'em_andamento', aberta && aberta.status);
+
   // --- quem chega sem dizer a vaga ---
   const foneQ = '11 9' + String(Date.now() + 33).slice(-8);
   const digQ = '55' + foneQ.replace(/\D/g, '');
@@ -255,6 +269,18 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   const escolha = await webhook(digQ, '2');
   check('aceita a vaga escolhida pelo numero',
     escolha.resultado && escolha.resultado.vaga === 'Gestor de Tráfego Jr', escolha.resultado);
+
+  // --- descanso: quem acabou de concluir nao e reiniciado por um "obrigado" ---
+  const foneD = '11 9' + String(Date.now() + 55).slice(-8);
+  const digD = '55' + foneD.replace(/\D/g, '');
+  await webhook(digD, 'Olá! Tenho interesse na vaga de Gestor de Tráfego Pleno.', 'Descanso Teste');
+  for (const r of ['4 anos', '3 anos cada', 'tenho sim', '2 milhoes', 'Imagine']) await webhook(digD, r);
+  const depoisFim = await webhook(digD, 'obrigado!');
+  check('depois de concluir, um obrigado nao reinicia o roteiro',
+    depoisFim.resultado && depoisFim.resultado.ignorado === true, depoisFim.resultado);
+  const citaVaga = await webhook(digD, 'na verdade queria a de Gestor de Tráfego Jr');
+  check('mas citar outra vaga recomeca',
+    citaVaga.resultado && citaVaga.resultado.vaga === 'Gestor de Tráfego Jr', citaVaga.resultado);
 
   console.log('\n5) WEBHOOK — casos que deve ignorar');
   const k = a2.webhook_url.split('k=')[1];

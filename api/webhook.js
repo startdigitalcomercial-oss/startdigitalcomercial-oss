@@ -134,11 +134,12 @@ module.exports = async function handler(req, res) {
     // se houver mais de um, prioriza quem tem conversa aberta
     let candidato = achados[0];
     let sessaoAberta = null;
+    const ABERTAS = ['em_andamento', 'escolhendo_vaga'];
     for (const c of achados) {
-      const s = await db.selectOne('prequal_sessions', {
-        candidate_id: 'eq.' + c.id, status: 'in.(em_andamento,escolhendo_vaga)',
-        order: 'started_at.desc', select: '*'
+      const sessoes = await db.select('prequal_sessions', {
+        candidate_id: 'eq.' + c.id, order: 'started_at.desc', select: '*', limit: 5
       });
+      const s = sessoes.filter(function (x) { return ABERTAS.indexOf(x.status) >= 0; })[0];
       if (s) { candidato = c; sessaoAberta = s; break; }
     }
 
@@ -150,7 +151,12 @@ module.exports = async function handler(req, res) {
       return responder({ ok: true, resultado: r });
     }
 
-    const r = await aurea.receber(candidato, texto);
+    // Tem conversa aberta? Continua. Não tem? Então esta é a primeira
+    // mensagem de alguém que já está no banco — trata como chegada nova,
+    // em vez de ficar mudo por "não há conversa em andamento".
+    const r = sessaoAberta
+      ? await aurea.receber(candidato, texto)
+      : await aurea.receberSemConversa(candidato, texto);
     return responder({ ok: true, resultado: r });
   } catch (e) {
     console.error('[webhook]', e);

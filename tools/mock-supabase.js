@@ -234,6 +234,8 @@ function combina(row, campo, expr) {
   const val = row[campo];
   if (expr === 'is.null') return val === null || val === undefined;
   if (expr === 'not.is.null') return val !== null && val !== undefined;
+  if (expr === 'is.true') return val === true;
+  if (expr === 'is.false') return val === false;
   if (expr.startsWith('eq.')) {
     const alvo = norm(expr.slice(3));
     if (typeof val === 'boolean' || typeof alvo === 'boolean') return String(val) === String(alvo);
@@ -244,7 +246,15 @@ function combina(row, campo, expr) {
     const padrao = expr.slice(5).replace(/[.*+?^${}()|[\]\\]/g, function (m) { return m === '*' ? m : '\\' + m; });
     return new RegExp('^' + padrao.replace(/\*/g, '.*') + '$').test(String(val == null ? '' : val));
   }
-  return true;
+  if (expr.startsWith('in.')) {
+    const lista = expr.slice(3).replace(/^\(|\)$/g, '').split(',')
+      .map(function (x) { return String(norm(x.trim().replace(/^"|"$/g, ''))); });
+    return lista.indexOf(String(val)) >= 0;
+  }
+  // Um espelho que ignora filtro que nao conhece mente para o teste:
+  // ele devolve linhas a mais e o teste passa onde a producao falharia.
+  console.error('[mock-supabase] filtro desconhecido, devolvendo nada:', campo, expr);
+  return false;
 }
 
 const IGNORAR = ['select', 'order', 'limit', 'offset', 'on_conflict'];

@@ -339,6 +339,30 @@ function vagaPeloNumero(texto, lista) {
   return n >= 1 && n <= lista.length ? lista[n - 1] : null;
 }
 
+// O miolo comum: a pessoa mandou a primeira mensagem. Se der para saber
+// a vaga, começa o roteiro. Se não der, pergunta qual é e espera.
+async function comecarPelaVaga(candidato, texto, cfg, abertas, vagaJaSabida) {
+  const vaga = vagaJaSabida || vagas.reconhecer(texto, abertas);
+
+  if (vaga) {
+    const r = await abrirRoteiro(candidato, vaga, cfg, null);
+    return Object.assign({ ok: true, candidate_id: candidato.id }, r);
+  }
+
+  const sessao = await db.insert('prequal_sessions', {
+    candidate_id: candidato.id,
+    status: 'escolhendo_vaga',
+    current_index: 0,
+    answers: [],
+    last_message_at: new Date().toISOString()
+  });
+  await registrar(sessao.id, 'candidato', texto);
+  const pergunta = perguntaQualVaga(abertas);
+  await enviarWhats(candidato, pergunta, cfg);
+  await registrar(sessao.id, 'aurea', pergunta);
+  return { ok: true, candidate_id: candidato.id, perguntou_vaga: true };
+}
+
 // Chamado pelo webhook quando o número não está cadastrado.
 async function receberDeDesconhecido(info) {
   const cfg = await config();
@@ -367,24 +391,46 @@ async function receberDeDesconhecido(info) {
     note: 'Chegou pelo WhatsApp' + (vaga ? ' — vaga de ' + vaga.title : '')
   });
 
-  if (vaga) {
-    const r = await abrirRoteiro(candidato, vaga, cfg, null);
-    return Object.assign({ ok: true, novo: true, candidate_id: candidato.id }, r);
+  const r = await comecarPelaVaga(candidato, info.texto, cfg, abertas, vaga);
+  return Object.assign({ novo: true }, r);
+}
+
+// ------------------------------------------------------------
+// Quem JÁ está cadastrado mas não tem conversa aberta.
+// Acontece o tempo todo: a pessoa preencheu o formulário semanas
+// atrás, hoje vê a landing e aperta o botão. Antes disso aqui, o
+// sistema recebia a mensagem e ficava mudo, porque só sabia
+// continuar conversa começada.
+// ------------------------------------------------------------
+const HORAS_DESCANSO = 12;
+
+async function receberSemConversa(candidato, texto) {
+  const cfg = await config();
+  if (!cfg.ativa) return { ok: false, ignorado: true, error: 'Aurea desligada.' };
+  if (cfg.atende_desconhecido === false) {
+    return { ok: false, ignorado: true, error: 'Aurea não puxa conversa sozinha.' };
   }
 
-  // não deu para saber a vaga: pergunta e espera
-  const sessao = await db.insert('prequal_sessions', {
-    candidate_id: candidato.id,
-    status: 'escolhendo_vaga',
-    current_index: 0,
-    answers: [],
-    last_message_at: new Date().toISOString()
-  });
-  await registrar(sessao.id, 'candidato', info.texto);
-  const pergunta = perguntaQualVaga(abertas);
-  await enviarWhats(candidato, pergunta, cfg);
-  await registrar(sessao.id, 'aurea', pergunta);
-  return { ok: true, novo: true, candidate_id: candidato.id, perguntou_vaga: true };
+  const abertas = await vagas.ativas();
+  const vaga = vagas.reconhecer(texto, abertas);
+
+  // Acabou de conversar e agora mandou um "obrigado"? Fica quieta.
+  // Só volta a falar se a mensagem citar uma vaga de verdade.
+  if (!vaga) {
+    const ultima = await db.selectOne('prequal_sessions', {
+      candidate_id: 'eq.' + candidato.id, finished_at: 'not.is.null',
+      order: 'finished_at.desc', select: 'finished_at'
+    });
+    if (ultima && ultima.finished_at) {
+      const horas = (Date.now() - new Date(ultima.finished_at).getTime()) / 3600000;
+      if (horas < HORAS_DESCANSO) {
+        return { ok: false, ignorado: true, error: 'Conversa recém-encerrada — deixando quieto.' };
+      }
+    }
+  }
+
+  const r = await comecarPelaVaga(candidato, texto, cfg, abertas, vaga);
+  return Object.assign({ recomecou: true }, r);
 }
 
 // A pessoa respondeu qual vaga quer.
@@ -601,5 +647,5 @@ async function testar() {
 module.exports = {
   config, instancia, dentroDoHorario, iniciar, receber, testar, chamarIA,
   grupoComPerguntas, grupoDaVaga,
-  receberDeDesconhecido, receberEscolhaDeVaga, abrirRoteiro, perguntaQualVaga
+  receberDeDesconhecido, receberSemConversa, receberEscolhaDeVaga, abrirRoteiro, perguntaQualVaga
 };
