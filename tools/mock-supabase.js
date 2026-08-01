@@ -138,7 +138,9 @@ const DB = {
   lesson_progress: [],
   message_logs: [],
   collaborators: [],
-  broadcasts: []
+  broadcasts: [],
+  panel_users: [],
+  audit_log: []
 };
 
 /* ---------------- defaults por tabela ---------------- */
@@ -160,6 +162,8 @@ const DEFAULTS = {
   prequal_questions: function () { return { id: uuid(), position: 1, required: true, weight: 1, objective: null }; },
   prequal_sessions: function () { return { id: uuid(), channel: 'whatsapp', status: 'aguardando', current_index: 0, answers: [], score: null, recommendation: null, summary: null, last_message_at: null, started_at: agora(), finished_at: null, error: null }; },
   prequal_messages: function () { return { id: seq('prequal_messages'), created_at: agora() }; },
+  panel_users: function () { return { id: uuid(), role: 'leitura', active: true, must_change: true, password_hash: null, password_salt: null, last_login_at: null, created_by: null, created_at: agora(), updated_at: agora() }; },
+  audit_log: function () { return { id: seq('audit_log'), detail: {}, created_at: agora() }; },
   broadcasts: function () { return { id: uuid(), total: 0, sent: 0, failed: 0, detail: {}, created_at: agora() }; },
   collaborators: function () { return { id: uuid(), token: uuid().replace(/-/g, ''), active: true, source: 'formulario', work_mode: null, welcomed_at: null, notes: null, created_at: agora(), updated_at: agora() }; }
 };

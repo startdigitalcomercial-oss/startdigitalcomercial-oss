@@ -29,6 +29,14 @@ async function adm(action, body, query) {
   return r.json();
 }
 
+// A senha do painel vem do ambiente — nunca fica escrita aqui dentro.
+// Rode assim:  ADMIN_PASSWORD='sua-senha' node tools/test-fluxo.js
+const SENHA_PAINEL = process.env.ADMIN_PASSWORD || process.env.ADMIN_SECRET || '';
+if (!SENHA_PAINEL) {
+  console.error('Falta a senha. Rode:  ADMIN_PASSWORD="sua-senha" node tools/test-fluxo.js');
+  process.exit(1);
+}
+
 (async function () {
   console.log('\n1) FORMULARIO PUBLICO');
   const cfg = await pub('config');
@@ -57,7 +65,7 @@ async function adm(action, body, query) {
   console.log('\n2) PAINEL');
   const login = await (await fetch(BASE + '/api/admin?action=login', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password: 'Start-RH-ioZSqXbN' })
+    body: JSON.stringify({ password: SENHA_PAINEL })
   })).json();
   TOKEN_ADMIN = login.token;
   check('login do painel', login.ok && !!login.token);

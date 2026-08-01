@@ -47,10 +47,18 @@ async function webhook(telefone, texto) {
   })).json();
 }
 
+// A senha do painel vem do ambiente — nunca fica escrita aqui dentro.
+// Rode assim:  ADMIN_PASSWORD='sua-senha' node tools/test-novo.js
+const SENHA_PAINEL = process.env.ADMIN_PASSWORD || process.env.ADMIN_SECRET || '';
+if (!SENHA_PAINEL) {
+  console.error('Falta a senha. Rode:  ADMIN_PASSWORD="sua-senha" node tools/test-novo.js');
+  process.exit(1);
+}
+
 (async function () {
   const login = await (await fetch(BASE + '/api/admin?action=login', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password: 'Start-RH-ioZSqXbN' })
+    body: JSON.stringify({ password: SENHA_PAINEL })
   })).json();
   T = login.token;
 
@@ -400,6 +408,112 @@ async function webhook(telefone, texto) {
   check('lista as rotas da conta', rotas.ok && dr.rotas.length === 2, rotas.error);
   check('marca a Premium como a escolhida', dr.escolhida === 17, dr.escolhida);
 
+  console.log('\n5d) USUARIOS E PAPEIS');
+  async function entra(email, senha) {
+    return (await fetch(BASE + '/api/admin?action=login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, password: senha })
+    })).json();
+  }
+  async function comoUsuario(tok, action, body, query) {
+    const qs = new URLSearchParams(Object.assign({ action: action }, query || {}));
+    return (await fetch(BASE + '/api/admin?' + qs, {
+      method: body ? 'POST' : 'GET',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+      body: body ? JSON.stringify(body) : undefined
+    })).json();
+  }
+
+  const listaU = await adm('usuarios');
+  const dlu = listaU.data || listaU;
+  check('lista de usuarios abre', listaU.ok, listaU.error);
+  check('oferece os 4 papeis', dlu.papeis.length === 4, dlu.papeis && dlu.papeis.length);
+  check('senha mestra vale enquanto nao ha dono', dlu.senha_mestra_vale === true, dlu.senha_mestra_vale);
+
+  const rh = await adm('usuario_salvar', { name: 'Marina do RH', email: 'marina.' + SUF + '@ex.com', role: 'rh' });
+  const drh = rh.data || rh;
+  check('cria usuario de RH', rh.ok && !!drh.senha_inicial, rh.error);
+  const aval = await adm('usuario_salvar', { name: 'Pedro Avaliador', email: 'pedro.' + SUF + '@ex.com', role: 'avaliador' });
+  const dav = aval.data || aval;
+  check('cria usuario avaliador', aval.ok, aval.error);
+  const leit = await adm('usuario_salvar', { name: 'Ana Leitura', email: 'ana.' + SUF + '@ex.com', role: 'leitura' });
+  const dle = leit.data || leit;
+  check('cria usuario de leitura', leit.ok, leit.error);
+  check('recusa e-mail repetido',
+    !(await adm('usuario_salvar', { name: 'Outra', email: 'marina.' + SUF + '@ex.com', role: 'rh' })).ok);
+  check('recusa papel inventado',
+    !(await adm('usuario_salvar', { name: 'X Y', email: 'xy.' + SUF + '@ex.com', role: 'chefe' })).ok);
+
+  const loginRh = await entra('marina.' + SUF + '@ex.com', drh.senha_inicial);
+  check('RH entra com o proprio e-mail', loginRh.ok && !!loginRh.token, loginRh.error);
+  check('RH ja sabe que precisa trocar a senha', loginRh.trocar_senha === true);
+  check('senha errada nao entra', !(await entra('marina.' + SUF + '@ex.com', 'chute')).ok);
+
+  const loginAval = await entra('pedro.' + SUF + '@ex.com', dav.senha_inicial);
+  const loginLeit = await entra('ana.' + SUF + '@ex.com', dle.senha_inicial);
+  check('avaliador entra', loginAval.ok);
+  check('leitura entra', loginLeit.ok);
+
+  // ---- o que cada papel pode ----
+  check('RH ve o quadro', (await comoUsuario(loginRh.token, 'board')).ok);
+  check('RH dispara mensagem', (await comoUsuario(loginRh.token, 'sms_rotas')).ok);
+  const rhUsers = await comoUsuario(loginRh.token, 'usuarios');
+  check('RH NAO mexe em usuarios', !rhUsers.ok && /Dono/.test(rhUsers.error || ''), rhUsers.error);
+
+  check('avaliador ve o quadro', (await comoUsuario(loginAval.token, 'board')).ok);
+  const avalEnvia = await comoUsuario(loginAval.token, 'broadcast_send',
+    { title: 'x', message: 'y', channels: ['whatsapp'] });
+  check('avaliador NAO dispara mensagem', !avalEnvia.ok && /não permite/.test(avalEnvia.error || ''), avalEnvia.error);
+  const avalAjuste = await comoUsuario(loginAval.token, 'settings_save', { key: 'form', value: {} });
+  check('avaliador NAO mexe em ajustes', !avalAjuste.ok, avalAjuste.error);
+  check('avaliador PODE corrigir quiz — a regra existe',
+    (await comoUsuario(loginAval.token, 'usuarios_eu')).menu.indexOf('quiz') >= 0);
+
+  check('leitura ve o quadro', (await comoUsuario(loginLeit.token, 'board')).ok);
+  const leitMove = await comoUsuario(loginLeit.token, 'move', { id: 'x', stage_key: 'teste' });
+  check('leitura NAO move candidato', !leitMove.ok && /consulta/.test(leitMove.error || ''), leitMove.error);
+
+  // ---- menu muda por papel ----
+  const menuRh = (await comoUsuario(loginRh.token, 'usuarios_eu')).menu;
+  const menuLeit = (await comoUsuario(loginLeit.token, 'usuarios_eu')).menu;
+  check('menu do RH nao tem Usuarios', menuRh.indexOf('usuarios') < 0, menuRh);
+  check('menu da leitura e menor', menuLeit.length < menuRh.length, { leitura: menuLeit.length, rh: menuRh.length });
+
+  // ---- desligar alguem tira o acesso na hora ----
+  await adm('usuario_salvar', { id: dle.usuario.id, active: false, role: 'leitura' });
+  const depoisDesligar = await comoUsuario(loginLeit.token, 'board');
+  check('quem foi desligado perde o acesso na hora',
+    !depoisDesligar.ok && /desativado/.test(depoisDesligar.error || ''), depoisDesligar.error);
+
+  // ---- senha nova ----
+  const nova = await adm('usuario_senha', { id: dav.usuario.id });
+  const dn = nova.data || nova;
+  check('gera senha nova', nova.ok && !!dn.senha_inicial, nova.error);
+  check('senha antiga para de valer', !(await entra('pedro.' + SUF + '@ex.com', dav.senha_inicial)).ok);
+  check('senha nova funciona', (await entra('pedro.' + SUF + '@ex.com', dn.senha_inicial)).ok);
+
+  // ---- o dono nao pode sumir ----
+  const dono = await adm('usuario_salvar', { name: 'Clovis Dono', email: 'dono.' + SUF + '@ex.com', role: 'dono' });
+  const ddono = dono.data || dono;
+  check('cria o primeiro dono', dono.ok, dono.error);
+  const semDono = await adm('usuario_salvar', { id: ddono.usuario.id, role: 'leitura' });
+  check('nao deixa rebaixar o unico dono', !semDono.ok && /único Dono/.test(semDono.error || ''), semDono.error);
+  check('nao deixa excluir o unico dono', !(await adm('usuario_excluir', { id: ddono.usuario.id })).ok);
+
+  // ---- historico ----
+  const aud = await adm('auditoria');
+  const da = aud.data || aud;
+  check('historico registra as mudancas', aud.ok && da.registros.length >= 3, da.registros && da.registros.length);
+
+  // Limpa direto no espelho do banco. Pela API nao daria: o sistema se
+  // recusa a excluir o unico Dono — que e exatamente o comportamento certo.
+  await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
+    .catch(function () { return null; });
+  const sobrou = await adm('usuarios');
+  const ds = sobrou.data || sobrou;
+  check('limpou os usuarios de teste', ds.usuarios.length === 0, ds.usuarios && ds.usuarios.length);
+  check('senha mestra volta a valer sem nenhum dono', ds.senha_mestra_vale === true);
+
   console.log('\n5c) SEGURANCA — trava de senha e fim de sessao');
   // a dica da senha na tela de login so aparece se a variavel estiver ligada
   const dica = await (await fetch(BASE + '/api/admin?action=dica_senha')).json();
@@ -421,7 +535,7 @@ async function webhook(telefone, texto) {
     if (/Muitas tentativas/.test(r.error || '')) { travou = r.error; break; }
   }
   check('trava depois de tentativas erradas', !!travou, travou);
-  check('senha certa tambem espera a trava', /Muitas tentativas/.test((await tentaLogin('Start-RH-ioZSqXbN')).error || ''));
+  check('senha certa tambem espera a trava', /Muitas tentativas/.test((await tentaLogin(SENHA_PAINEL)).error || ''));
 
   // limpa a trava direto no espelho do banco, senao os proximos testes nao entram
   await fetch('http://127.0.0.1:54321/rest/v1/settings?key=eq.login_erros', {
@@ -429,7 +543,7 @@ async function webhook(telefone, texto) {
     headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
     body: JSON.stringify({ value: {} })
   }).catch(function () { return null; });
-  const voltou = await tentaLogin('Start-RH-ioZSqXbN');
+  const voltou = await tentaLogin(SENHA_PAINEL);
   check('depois de limpar a trava, entra de novo', voltou.ok && !!voltou.token, voltou.error);
   check('token novo carrega a epoca da sessao', !!voltou.token, voltou.error);
 
@@ -440,7 +554,7 @@ async function webhook(telefone, texto) {
     headers: { Authorization: 'Bearer ' + tokenAntigo }
   })).json();
   check('token antigo para de valer', usandoAntigo.ok === false && /encerrada|expirada/i.test(usandoAntigo.error || ''), usandoAntigo.error);
-  T = (await tentaLogin('Start-RH-ioZSqXbN')).token;
+  T = (await tentaLogin(SENHA_PAINEL)).token;
   check('login novo volta a funcionar', !!T);
 
   const qrNovo = await adm('wa_qr', {});
