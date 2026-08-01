@@ -34,6 +34,12 @@ async function comoCandidato(action, token, body, query) {
   })).json();
 }
 async function webhook(telefone, texto, nome) {
+  return webhookMsg(telefone, { conversation: texto }, nome);
+}
+async function webhookVideo(telefone, legenda) {
+  return webhookMsg(telefone, { videoMessage: { mimetype: 'video/mp4', caption: legenda || '' } });
+}
+async function webhookMsg(telefone, message, nome) {
   const k = (await adm('aurea')).webhook_url.split('k=')[1];
   return (await fetch(BASE + '/api/webhook?k=' + k, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -42,7 +48,7 @@ async function webhook(telefone, texto, nome) {
       data: {
         key: { remoteJid: telefone + '@s.whatsapp.net', fromMe: false, id: 'm' + Math.random() },
         pushName: nome || undefined,
-        message: { conversation: texto }
+        message: message
       }
     })
   })).json();
@@ -196,8 +202,10 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   check('vaga tem salario', vagaPleno && vagaPleno.salary === 'R$ 2.200 + Comissões', vagaPleno && vagaPleno.salary);
   // O botao TEM que levar para o numero conectado na Evolution — nao para
   // um numero digitado a mao, que pode ficar velho quando trocam a conexao.
+  const zapConectado = (await adm('wa_status')).numero_conectado;
   check('botao leva para o numero conectado na Evolution',
-    /^https:\/\/wa\.me\/5513988887777\?text=/.test(vagaPleno.link_whatsapp), vagaPleno.link_whatsapp);
+    vagaPleno.link_whatsapp.indexOf('https://wa.me/' + zapConectado + '?text=') === 0,
+    { link: vagaPleno.link_whatsapp, conectado: zapConectado });
   check('mensagem do botao cita a vaga',
     decodeURIComponent(vagaPleno.link_whatsapp.split('text=')[1]).indexOf('Gestor de Tráfego Pleno') >= 0);
   check('landing nao vaza o roteiro de perguntas', vagaPleno.prequal_group_id === undefined);
@@ -207,25 +215,27 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   // ============================================================
   // O funil de verdade: formulario na landing -> WhatsApp -> sequencia
   // ============================================================
+  const NOME_RAFA = 'Rafaela Souza ' + SUF;
   const foneL = '11 9' + String(Date.now() + 7).slice(-8);
   const digL = '55' + foneL.replace(/\D/g, '');
 
   // sem cadastro, a Aurea nao fala com ninguem
-  const semCad = await webhook(digL, 'Olá! quero a vaga', 'Rafaela Souza');
+  const semCad = await webhook(digL, 'Olá! quero a vaga', NOME_RAFA);
   check('sem cadastro na landing, a Aurea nao responde',
     semCad.ignorado === 'sem cadastro na landing', semCad);
 
   // ---- 1) a pessoa preenche o formulario da landing ----
   const cad = await pub('candidatar', {
-    vaga: 'gestor-de-trafego-pleno', name: 'Rafaela Souza',
+    vaga: 'gestor-de-trafego-pleno', name: NOME_RAFA,
     phone: foneL, email: 'rafaela.' + SUF + '@exemplo.com'
   });
   check('cadastro da landing aceito', cad.ok, cad.error);
   check('devolve o primeiro nome', cad.nome === 'Rafaela', cad.nome);
   check('a mensagem do botao leva o titulo da vaga',
     (cad.mensagem || '').indexOf('(Gestor de Tráfego Pleno)') >= 0, cad.mensagem);
-  check('e o link abre o whatsapp certo',
-    /^https:\/\/wa\.me\/5513988887777\?text=/.test(cad.link_whatsapp || ''), cad.link_whatsapp);
+  check('e o link abre o whatsapp conectado',
+    (cad.link_whatsapp || '').indexOf('https://wa.me/' + zapConectado + '?text=') === 0,
+    { link: cad.link_whatsapp, conectado: zapConectado });
 
   check('recusa nome sem sobrenome',
     !(await pub('candidatar', { vaga: 'gestor-de-trafego-pleno', name: 'Ana', phone: foneL, email: 'a@b.com' })).ok);
@@ -234,53 +244,78 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   check('recusa vaga que nao existe',
     !(await pub('candidatar', { vaga: 'inventada', name: 'Ana Paula', phone: foneL, email: 'a@b.com' })).ok);
 
-  const leadR = (await adm('board')).candidates.filter(function (c) { return c.name === 'Rafaela Souza'; })[0];
+  const leadR = (await adm('board')).candidates.filter(function (c) { return c.name === NOME_RAFA; })[0];
   check('cadastro entrou no sistema', !!leadR, leadR);
   check('marcado como vindo da landing', leadR && leadR.source === 'landing', leadR && leadR.source);
   check('ja nasce ligado a vaga', leadR && !!leadR.job_id);
 
-  // ---- 2) ela chama no WhatsApp e recebe a sequencia ----
-  const seq = await webhook(digL, cad.mensagem, 'Rafaela Souza');
-  check('a sequencia dispara', seq.resultado && seq.resultado.sequencia === true, seq.resultado);
-  check('sao 4 mensagens', seq.resultado && seq.resultado.mensagens === 4, seq.resultado);
+  // ---- 2) ela chama no WhatsApp: chegam SO as perguntas e o pedido do video ----
+  const seq = await webhook(digL, cad.mensagem, NOME_RAFA);
+  check('a sequencia de chegada dispara', seq.resultado && seq.resultado.sequencia === true, seq.resultado);
+  check('sao 2 mensagens, nao 4', seq.resultado && seq.resultado.mensagens === 2, seq.resultado);
 
-  const enviadas = (await adm('logs', null, { limit: 40 })).logs
-    .filter(function (l) { return l.candidate_name === 'Rafaela Souza'; });
-  const corpos = enviadas.map(function (l) { return l.body; }).join('\n---\n');
+  function logsDela() {
+    return adm('logs', null, { limit: 60 }).then(function (l) {
+      return (l.logs || []).filter(function (x) { return x.candidate_name === NOME_RAFA; });
+    });
+  }
+  let enviadas = await logsDela();
+  let corpos = enviadas.map(function (l) { return l.body; }).join('\n---\n');
   check('a primeira chama pelo nome', /Olá, Rafaela!/.test(corpos), corpos.slice(0, 80));
   check('manda as 4 perguntas', /Meta Ads e Google Ads/.test(corpos) && /Praia Grande/.test(corpos) &&
     /rodou em Ads/.test(corpos) && /crescer dentro de uma empresa/.test(corpos));
   check('pede o video de 1 minuto', /Grave um vídeo de até 1 minuto/.test(corpos));
-  check('agradece e fala do contato', /Entraremos em contato caso você passe/.test(corpos));
-  check('manda as duas redes',
-    /startdigital_oficial/.test(corpos) && /somossangueroxo/.test(corpos));
-  check('todas sairam sem erro', enviadas.every(function (l) { return l.status === 'enviado'; }),
-    enviadas.map(function (l) { return l.status; }));
+  check('NAO agradece ainda', !/Obrigada por participar/.test(corpos) && !/Recebido/.test(corpos));
+  check('NAO manda as redes ainda', !/somossangueroxo/.test(corpos));
 
   // ---- 3) "digitando..." antes de cada mensagem ----
   const presencas = await (await fetch('http://127.0.0.1:54322/__presencas')).json();
   const minhas = presencas.filter(function (p) { return String(p.number).indexOf(digL.slice(-8)) >= 0; });
-  check('mostrou "digitando" antes de cada mensagem', minhas.length >= 4, minhas.length);
+  check('mostrou "digitando" antes de cada mensagem', minhas.length >= 2, minhas.length);
   check('e o aviso e de digitacao', minhas.every(function (p) { return p.presence === 'composing'; }));
   check('com pausa de 4 segundos', minhas.every(function (p) { return Number(p.delay) === 4000; }),
     minhas.map(function (p) { return p.delay; }));
 
-  // ---- 4) uma vez so ----
-  const denovo = await webhook(digL, 'oi de novo');
-  check('a sequencia nao repete', denovo.resultado && denovo.resultado.ignorado === true, denovo.resultado);
-  const depoisDeNovo = (await adm('logs', null, { limit: 40 })).logs
-    .filter(function (l) { return l.candidate_name === 'Rafaela Souza'; });
-  check('e nao mandou mensagem a mais', depoisDeNovo.length === enviadas.length,
-    { antes: enviadas.length, depois: depoisDeNovo.length });
+  // ---- 4) ela tira uma duvida antes de responder ----
+  const duvida = await webhook(digL, 'Qual o salário mesmo?');
+  check('a Aurea continua conversando', duvida.resultado && duvida.resultado.ok === true, duvida.resultado);
+  check('ainda esta esperando as duas coisas',
+    duvida.resultado && duvida.resultado.aguardando &&
+    duvida.resultado.aguardando.respostas === true && duvida.resultado.aguardando.video === true,
+    duvida.resultado);
+
+  // ---- 5) responde tudo, mas ainda sem video ----
+  const respondeu = await webhook(digL, '4 anos com Meta Ads e Google Ads, tenho disponibilidade presencial sim, ja rodei 3 milhoes, e sim quero crescer');
+  check('respostas completas nao fecham sozinhas',
+    respondeu.resultado && respondeu.resultado.aguardando &&
+    respondeu.resultado.aguardando.respostas === false &&
+    respondeu.resultado.aguardando.video === true, respondeu.resultado);
+  const ultimas = await logsDela();
+  check('e ela cobra o video', /vídeo/i.test(ultimas[0] ? ultimas[0].body : ''), ultimas[0] && ultimas[0].body);
+  check('continua sem agradecer',
+    !ultimas.some(function (l) { return /Recebido, Rafaela/.test(l.body || ''); }));
+
+  // ---- 6) manda o video: agora sim fecha ----
+  const comVideo = await webhookVideo(digL);
+  check('com respostas e video, o processo conclui',
+    comVideo.resultado && comVideo.resultado.concluiu === true, comVideo.resultado);
+  corpos = (await logsDela()).map(function (l) { return l.body; }).join('\n---\n');
+  check('agora sim agradece', /Recebido, Rafaela/.test(corpos) && /Obrigada por participar/.test(corpos));
+  check('e manda as duas redes',
+    /startdigital_oficial/.test(corpos) && /somossangueroxo/.test(corpos));
+
+  // ---- 7) depois de concluir, nao repete ----
+  const depois = await webhook(digL, 'oi de novo');
+  check('processo concluido nao reabre', depois.resultado && depois.resultado.ignorado === true, depois.resultado);
 
   // ---- 5) trocou de vaga? a sequencia pode ir de novo ----
   const trocou = await pub('candidatar', {
-    vaga: 'gestor-de-trafego-jr', name: 'Rafaela Souza',
+    vaga: 'gestor-de-trafego-jr', name: NOME_RAFA,
     phone: foneL, email: 'rafaela.' + SUF + '@exemplo.com'
   });
   check('deixa se candidatar a outra vaga', trocou.ok, trocou.error);
   const seq2 = await webhook(digL, trocou.mensagem);
-  check('e a sequencia roda de novo para a vaga nova',
+  check('e a sequencia de chegada roda de novo para a vaga nova',
     seq2.resultado && seq2.resultado.sequencia === true, seq2.resultado);
 
   console.log('\n5) WEBHOOK — casos que deve ignorar');

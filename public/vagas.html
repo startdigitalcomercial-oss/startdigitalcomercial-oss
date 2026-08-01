@@ -272,12 +272,13 @@
   .campo input:focus { border-color: var(--uva); box-shadow: 0 0 0 4px rgba(141,56,163,.18); }
   .campo .erro { display: block; margin-top: 7px; font-size: 13px; color: #ff6b8a; }
 
-  .atencao {
-    border: 1px solid rgba(245,158,11,.4); background: rgba(245,158,11,.09);
-    border-radius: 16px; padding: 18px 20px; margin-bottom: 22px;
-  }
-  .atencao strong { display: block; color: #fbbf24; font-size: 15.5px; margin-bottom: 5px; }
-  .atencao span { color: var(--tinta-2); font-size: 14.5px; line-height: 1.6; }
+  .trilho { height: 8px; border-radius: 999px; background: var(--fundo-alto); overflow: hidden; }
+  .trilho > i { display: block; height: 100%; width: 0; border-radius: 999px; background: var(--grad); transition: width .9s cubic-bezier(.2,.8,.3,1); }
+  .trilho-txt { margin-top: 10px; font-size: 12.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--tinta-3); }
+
+  .final { text-align: center; padding: 8vh 0 4vh; }
+  .final h2 { margin: 34px 0 0; font-size: clamp(28px, 4.6vw, 38px); font-weight: 900; letter-spacing: -.03em; line-height: 1.15; }
+  .final p { margin: 14px auto 0; max-width: 26ch; color: var(--tinta-2); font-size: 16.5px; line-height: 1.6; }
 
   .btn-zap {
     width: 100%; display: flex; align-items: center; justify-content: center; gap: 12px;
@@ -601,27 +602,19 @@ var ZAP_ICONE = '<svg viewBox="0 0 24 24"><path d="M17.5 14.4c-.3-.2-1.7-.9-2-1-
 function telaWhatsApp(v, r) {
   el('p-area').textContent = 'Último passo';
   el('p-corpo').innerHTML =
-    '<div class="atencao">' +
-      '<strong>⚠️ Atenção: ainda não concluído</strong>' +
-      '<span>Sua inscrição para <strong>' + esc(v.title) + '</strong> só vale depois que você falar com a gente ' +
-      'no WhatsApp. É agora, ' + esc(r.nome) + ' — leva menos de um minuto.</span>' +
-    '</div>' +
-
-    '<h2 style="font-size:24px;margin:0 0 8px">Para concluir o seu processo seletivo, clique no botão do WhatsApp</h2>' +
-    '<p style="margin:0 0 22px;color:var(--tinta-2);font-size:16px;line-height:1.7">' +
-      'A mensagem já vai escrita. É só apertar enviar do outro lado.</p>' +
-
-    (r.link_whatsapp
-      ? '<a class="btn-zap" href="' + esc(r.link_whatsapp) + '" target="_blank" rel="noopener" id="c-zap">' +
-        ZAP_ICONE + 'Concluir no WhatsApp</a>'
-      : '<div class="atencao"><strong>WhatsApp indisponível</strong>' +
-        '<span>Não conseguimos abrir a conversa agora. Tente de novo em alguns minutos.</span></div>') +
-
-    '<ol class="passos">' +
-      '<li>Você aperta o botão e o WhatsApp abre com a mensagem pronta.</li>' +
-      '<li>Envia a mensagem do jeito que está.</li>' +
-      '<li>A Aurea responde na hora com as próximas perguntas.</li>' +
-    '</ol>';
+    '<div class="trilho"><i id="barra-fim"></i></div>' +
+    '<div class="trilho-txt">70% concluído</div>' +
+    '<div class="final">' +
+      '<h2>Ainda não concluiu</h2>' +
+      (r.link_whatsapp
+        ? '<a class="btn-zap" href="' + esc(r.link_whatsapp) + '" target="_blank" rel="noopener" ' +
+          'id="c-zap" style="margin-top:32px">' + ZAP_ICONE + 'Conclua o seu processo seletivo</a>'
+        : '<p>Não conseguimos abrir a conversa agora. Tente de novo em alguns minutos.</p>') +
+    '</div>';
+  setTimeout(function () {
+    var b = el('barra-fim');
+    if (b) b.style.width = '70%';
+  }, 120);
 }
 
 function fechar() {

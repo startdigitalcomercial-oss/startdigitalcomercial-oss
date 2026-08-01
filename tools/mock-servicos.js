@@ -54,6 +54,30 @@ const server = http.createServer(async function (req, res) {
       });
     }
 
+    // acompanhamento do funil da landing
+    if (tool && tool.name === 'acompanhar_candidato') {
+      const conversa = (body.messages || []).filter(function (m) { return m.role === 'user'; })
+        .map(function (m) { return String(m.content || ''); }).join(' ').toLowerCase();
+      const temVideo = /V[ií]deo recebido at[ée] agora: SIM/i.test(sys);
+      const desistiu = /(n[ãa]o tenho interesse|desisto|para de|parar)/i.test(conversa);
+      // considera respondido quando a pessoa falou dos quatro assuntos
+      const completas = /meta ads|google ads/.test(conversa) && /presencial|disponibilidade|sim/.test(conversa) &&
+        /(mil|milh|r\$|rodei)/.test(conversa) && /(crescer|sim|claro)/.test(conversa);
+      return json({
+        content: [{
+          type: 'tool_use', name: tool.name,
+          input: {
+            mensagem: desistiu ? 'Tudo bem, obrigada pelo seu tempo!'
+              : (completas && !temVideo ? 'Perfeito! Só falta o vídeo de 1 minuto.'
+                : (completas ? '' : 'Legal! Me conta o resto quando puder.')),
+            respostas_completas: completas,
+            resumo_respostas: completas ? '1. 4 anos\n2. sim\n3. 3 milhoes\n4. sim' : null,
+            desistiu: desistiu
+          }
+        }]
+      });
+    }
+
     if (tool && tool.name === 'resumir_prequalificacao') {
       return json({
         content: [{

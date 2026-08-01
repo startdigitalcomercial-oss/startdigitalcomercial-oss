@@ -48,6 +48,25 @@ async function anota(dados) {
   } catch (e) { /* diario nunca pode derrubar o webhook */ }
 }
 
+// Que tipo de coisa a pessoa mandou. Video importa: e ele que
+// fecha o processo seletivo.
+function tipoDaMensagem(msg) {
+  if (!msg) return 'outro';
+  if (msg.videoMessage || msg.ptvMessage || msg.videoMessageV2) return 'video';
+  const doc = msg.documentMessage || msg.documentWithCaptionMessage;
+  if (doc) {
+    const mime = String((doc.message && doc.message.documentMessage && doc.message.documentMessage.mimetype) ||
+      doc.mimetype || '');
+    if (/^video\//i.test(mime)) return 'video';
+    return 'documento';
+  }
+  if (msg.audioMessage) return 'audio';
+  if (msg.imageMessage) return 'imagem';
+  if (msg.stickerMessage) return 'figurinha';
+  if (msg.conversation || msg.extendedTextMessage) return 'texto';
+  return 'outro';
+}
+
 function extrairTexto(msg) {
   if (!msg) return '';
   if (typeof msg.conversation === 'string') return msg.conversation;
@@ -108,8 +127,10 @@ module.exports = async function handler(req, res) {
 
     if (jaVista(key.id)) return descarta('repetida');
 
+    const tipo = tipoDaMensagem(d.message);
     const texto = String(extrairTexto(d.message) || '').trim();
-    if (!texto) return descarta('sem texto');
+    // Video sem legenda nao pode ser descartado: e a entrega do candidato.
+    if (!texto && tipo !== 'video') return descarta('sem texto');
 
     const tail = u.phoneTail(jid.split('@')[0]);
     if (!tail) return descarta('telefone invalido');
@@ -142,16 +163,24 @@ module.exports = async function handler(req, res) {
     }
 
     // ainda estava decidindo qual vaga quer
-    await anota({ decisao: 'entregue', evento: evento, de: de0, texto: texto.slice(0, 60), quem: candidato.name });
+    await anota({
+      decisao: 'entregue', evento: evento, de: de0, tipo: tipo,
+      texto: texto.slice(0, 60) || '(' + tipo + ')', quem: candidato.name
+    });
 
     if (sessaoAberta && sessaoAberta.status === 'escolhendo_vaga') {
       const r = await aurea.receberEscolhaDeVaga(candidato, sessaoAberta, texto);
       return responder({ ok: true, resultado: r });
     }
 
-    // ---- quem veio da landing: sequência fixa, uma vez só ----
+    // ---- quem veio da landing ----
+    // Primeira mensagem: dispara as perguntas e o pedido do vídeo.
+    // Depois disso: a Aurea conversa, tira dúvidas, e só fecha quando
+    // recebe as respostas E o vídeo.
     if (candidato.source === 'landing') {
-      const r = await aurea.receberDaLanding(candidato);
+      const r = candidato.wa_sequencia_em
+        ? await aurea.acompanharDaLanding(candidato, texto, tipo)
+        : await aurea.receberDaLanding(candidato);
       return responder({ ok: true, resultado: r });
     }
 

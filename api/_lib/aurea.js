@@ -403,9 +403,14 @@ async function receberDeDesconhecido(info) {
 // Não é conversa com IA: é um roteiro fixo, que o time edita em
 // Mensagens. A pessoa responde e um humano lê.
 // ============================================================
+// Na chegada vao so estas duas. O agradecimento e as redes ficam
+// para o fim, quando a pessoa entrega tudo.
 const SEQUENCIA = [
   'landing_wa_1_perguntas',
-  'landing_wa_2_video',
+  'landing_wa_2_video'
+];
+
+const FECHAMENTO = [
   'landing_wa_3_obrigado',
   'landing_wa_4_redes'
 ];
@@ -418,8 +423,9 @@ async function textoDoModelo(chave, vars, reserva) {
   return u.renderTemplate(corpo, vars);
 }
 
-async function mandarSequencia(candidato, vaga, cfg) {
+async function mandarSequencia(candidato, vaga, cfg, chaves) {
   cfg = cfg || await config();
+  const lista = chaves || SEQUENCIA;
   const inst = await instancia(cfg);
   const pausa = cfg.pausa_entre_mensagens === undefined ? PAUSA_PADRAO : Number(cfg.pausa_entre_mensagens);
 
@@ -430,8 +436,8 @@ async function mandarSequencia(candidato, vaga, cfg) {
   );
 
   const saidas = [];
-  for (let i = 0; i < SEQUENCIA.length; i++) {
-    const texto = await textoDoModelo(SEQUENCIA[i], vars);
+  for (let i = 0; i < lista.length; i++) {
+    const texto = await textoDoModelo(lista[i], vars);
     if (!texto.trim()) continue;
 
     // A primeira já entra digitando também: a pessoa acabou de mandar
@@ -439,23 +445,25 @@ async function mandarSequencia(candidato, vaga, cfg) {
     const r = await send.sendWhatsAppComPausa({
       to: candidato.phone, text: texto, instance: inst, pausa: pausa
     });
-    saidas.push({ chave: SEQUENCIA[i], status: r.status, error: r.error || null });
+    saidas.push({ chave: lista[i], status: r.status, error: r.error || null });
 
     await db.insert('message_logs', {
       candidate_id: candidato.id, channel: 'whatsapp', to_address: candidato.phone,
-      subject: SEQUENCIA[i], body: texto,
+      subject: lista[i], body: texto,
       status: r.status, provider: r.provider, error: r.error || null
     });
     if (r.status === 'erro') break;
   }
 
-  await db.update('candidates', {
-    wa_sequencia_em: new Date().toISOString(), updated_at: new Date().toISOString()
-  }, { id: 'eq.' + candidato.id });
+  if (!chaves) {
+    await db.update('candidates', {
+      wa_sequencia_em: new Date().toISOString(), updated_at: new Date().toISOString()
+    }, { id: 'eq.' + candidato.id });
+  }
 
   await db.insert('stage_history', {
     candidate_id: candidato.id, from_stage: candidato.stage_key, to_stage: candidato.stage_key,
-    note: 'Aurea enviou a sequência da landing (' + saidas.length + ' mensagens)'
+    note: 'Aurea enviou ' + saidas.length + ' mensagem(ns) da landing'
   });
 
   return { ok: true, sequencia: true, mensagens: saidas.length, saidas: saidas };
@@ -470,7 +478,208 @@ async function receberDaLanding(candidato) {
     return { ok: false, ignorado: true, error: 'Sequência já enviada para esta pessoa.' };
   }
   const vaga = candidato.job_id ? await vagas.porId(candidato.job_id) : null;
-  return await mandarSequencia(candidato, vaga, cfg);
+  const r = await mandarSequencia(candidato, vaga, cfg);
+
+  // A partir daqui a conversa fica aberta: a pessoa responde no tempo
+  // dela, tira dúvidas, e manda o vídeo quando conseguir.
+  const sessao = await db.insert('prequal_sessions', {
+    candidate_id: candidato.id,
+    job_id: vaga ? vaga.id : null,
+    status: 'em_andamento',
+    current_index: 0,
+    answers: [],
+    respostas_ok: false,
+    last_message_at: new Date().toISOString()
+  });
+  const vars = u.templateVars(candidato, {});
+  for (const ch of SEQUENCIA) {
+    await registrar(sessao.id, 'aurea', await textoDoModelo(ch, vars));
+  }
+  return Object.assign({ session_id: sessao.id }, r);
+}
+
+// ------------------------------------------------------------
+// DEPOIS DAS PERGUNTAS: a conversa fica aberta.
+// A pessoa responde no tempo dela, pode perguntar sobre a vaga, e
+// manda o vídeo quando conseguir. A Aurea acompanha e só fecha o
+// processo quando tem as duas coisas: respostas e vídeo.
+// ------------------------------------------------------------
+const FERRAMENTA_ACOMPANHA = {
+  name: 'acompanhar_candidato',
+  description: 'Responde o candidato e informa se ele já respondeu as perguntas da pré-qualificação.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      mensagem: {
+        type: 'string',
+        description: 'A mensagem a enviar agora no WhatsApp. Curta, no máximo 3 linhas. ' +
+          'Deixe vazio ("") se não houver nada útil a dizer.'
+      },
+      respostas_completas: {
+        type: 'boolean',
+        description: 'true somente se o candidato já respondeu, somando tudo que ele escreveu, as QUATRO perguntas.'
+      },
+      resumo_respostas: {
+        type: ['string', 'null'],
+        description: 'Se respostas_completas for true: as respostas dele resumidas, uma por linha, numeradas.'
+      },
+      desistiu: {
+        type: 'boolean',
+        description: 'true se o candidato disse que não tem mais interesse ou pediu para parar.'
+      }
+    },
+    required: ['mensagem', 'respostas_completas', 'desistiu']
+  }
+};
+
+function fichaDaVaga(vaga) {
+  if (!vaga) return '(nenhuma vaga vinculada)';
+  const lista = function (t, a) {
+    return (a && a.length) ? '\n' + t + ':\n- ' + a.join('\n- ') : '';
+  };
+  return 'Vaga: ' + vaga.title +
+    (vaga.salary ? '\nRemuneração: ' + vaga.salary : '') +
+    (vaga.employment_type ? '\nContrato: ' + vaga.employment_type : '') +
+    (vaga.work_mode ? '\nModelo: ' + (vagas.MODO_NOME[vaga.work_mode] || vaga.work_mode) : '') +
+    (vaga.location ? '\nLocal: ' + vaga.location : '') +
+    (vaga.schedule ? '\nHorário: ' + vaga.schedule : '') +
+    (vaga.description ? '\nSobre: ' + vaga.description : '') +
+    lista('Requisitos', vaga.requirements) +
+    lista('Responsabilidades', vaga.responsibilities) +
+    lista('Benefícios', vaga.benefits);
+}
+
+async function acompanharDaLanding(candidato, texto, tipo) {
+  const cfg = await config();
+  if (!cfg.ativa) return { ok: false, ignorado: true, error: 'Aurea desligada.' };
+
+  const sessao = await db.selectOne('prequal_sessions', {
+    candidate_id: 'eq.' + candidato.id, order: 'started_at.desc', select: '*'
+  });
+  if (!sessao) return { ok: false, ignorado: true, error: 'Sem conversa aberta.' };
+  if (sessao.status !== 'em_andamento') {
+    return { ok: false, ignorado: true, error: 'Processo já concluído com esta pessoa.' };
+  }
+
+  const vaga = sessao.job_id ? await vagas.porId(sessao.job_id) : null;
+  const inst = await instancia(cfg);
+
+  // ---- chegou o vídeo ----
+  let videoEm = sessao.video_em;
+  if (tipo === 'video') {
+    videoEm = videoEm || new Date().toISOString();
+    await db.update('prequal_sessions', { video_em: videoEm, last_message_at: new Date().toISOString() },
+      { id: 'eq.' + sessao.id });
+    await registrar(sessao.id, 'candidato', texto || '[enviou um vídeo]');
+    await db.insert('stage_history', {
+      candidate_id: candidato.id, from_stage: candidato.stage_key, to_stage: candidato.stage_key,
+      note: 'Candidato enviou o vídeo de apresentação'
+    });
+  } else {
+    await registrar(sessao.id, 'candidato', texto || '[' + tipo + ']');
+  }
+
+  // ---- a IA lê tudo e decide o que falar ----
+  const historico = await db.select('prequal_messages', {
+    session_id: 'eq.' + sessao.id, order: 'created_at.asc', select: 'role,text', limit: 40
+  });
+  const messages = historico.map(function (m) {
+    return { role: m.role === 'candidato' ? 'user' : 'assistant', content: m.text || '...' };
+  });
+  if (!messages.length || messages[0].role !== 'user') {
+    messages.unshift({ role: 'user', content: '(início da conversa)' });
+  }
+
+  const perguntas = await textoDoModelo('landing_wa_1_perguntas',
+    u.templateVars(candidato, {}));
+
+  const system = (cfg.personalidade || '') + '\n\n' +
+    '=== ONDE ESTAMOS ===\n' +
+    'Candidato: ' + (candidato.name || '') + '\n' +
+    'Ele se candidatou pela landing page e já recebeu esta mensagem com as perguntas:\n---\n' +
+    perguntas + '\n---\n' +
+    'Também já pediram a ele um vídeo de até 1 minuto se apresentando.\n' +
+    'Vídeo recebido até agora: ' + (videoEm ? 'SIM' : 'AINDA NÃO') + '\n\n' +
+    '=== A VAGA (use só o que está aqui) ===\n' + fichaDaVaga(vaga) + '\n\n' +
+    '=== O QUE VOCÊ FAZ AGORA ===\n' +
+    '1. Se ele fez uma pergunta sobre a vaga, responda com o que está na ficha acima. ' +
+    'Se a resposta não estiver ali, diga com honestidade que vai confirmar com o time.\n' +
+    '2. Se ele ainda não respondeu todas as quatro perguntas, peça com gentileza só o que falta — ' +
+    'sem repetir a lista inteira.\n' +
+    (videoEm ? '3. O vídeo já chegou, não peça de novo.\n'
+             : '3. Se as quatro respostas já vieram e o vídeo não, lembre do vídeo de 1 minuto.\n') +
+    '4. Nunca prometa aprovação, prazo ou vaga garantida.\n' +
+    '5. Não agradeça pelo encerramento: quem fecha o processo é o sistema, não você.\n\n' +
+    'Marque respostas_completas=true SÓ quando as quatro perguntas estiverem respondidas ' +
+    'somando tudo que ele já escreveu na conversa.';
+
+  let saida;
+  try {
+    saida = await chamarIA({
+      modelo: cfg.modelo, system: system, messages: messages,
+      tool: FERRAMENTA_ACOMPANHA, max_tokens: 700
+    });
+  } catch (e) {
+    await db.update('prequal_sessions', { error: e.message }, { id: 'eq.' + sessao.id });
+    return { ok: false, error: e.message };
+  }
+
+  const respostasOk = sessao.respostas_ok === true || saida.respostas_completas === true;
+
+  // ---- desistiu ----
+  if (saida.desistiu) {
+    if (saida.mensagem) {
+      await send.sendWhatsAppComPausa({ to: candidato.phone, text: saida.mensagem, instance: inst, pausa: pausaDe(cfg) });
+      await registrar(sessao.id, 'aurea', saida.mensagem);
+    }
+    await db.update('prequal_sessions', {
+      status: 'sem_interesse', finished_at: new Date().toISOString(),
+      respostas_ok: respostasOk, video_em: videoEm
+    }, { id: 'eq.' + sessao.id });
+    return { ok: true, desistiu: true };
+  }
+
+  // ---- fala o que tiver para falar ----
+  if (saida.mensagem && saida.mensagem.trim()) {
+    await send.sendWhatsAppComPausa({
+      to: candidato.phone, text: saida.mensagem, instance: inst, pausa: pausaDe(cfg)
+    });
+    await registrar(sessao.id, 'aurea', saida.mensagem);
+  }
+
+  const patch = {
+    respostas_ok: respostasOk, video_em: videoEm,
+    last_message_at: new Date().toISOString()
+  };
+  if (saida.resumo_respostas) patch.summary = saida.resumo_respostas;
+
+  // ---- entregou tudo? aí sim fecha ----
+  const concluiu = respostasOk && !!videoEm;
+  if (concluiu) {
+    patch.status = 'concluida';
+    patch.finished_at = new Date().toISOString();
+  }
+  await db.update('prequal_sessions', patch, { id: 'eq.' + sessao.id });
+
+  if (!concluiu) {
+    return { ok: true, aguardando: { respostas: !respostasOk, video: !videoEm } };
+  }
+
+  // agradecimento + redes, só agora
+  const r = await mandarSequencia(candidato, vaga, cfg, FECHAMENTO);
+  const vars2 = u.templateVars(candidato, {});
+  for (const ch of FECHAMENTO) {
+    await registrar(sessao.id, 'aurea', await textoDoModelo(ch, vars2));
+  }
+  await db.insert('stage_history', {
+    candidate_id: candidato.id, from_stage: candidato.stage_key, to_stage: candidato.stage_key,
+    note: 'Candidato concluiu: respondeu tudo e enviou o vídeo'
+  });
+  return { ok: true, concluiu: true, mensagens: r.mensagens };
+}
+
+function pausaDe(cfg) {
+  return cfg.pausa_entre_mensagens === undefined ? PAUSA_PADRAO : Number(cfg.pausa_entre_mensagens);
 }
 
 // ------------------------------------------------------------
@@ -703,5 +912,5 @@ module.exports = {
   config, instancia, dentroDoHorario, iniciar, receber, testar, chamarIA,
   grupoComPerguntas, grupoDaVaga,
   receberDeDesconhecido, receberSemConversa, receberEscolhaDeVaga, abrirRoteiro, perguntaQualVaga,
-  receberDaLanding, mandarSequencia, SEQUENCIA
+  receberDaLanding, acompanharDaLanding, mandarSequencia, SEQUENCIA, FECHAMENTO
 };
