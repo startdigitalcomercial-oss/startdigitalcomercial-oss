@@ -285,6 +285,19 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   check('com a porta aberta, atende numero novo',
     abriu.resultado && abriu.resultado.novo === true, abriu);
 
+  // ---- diario do webhook: precisa registrar ate o que descarta ----
+  const diario = await adm('wa_status');
+  const bat = diario.batidas || [];
+  check('o painel guarda as chamadas do webhook', bat.length > 0, bat.length);
+  check('registra o que foi entregue',
+    bat.some(function (x) { return String(x.decisao).indexOf('entregue') === 0; }), bat.slice(0, 3));
+  check('registra tambem o que foi descartado',
+    bat.some(function (x) { return String(x.decisao).indexOf('entregue') !== 0; }), bat.slice(0, 3));
+  check('anota mensagem propria como descartada',
+    bat.some(function (x) { return x.decisao === 'mensagem nossa'; }), bat.slice(0, 6));
+  check('guarda de qual numero veio',
+    bat.some(function (x) { return !!x.de; }));
+
   console.log('\n6) IMPORTAR LISTA');
   const imp = await adm('import_candidates', {
     source: 'Indeed', role: 'Social Media', iniciar_aurea: true, forcar: true,

@@ -29,6 +29,25 @@ function jaVista(id) {
   return false;
 }
 
+// ------------------------------------------------------------
+// DIARIO DO WEBHOOK
+// Guarda as ultimas batidas — inclusive as ignoradas. Sem isto,
+// quando a Aurea nao responde, nao da para saber se a Evolution
+// nao chamou ou se chamou e a gente descartou.
+// ------------------------------------------------------------
+const MAX_BATIDAS = 25;
+
+async function anota(dados) {
+  try {
+    const reg = await db.selectOne('settings', { key: 'eq.webhook_log', select: 'value' });
+    const itens = (reg && reg.value && Array.isArray(reg.value.itens)) ? reg.value.itens : [];
+    itens.unshift(Object.assign({ em: new Date().toISOString() }, dados));
+    await db.upsert('settings', {
+      key: 'webhook_log', value: { itens: itens.slice(0, MAX_BATIDAS) }
+    }, 'key');
+  } catch (e) { /* diario nunca pode derrubar o webhook */ }
+}
+
 function extrairTexto(msg) {
   if (!msg) return '';
   if (typeof msg.conversation === 'string') return msg.conversation;
@@ -53,6 +72,8 @@ module.exports = async function handler(req, res) {
   const responder = function (payload) { return u.json(res, 200, payload); };
 
   if (params.k !== chaveWebhook()) {
+    // Grava mesmo assim: e exatamente o sintoma de APP_SECRET trocado.
+    await anota({ decisao: 'chave invalida', chave_recebida: String(params.k || '').slice(0, 8) + '…' });
     return u.json(res, 401, { ok: false, error: 'chave invalida' });
   }
   if (req.method === 'GET') {
@@ -64,25 +85,34 @@ module.exports = async function handler(req, res) {
 
   try {
     const evento = body.event || body.Event || '';
-    if (evento && evento.replace('.', '_').toLowerCase().indexOf('messages_upsert') < 0) {
-      return responder({ ok: true, ignorado: 'evento ' + evento });
+    const d0 = body.data || body.Data || body;
+    const k0 = d0.key || {};
+    const de0 = String(k0.remoteJid || d0.remoteJid || '').split('@')[0];
+
+    async function descarta(motivo) {
+      await anota({ decisao: motivo, evento: evento || '(sem evento)', de: de0, de_mim: !!k0.fromMe });
+      return responder({ ok: true, ignorado: motivo });
     }
 
-    const d = body.data || body.Data || body;
-    const key = d.key || {};
-    if (key.fromMe) return responder({ ok: true, ignorado: 'mensagem nossa' });
+    if (evento && evento.replace('.', '_').toLowerCase().indexOf('messages_upsert') < 0) {
+      return descarta('evento ' + evento);
+    }
+
+    const d = d0;
+    const key = k0;
+    if (key.fromMe) return descarta('mensagem nossa');
 
     const jid = String(key.remoteJid || d.remoteJid || '');
-    if (jid.indexOf('@g.us') >= 0) return responder({ ok: true, ignorado: 'mensagem de grupo' });
-    if (jid.indexOf('@broadcast') >= 0) return responder({ ok: true, ignorado: 'status' });
+    if (jid.indexOf('@g.us') >= 0) return descarta('mensagem de grupo');
+    if (jid.indexOf('@broadcast') >= 0) return descarta('status');
 
-    if (jaVista(key.id)) return responder({ ok: true, ignorado: 'repetida' });
+    if (jaVista(key.id)) return descarta('repetida');
 
     const texto = String(extrairTexto(d.message) || '').trim();
-    if (!texto) return responder({ ok: true, ignorado: 'sem texto' });
+    if (!texto) return descarta('sem texto');
 
     const tail = u.phoneTail(jid.split('@')[0]);
-    if (!tail) return responder({ ok: true, ignorado: 'telefone invalido' });
+    if (!tail) return descarta('telefone invalido');
 
     const achados = await db.select('candidates', {
       phone_digits: 'like.*' + tail, archived: 'eq.false',
@@ -92,6 +122,7 @@ module.exports = async function handler(req, res) {
     // Número novo: veio do botão da landing. A Aurea abre a porta,
     // descobre a vaga pela mensagem e começa a pré-qualificação.
     if (!achados.length) {
+      await anota({ decisao: 'entregue (numero novo)', evento: evento, de: de0, texto: texto.slice(0, 60) });
       const r = await aurea.receberDeDesconhecido({
         telefone: jid.split('@')[0],
         nome: d.pushName || d.pushname || (body.data && body.data.pushName) || '',
@@ -112,6 +143,8 @@ module.exports = async function handler(req, res) {
     }
 
     // ainda estava decidindo qual vaga quer
+    await anota({ decisao: 'entregue', evento: evento, de: de0, texto: texto.slice(0, 60), quem: candidato.name });
+
     if (sessaoAberta && sessaoAberta.status === 'escolhendo_vaga') {
       const r = await aurea.receberEscolhaDeVaga(candidato, sessaoAberta, texto);
       return responder({ ok: true, resultado: r });
@@ -121,6 +154,7 @@ module.exports = async function handler(req, res) {
     return responder({ ok: true, resultado: r });
   } catch (e) {
     console.error('[webhook]', e);
+    await anota({ decisao: 'erro', erro: e.message });
     return responder({ ok: true, erro: e.message });
   }
 };

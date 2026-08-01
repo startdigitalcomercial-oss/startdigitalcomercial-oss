@@ -61,6 +61,58 @@ function caixaWebhook(d) {
     '</div>';
 }
 
+/* ------------------------------------------------------------
+   As ultimas vezes que a Evolution bateu aqui — inclusive as que
+   o sistema descartou. E o unico jeito de separar "ela nao chamou"
+   de "ela chamou e a gente ignorou".
+   ------------------------------------------------------------ */
+function caixaBatidas(d) {
+  const b = d.batidas || [];
+
+  if (!b.length) {
+    return '<hr class="sep"><div class="alert alert-aviso" style="margin:0">' +
+      '<strong>A Evolution nunca chamou este sistema.</strong> ' +
+      'O endereço está configurado, mas nenhuma mensagem chegou até aqui — nem uma descartada.' +
+      '<div class="small" style="margin-top:10px">Isso aponta para um destes casos:' +
+      '<ul style="margin:8px 0 0;padding-left:18px;line-height:1.9">' +
+      '<li>O site está com <strong>proteção de acesso na Vercel</strong> (Deployment Protection). ' +
+      'A Evolution tenta entregar, recebe uma tela de login e desiste. É a causa mais comum.</li>' +
+      '<li>O servidor da Evolution <strong>não alcança a internet</strong> para chegar até aqui.</li>' +
+      '<li>Você mandou a mensagem <strong>do mesmo celular</strong> onde o WhatsApp da Aurea está conectado. ' +
+      'Aí é você falando com você, e o WhatsApp nem gera evento.</li>' +
+      '</ul></div></div>';
+  }
+
+  const rot = {
+    'mensagem nossa': 'era mensagem enviada por este próprio número',
+    'mensagem de grupo': 'veio de um grupo',
+    'status': 'era um status',
+    'repetida': 'repetida, já tratada antes',
+    'sem texto': 'sem texto (áudio, figurinha, imagem sem legenda)',
+    'telefone invalido': 'telefone em formato estranho',
+    'chave invalida': 'CHAVE ERRADA — o APP_SECRET não bate'
+  };
+
+  return '<hr class="sep">' +
+    '<h3 style="font-size:14px;margin:0 0 4px">Últimas chamadas do WhatsApp</h3>' +
+    '<p class="small muted" style="margin:0 0 12px">Tudo que a Evolution mandou para cá, inclusive o que foi ' +
+    'descartado e por quê.</p>' +
+    '<table class="tbl"><thead><tr><th>Quando</th><th>De</th><th>O que aconteceu</th></tr></thead><tbody>' +
+    b.slice(0, 12).map(function (x) {
+      const entregue = String(x.decisao || '').indexOf('entregue') === 0;
+      const grave = x.decisao === 'chave invalida' || x.decisao === 'erro';
+      const cls = entregue ? 'tag-verde' : (grave ? 'tag-vermelho' : 'tag-ambar');
+      const texto = entregue ? 'entregue para a Aurea'
+        : (x.decisao === 'erro' ? 'erro: ' + esc(x.erro || '')
+        : (rot[x.decisao] || esc(x.decisao || '')));
+      return '<tr><td class="small muted" style="white-space:nowrap">' + dataBr(x.em) + '</td>' +
+        '<td class="small">' + esc(x.de || '—') + '</td>' +
+        '<td><span class="tag ' + cls + '">' + (entregue ? 'ok' : 'descartada') + '</span> ' +
+        '<span class="small">' + texto + '</span>' +
+        (x.texto ? '<div class="small muted">“' + esc(x.texto) + '”</div>' : '') + '</td></tr>';
+    }).join('') + '</tbody></table>';
+}
+
 async function carregaWhatsApp() {
   const box = document.getElementById('wa-area');
   if (!box) return;
@@ -108,7 +160,7 @@ async function carregaWhatsApp() {
           '<input type="hidden" id="wa-nome" value="' + esc(inst || 'start-rh') + '">' +
         '</div><div id="wa-qr"></div>') +
 
-    '<hr class="sep">' + caixaWebhook(d) +
+    '<hr class="sep">' + caixaWebhook(d) + caixaBatidas(d) +
 
     ((d.sobrando || []).length
       ? '<hr class="sep"><div class="alert alert-aviso" style="margin:0">' +

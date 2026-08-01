@@ -1257,6 +1257,9 @@ module.exports = async function handler(req, res) {
         role: 'eq.candidato', order: 'created_at.desc', select: 'created_at'
       });
 
+      // as ultimas batidas do webhook, inclusive as descartadas
+      const diario = await getSetting('webhook_log', {});
+
       return u.ok(res, {
         configurada: send.evoPronta(),
         instancias: instancias,
@@ -1265,7 +1268,8 @@ module.exports = async function handler(req, res) {
         estado: estado,
         webhook_url: esperado,
         webhook: gancho,
-        ultima_recebida: ultimaEntrada ? ultimaEntrada.created_at : null
+        ultima_recebida: ultimaEntrada ? ultimaEntrada.created_at : null,
+        batidas: (diario && diario.itens) || []
       });
     }
 
