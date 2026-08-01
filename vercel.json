@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/favicon-32.png",
+      "destination": "/favicon.svg"
+    },
+    {
       "source": "/trabalhe-conosco",
       "destination": "/vagas.html"
     },
