@@ -10,6 +10,7 @@ const disc = require('./_lib/disc');
 const send = require('./_lib/send');
 const aurea = require('./_lib/aurea');
 const webhook = require('./webhook');
+const perms = require('./_lib/perms');
 
 const SESSION_HOURS = 12;
 
@@ -106,6 +107,56 @@ async function getSetting(key, fallback) {
   return row ? row.value : fallback;
 }
 
+// ============================================================
+// USUARIOS DO PAINEL
+// Cada pessoa entra com o proprio e-mail e senha, e tem um papel.
+// ============================================================
+
+// Enquanto nao existir NENHUM usuario ativo, a senha mestra
+// (ADMIN_PASSWORD) entra como Dono — senao ninguem conseguiria
+// criar o primeiro. Depois do primeiro Dono, ela deixa de valer,
+// a nao ser que SENHA_MESTRA_SEMPRE esteja ligada na Vercel.
+async function usuariosAtivos() {
+  return await db.select('panel_users', { active: 'is.true', select: '*', order: 'name.asc' });
+}
+
+async function senhaMestraVale(ativos) {
+  if (String(process.env.SENHA_MESTRA_SEMPRE || '').toLowerCase() === 'true') return true;
+  return !ativos.some(function (x) { return x.role === 'dono'; });
+}
+
+function usuarioLimpo(x) {
+  return {
+    id: x.id, name: x.name, email: x.email, role: x.role,
+    role_nome: perms.NOMES[x.role] || x.role,
+    active: x.active, must_change: x.must_change,
+    tem_senha: !!x.password_hash,
+    last_login_at: x.last_login_at, created_at: x.created_at
+  };
+}
+
+// Guarda no historico quem fez o que. So grava o que muda alguma coisa.
+async function anota(sessao, acao, alvo, detalhe) {
+  try {
+    await db.insert('audit_log', {
+      user_id: sessao && sessao.uid ? sessao.uid : null,
+      user_name: (sessao && sessao.nome) || 'senha mestra',
+      user_email: (sessao && sessao.email) || '',
+      action: acao,
+      target: alvo || null,
+      detail: detalhe || {}
+    });
+  } catch (e) { console.error('[auditoria]', e.message); }
+}
+
+// Uma senha inicial legivel, para o dono passar por WhatsApp.
+function senhaInicial() {
+  const c = require('crypto');
+  const pal = ['Aurora', 'Farol', 'Bussola', 'Vertice', 'Orbita', 'Pilar', 'Marco', 'Cume'];
+  return pal[c.randomInt(pal.length)] + c.randomInt(100, 1000) +
+    c.randomBytes(4).toString('base64').replace(/[+/=]/g, '').slice(0, 4);
+}
+
 async function renderSet(candidate, setName, channels) {
   const company = await getSetting('company', {});
   const vars = u.templateVars(candidate, company);
@@ -162,18 +213,64 @@ module.exports = async function handler(req, res) {
           ' minuto(s) antes de tentar de novo.');
       }
 
+      const email = String(body.email || '').trim().toLowerCase();
+      const ativos = await usuariosAtivos();
+
+      // ---- entrada por e-mail e senha (o jeito normal) ----
+      if (email) {
+        const pessoa = ativos.filter(function (x) { return String(x.email).toLowerCase() === email; })[0];
+        const bate = pessoa && pessoa.password_hash &&
+          u.checkPassword(senha, pessoa.password_hash, pessoa.password_salt);
+        if (!bate) {
+          await registraErroLogin(deOnde);
+          return u.fail(res, 401, 'E-mail ou senha incorretos.');
+        }
+        await limpaErrosLogin(deOnde);
+        await db.update('panel_users', { last_login_at: new Date().toISOString() }, { id: 'eq.' + pessoa.id });
+
+        const sessao = {
+          role: 'admin', papel: pessoa.role, uid: pessoa.id,
+          nome: pessoa.name, email: pessoa.email,
+          epoca: await epocaSessao(),
+          exp: Date.now() + SESSION_HOURS * 3600 * 1000
+        };
+        await anota(sessao, 'entrou', null, {});
+        return u.ok(res, {
+          token: u.signSession(sessao),
+          expires_in_hours: SESSION_HOURS,
+          usuario: usuarioLimpo(pessoa),
+          menu: perms.menuDoPapel(pessoa.role),
+          trocar_senha: pessoa.must_change === true
+        });
+      }
+
+      // ---- senha mestra (so enquanto nao houver um Dono) ----
+      if (!(await senhaMestraVale(ativos))) {
+        return u.fail(res, 401, 'Agora cada pessoa entra com o próprio e-mail e senha. ' +
+          'Peça o seu acesso ao Dono do painel.');
+      }
       if (!senha || !u.safeEqual(senha, esperada)) {
         await registraErroLogin(deOnde);
         return u.fail(res, 401, 'Senha incorreta.');
       }
       await limpaErrosLogin(deOnde);
 
-      const token = u.signSession({
-        role: 'admin',
+      const sessao = {
+        role: 'admin', papel: 'dono', uid: null,
+        nome: 'Senha mestra', email: '', mestra: true,
         epoca: await epocaSessao(),
         exp: Date.now() + SESSION_HOURS * 3600 * 1000
+      };
+      return u.ok(res, {
+        token: u.signSession(sessao),
+        expires_in_hours: SESSION_HOURS,
+        usuario: { name: 'Senha mestra', role: 'dono', role_nome: 'Dono' },
+        menu: perms.menuDoPapel('dono'),
+        mestra: true,
+        aviso: ativos.length
+          ? null
+          : 'Você entrou com a senha mestra. Crie o seu usuário em Usuários — depois disso a senha mestra deixa de valer.'
       });
-      return u.ok(res, { token: token, expires_in_hours: SESSION_HOURS });
     }
 
     // Desliga TODAS as sessoes abertas, inclusive a de quem clicou.
@@ -193,6 +290,37 @@ module.exports = async function handler(req, res) {
     const epocaAtual = await epocaSessao();
     if (session.epoca && session.epoca < epocaAtual) {
       return u.fail(res, 401, 'Sua sessao foi encerrada. Faca login novamente.');
+    }
+
+    // Quem foi desligado do painel perde o acesso na hora, sem esperar a sessao vencer.
+    const papel = session.papel || 'dono';
+    if (session.uid) {
+      const eu = await db.selectOne('panel_users', { id: 'eq.' + session.uid, select: '*' });
+      if (!eu || eu.active === false) {
+        return u.fail(res, 401, 'O seu acesso foi desativado. Fale com o Dono do painel.');
+      }
+      if (eu.role !== papel) {
+        return u.fail(res, 401, 'O seu nível de acesso mudou. Entre novamente.');
+      }
+    }
+
+    // ---- a barreira: este papel pode executar esta acao? ----
+    if (!perms.permite(papel, action)) {
+      return u.fail(res, 403, perms.recado(papel, action));
+    }
+
+    // quem sou eu (a tela usa para montar o menu e mostrar o nome)
+    if (action === 'usuarios_eu') {
+      return u.ok(res, {
+        usuario: {
+          nome: session.nome || 'Senha mestra',
+          email: session.email || '',
+          papel: papel,
+          papel_nome: perms.NOMES[papel] || papel,
+          mestra: !!session.mestra
+        },
+        menu: perms.menuDoPapel(papel)
+      });
     }
 
     // ---------------------------------------------------- QUADRO (KANBAN)
@@ -1027,6 +1155,107 @@ module.exports = async function handler(req, res) {
       const body = await u.readBody(req);
       await db.remove('collaborators', { id: 'eq.' + body.id });
       return u.ok(res, {});
+    }
+
+    // ==========================================================
+    // USUARIOS DO PAINEL — so o Dono chega aqui
+    // ==========================================================
+    if (action === 'usuarios') {
+      const lista = await db.select('panel_users', { order: 'name.asc', select: '*' });
+      const ativos = lista.filter(function (x) { return x.active !== false; });
+      return u.ok(res, {
+        usuarios: lista.map(usuarioLimpo),
+        papeis: perms.PAPEIS.map(function (p) {
+          return { chave: p, nome: perms.NOMES[p], descricao: perms.DESCRICOES[p] };
+        }),
+        senha_mestra_vale: await senhaMestraVale(ativos),
+        eu: session.email || null
+      });
+    }
+
+    if (action === 'usuario_salvar') {
+      const body = await u.readBody(req);
+      const nome = String(body.name || '').trim();
+      const email = String(body.email || '').trim().toLowerCase();
+      const papelNovo = String(body.role || 'leitura');
+
+      if (!perms.papelValido(papelNovo)) return u.fail(res, 400, 'Papel desconhecido.');
+
+      // ---- editar quem ja existe ----
+      if (body.id) {
+        const alvo = await db.selectOne('panel_users', { id: 'eq.' + body.id, select: '*' });
+        if (!alvo) return u.fail(res, 404, 'Usuário não encontrado.');
+
+        // nao dá para tirar o ultimo Dono do ar
+        if (alvo.role === 'dono' && (papelNovo !== 'dono' || body.active === false)) {
+          const donos = await db.select('panel_users', { role: 'eq.dono', active: 'is.true', select: 'id' });
+          if (donos.length <= 1) {
+            return u.fail(res, 400, 'Este é o único Dono do painel. Promova outra pessoa antes de mudar este.');
+          }
+        }
+        const patch = { updated_at: new Date().toISOString() };
+        if (nome) patch.name = nome;
+        if (perms.papelValido(papelNovo)) patch.role = papelNovo;
+        if (body.active !== undefined) patch.active = !!body.active;
+        const row = await db.update('panel_users', patch, { id: 'eq.' + body.id });
+        await anota(session, 'usuario_alterado', alvo.email, { papel: patch.role, ativo: patch.active });
+        return u.ok(res, { usuario: usuarioLimpo(row) });
+      }
+
+      // ---- criar novo ----
+      if (!nome || nome.length < 2) return u.fail(res, 400, 'Escreva o nome da pessoa.');
+      if (!u.isEmail(email)) return u.fail(res, 400, 'O e-mail não parece certo.');
+
+      const jaTem = await db.selectOne('panel_users', { email: 'eq.' + email, select: 'id' });
+      if (jaTem) return u.fail(res, 409, 'Já existe um usuário com este e-mail.');
+
+      const senha = senhaInicial();
+      const cifra = u.hashPassword(senha);
+      const novo = await db.insert('panel_users', {
+        name: nome, email: email, role: papelNovo,
+        password_hash: cifra.hash, password_salt: cifra.salt,
+        must_change: true, active: true,
+        created_by: session.email || 'senha mestra'
+      });
+      await anota(session, 'usuario_criado', email, { papel: papelNovo });
+
+      return u.ok(res, {
+        usuario: usuarioLimpo(novo),
+        senha_inicial: senha,
+        aviso: 'Anote e passe esta senha para a pessoa. Ela não aparece de novo.'
+      });
+    }
+
+    if (action === 'usuario_senha') {
+      const body = await u.readBody(req);
+      const alvo = await db.selectOne('panel_users', { id: 'eq.' + body.id, select: '*' });
+      if (!alvo) return u.fail(res, 404, 'Usuário não encontrado.');
+      const senha = senhaInicial();
+      const cifra = u.hashPassword(senha);
+      await db.update('panel_users', {
+        password_hash: cifra.hash, password_salt: cifra.salt,
+        must_change: true, updated_at: new Date().toISOString()
+      }, { id: 'eq.' + alvo.id });
+      await anota(session, 'senha_redefinida', alvo.email, {});
+      return u.ok(res, { senha_inicial: senha, nome: alvo.name });
+    }
+
+    if (action === 'usuario_excluir') {
+      const body = await u.readBody(req);
+      const alvo = await db.selectOne('panel_users', { id: 'eq.' + body.id, select: '*' });
+      if (!alvo) return u.fail(res, 404, 'Usuário não encontrado.');
+      if (alvo.role === 'dono') {
+        const donos = await db.select('panel_users', { role: 'eq.dono', active: 'is.true', select: 'id' });
+        if (donos.length <= 1) return u.fail(res, 400, 'Não dá para excluir o único Dono do painel.');
+      }
+      await db.remove('panel_users', { id: 'eq.' + alvo.id });
+      await anota(session, 'usuario_excluido', alvo.email, { papel: alvo.role });
+      return u.ok(res, {});
+    }
+
+    if (action === 'auditoria') {
+      const linhas = await db.select('audit_log', { order: 'created_at.desc', limit: '80', select: '*' });
+      return u.ok(res, { registros: linhas });
     }
 
     // ==========================================================
