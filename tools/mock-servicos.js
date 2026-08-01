@@ -114,6 +114,13 @@ const server = http.createServer(async function (req, res) {
     return json({ webhook: { url: g.url, enabled: true, events: ['MESSAGES_UPSERT'] } });
   }
 
+  // presenca ("digitando...")
+  if (url.pathname.indexOf('/chat/sendPresence/') === 0 || url.pathname.indexOf('/chat/updatePresence/') === 0) {
+    global.__waPresenca = (global.__waPresenca || []).concat([{ number: body.number, presence: body.presence, delay: body.delay }]);
+    return json({ presence: body.presence || 'composing' });
+  }
+  if (url.pathname === '/__presencas') return json(global.__waPresenca || []);
+
   // ---------------- Resend (e-mail) ----------------
   if (url.pathname === '/__ultimo-email') {
     return json(global.__resend || {});

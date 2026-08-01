@@ -162,6 +162,52 @@ async function sendWhatsApp(opts) {
   }
 }
 
+// ------------------------------------------------------------
+// "Digitando…" de verdade no WhatsApp da pessoa.
+// A Evolution tem duas formas: o endpoint de presenca (mostra o
+// aviso agora) e o campo delay do sendText (ela mesma segura a
+// mensagem digitando). Usamos as duas, porque versoes diferentes
+// suportam uma ou outra.
+// ------------------------------------------------------------
+async function waDigitando(telefone, instancia, milissegundos) {
+  const base = (process.env.EVOLUTION_API_URL || '').replace(/\/+$/, '');
+  const apiKey = process.env.EVOLUTION_API_KEY;
+  const inst = instancia || process.env.EVOLUTION_INSTANCE;
+  if (!base || !apiKey || !inst) return { ok: false };
+  const number = u.normalizePhone(telefone);
+  const corpo = { number: number, delay: milissegundos || 3000, presence: 'composing' };
+  try {
+    let r = await fetch(base + '/chat/sendPresence/' + encodeURIComponent(inst), {
+      method: 'POST',
+      headers: { apikey: apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify(corpo)
+    });
+    if (!r.ok) {
+      // v1 usa outro caminho
+      r = await fetch(base + '/chat/updatePresence/' + encodeURIComponent(inst), {
+        method: 'POST',
+        headers: { apikey: apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify(corpo)
+      });
+    }
+    return { ok: r.ok };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+function espera(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+// Manda uma mensagem como gente: mostra "digitando", espera, e envia.
+async function sendWhatsAppComPausa(opts) {
+  const pausa = Math.max(0, Number(opts.pausa === undefined ? 4000 : opts.pausa));
+  if (pausa > 0) {
+    await waDigitando(opts.to, opts.instance, pausa);
+    await espera(pausa);
+  }
+  return await sendWhatsApp(opts);
+}
+
 // Pergunta para a Evolution se um numero realmente existe no WhatsApp.
 async function waNumeroExiste(telefone, instancia) {
   const base = (process.env.EVOLUTION_API_URL || '').replace(/\/+$/, '');
@@ -460,7 +506,8 @@ function providerStatus() {
 }
 
 module.exports = {
-  sendEmail, sendWhatsApp, sendSms, listWhatsAppInstances, providerStatus,
+  sendEmail, sendWhatsApp, sendWhatsAppComPausa, waDigitando, sendSms,
+  listWhatsAppInstances, providerStatus,
   waNumeroExiste, comteleRotas, comteleRotaEscolhida, comteleEntregas, comteleSaldo
 };
 

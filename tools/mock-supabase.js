@@ -61,6 +61,10 @@ const DB = {
   ],
 
   message_templates: [
+    { key: 'landing_wa_1_perguntas', channel: 'whatsapp', name: 'Landing 1 — saudação e perguntas', subject: null, body: 'Olá, {{primeiro_nome}}!\n\nAntes de avançar para a próxima fase, me responde:\n\n1.) Quanto tempo de experiência você tem com Meta Ads e Google Ads?\n\n2.) Tem disponibilidade pra trabalhar presencial em Praia Grande, das 08h40 às 18h?\n\n3.) E quanto você já rodou em Ads?\n\n4.) Está disposto a crescer dentro de uma empresa no setor de Marketing em Praia Grande?' },
+    { key: 'landing_wa_2_video', channel: 'whatsapp', name: 'Landing 2 — pedido do vídeo', subject: null, body: '📽️ Grave um vídeo de até 1 minuto se apresentando: fale sobre sua trajetória profissional.' },
+    { key: 'landing_wa_3_obrigado', channel: 'whatsapp', name: 'Landing 3 — agradecimento', subject: null, body: 'Obrigada por participar, {{primeiro_nome}}! 💜\n\nEntraremos em contato caso você passe no processo seletivo.' },
+    { key: 'landing_wa_4_redes', channel: 'whatsapp', name: 'Landing 4 — nossas redes', subject: null, body: 'Enquanto isso, dá uma olhada na gente:\n\n*Perfil oficial da Start*\ninstagram.com/startdigital_oficial\n\n*Perfil de carreiras*\ninstagram.com/somossangueroxo' },
     { key: 'welcome_email_senha', channel: 'email', name: 'Boas-vindas com criação de senha', subject: 'Bem-vindo(a) à StartDigital, {{primeiro_nome}}!', body: 'Olá {{primeiro_nome}}!\n\nVocê foi aprovado(a) para {{vaga}}.\n\nCrie a sua senha aqui:\n{{link_senha}}\n\nSeu e-mail de acesso: {{email}}\n\nEquipe StartDigital' },
     { key: 'welcome_email', channel: 'email', name: 'Boas-vindas — E-mail', subject: 'Bem-vindo(a) à StartDigital, {{primeiro_nome}}!', body: 'Olá {{primeiro_nome}}, tudo bem?\n\nVocê foi aprovado(a) para a vaga de {{vaga}}.\n\nAcesse a sua área de integração:\n{{link_portal}}\n\nEquipe StartDigital' },
     { key: 'welcome_whatsapp', channel: 'whatsapp', name: 'Boas-vindas — WhatsApp', subject: null, body: 'Oi {{primeiro_nome}}! *Você foi aprovado(a)* para {{vaga}}.\n\n👉 {{link_portal}}' },
@@ -192,7 +196,7 @@ const DB = {
 
 /* ---------------- defaults por tabela ---------------- */
 const DEFAULTS = {
-  candidates: function () { return { id: uuid(), extra: {}, source: 'formulario', source_detail: null, stage_key: 'triagem', password_hash: null, password_salt: null, rating: null, notes: null, member_access: false, archived: false, created_at: agora(), updated_at: agora() }; },
+  candidates: function () { return { id: uuid(), extra: {}, wa_sequencia_em: null, job_id: null, source: 'formulario', source_detail: null, stage_key: 'triagem', password_hash: null, password_salt: null, rating: null, notes: null, member_access: false, archived: false, created_at: agora(), updated_at: agora() }; },
   stage_history: function () { return { id: seq('stage_history'), created_at: agora(), note: null, from_stage: null, to_stage: null }; },
   disc_results: function () { return { id: uuid(), answers: {}, created_at: agora() }; },
   quiz_attempts: function () { return { id: uuid(), answers: {}, score: null, max_score: null, percent: null, passed: null, focus_lost: 0, paste_blocked: 0, integrity_flags: [], started_at: agora(), finished_at: null }; },

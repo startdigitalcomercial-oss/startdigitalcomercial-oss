@@ -204,93 +204,84 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   check('vaga sozinha pelo apelido', (await pub('vaga', null, { slug: 'gestor-de-trafego-jr' })).ok);
   check('apelido que nao existe da 404', !(await pub('vaga', null, { slug: 'nao-existe' })).ok);
 
-  // --- a pessoa manda a mensagem do botao ---
+  // ============================================================
+  // O funil de verdade: formulario na landing -> WhatsApp -> sequencia
+  // ============================================================
   const foneL = '11 9' + String(Date.now() + 7).slice(-8);
   const digL = '55' + foneL.replace(/\D/g, '');
-  const bate = await webhook(digL, 'Olá! Tenho interesse na vaga de Gestor de Tráfego Pleno.', 'Rafaela Souza');
-  check('webhook atende numero novo', bate.ok && bate.resultado && bate.resultado.novo === true, bate.resultado);
-  check('reconheceu a vaga pela mensagem',
-    bate.resultado && bate.resultado.vaga === 'Gestor de Tráfego Pleno', bate.resultado);
 
-  function achaRafaela(bd) {
-    return (bd.candidates || []).filter(function (c) { return c.name === 'Rafaela Souza'; });
-  }
-  const leadR = achaRafaela(await adm('board'))[0];
-  check('criou o contato com o nome do WhatsApp', !!leadR, leadR);
-  check('contato marcado como vindo do whatsapp', leadR && leadR.source === 'whatsapp', leadR && leadR.source);
+  // sem cadastro, a Aurea nao fala com ninguem
+  const semCad = await webhook(digL, 'Olá! quero a vaga', 'Rafaela Souza');
+  check('sem cadastro na landing, a Aurea nao responde',
+    semCad.ignorado === 'sem cadastro na landing', semCad);
 
-  // --- roteiro do gestor de trafego: 5 perguntas ---
-  const respTrafego = [
-    'Uns 4 anos como gestor de trafego.',
-    'Meta Ads tem 4 anos, Google Ads uns 2 anos.',
-    'Tenho sim, sem problema nenhum.',
-    'Ja rodei uns 3 milhoes em ads no total.',
-    'Bohemian Rhapsody, do Queen.'
-  ];
-  for (const r of respTrafego) await webhook(digL, r);
-
-  const aL = await adm('aurea');
-  const sessL = aL.sessoes.filter(function (s) { return s.candidato === 'Rafaela Souza'; })[0];
-  check('conversa da landing concluiu', sessL && sessL.status === 'concluida', sessL && sessL.status);
-  check('capturou as 5 respostas do roteiro', sessL && sessL.total_respostas === 5, sessL && sessL.total_respostas);
-
-  const detL = await adm('aurea_session', null, { id: sessL.id });
-  const textos = (detL.mensagens || []).map(function (m) { return m.text; }).join('\n');
-  check('a Aurea perguntou da musica favorita', /m[uú]sica favorita/i.test(textos));
-  check('mandou o link do cadastro no fim', /\/vaga\?t=/.test(textos), textos.slice(-200));
-  check('link do cadastro leva a vaga junto', /v=gestor-de-trafego-pleno/.test(textos));
-
-  // --- a pessoa preenche o cadastro: completa o contato, nao cria outro ---
-  const antesL = achaRafaela(await adm('board')).length;
-  const fichaLead = await adm('candidate', null, { id: leadR.id });
-  check('ficha do contato traz o link pessoal', fichaLead.ok && !!fichaLead.candidate.token, fichaLead.error);
-  const cadastro = await pub('apply', {
-    t: fichaLead.candidate.token, vaga: 'gestor-de-trafego-pleno',
-    name: 'Rafaela Souza', email: 'rafaela.' + SUF + '@exemplo.com', phone: foneL,
-    experience: 'Quatro anos de agencia.'
+  // ---- 1) a pessoa preenche o formulario da landing ----
+  const cad = await pub('candidatar', {
+    vaga: 'gestor-de-trafego-pleno', name: 'Rafaela Souza',
+    phone: foneL, email: 'rafaela.' + SUF + '@exemplo.com'
   });
-  check('cadastro completo aceito', cadastro.ok, cadastro.error);
-  const depois = achaRafaela(await adm('board'));
-  check('nao duplicou a pessoa', depois.length === antesL, { antes: antesL, depois: depois.length });
-  check('agora tem e-mail', depois[0] && !!depois[0].email, depois[0] && depois[0].email);
-  check('nao chamou a Aurea de novo', cadastro.aurea === false, cadastro.aurea);
+  check('cadastro da landing aceito', cad.ok, cad.error);
+  check('devolve o primeiro nome', cad.nome === 'Rafaela', cad.nome);
+  check('a mensagem do botao leva o titulo da vaga',
+    (cad.mensagem || '').indexOf('(Gestor de Tráfego Pleno)') >= 0, cad.mensagem);
+  check('e o link abre o whatsapp certo',
+    /^https:\/\/wa\.me\/5513988887777\?text=/.test(cad.link_whatsapp || ''), cad.link_whatsapp);
 
-  // --- quem JA esta cadastrado e aperta o botao da landing ---
-  // Este era o buraco: a pessoa preencheu o formulario semanas atras,
-  // hoje clica na vaga, e a Aurea ficava muda porque so sabia continuar
-  // conversa ja comecada.
-  const jaTinha = await webhook(digitos, 'Olá! Tenho interesse na vaga de Gestor de Tráfego Jr.');
-  check('quem ja e cadastrado tambem e atendido',
-    jaTinha.resultado && jaTinha.resultado.recomecou === true, jaTinha.resultado);
-  check('e comeca pelo roteiro da vaga citada',
-    jaTinha.resultado && jaTinha.resultado.vaga === 'Gestor de Tráfego Jr', jaTinha.resultado);
+  check('recusa nome sem sobrenome',
+    !(await pub('candidatar', { vaga: 'gestor-de-trafego-pleno', name: 'Ana', phone: foneL, email: 'a@b.com' })).ok);
+  check('recusa e-mail torto',
+    !(await pub('candidatar', { vaga: 'gestor-de-trafego-pleno', name: 'Ana Paula', phone: foneL, email: 'nao-e-email' })).ok);
+  check('recusa vaga que nao existe',
+    !(await pub('candidatar', { vaga: 'inventada', name: 'Ana Paula', phone: foneL, email: 'a@b.com' })).ok);
 
-  // logo depois, um "obrigado" solto nao pode reiniciar tudo
-  const aberta = (await adm('aurea')).sessoes.filter(function (x) { return x.candidato.indexOf(SUF) >= 0; })[0];
-  check('a conversa nova ficou em andamento', aberta && aberta.status === 'em_andamento', aberta && aberta.status);
+  const leadR = (await adm('board')).candidates.filter(function (c) { return c.name === 'Rafaela Souza'; })[0];
+  check('cadastro entrou no sistema', !!leadR, leadR);
+  check('marcado como vindo da landing', leadR && leadR.source === 'landing', leadR && leadR.source);
+  check('ja nasce ligado a vaga', leadR && !!leadR.job_id);
 
-  // --- quem chega sem dizer a vaga ---
-  const foneQ = '11 9' + String(Date.now() + 33).slice(-8);
-  const digQ = '55' + foneQ.replace(/\D/g, '');
-  const vago = await webhook(digQ, 'oi, bom dia', 'Pessoa Sem Vaga');
-  check('quando nao sabe a vaga, pergunta',
-    vago.resultado && vago.resultado.perguntou_vaga === true, vago.resultado);
-  const escolha = await webhook(digQ, '2');
-  check('aceita a vaga escolhida pelo numero',
-    escolha.resultado && escolha.resultado.vaga === 'Gestor de Tráfego Jr', escolha.resultado);
+  // ---- 2) ela chama no WhatsApp e recebe a sequencia ----
+  const seq = await webhook(digL, cad.mensagem, 'Rafaela Souza');
+  check('a sequencia dispara', seq.resultado && seq.resultado.sequencia === true, seq.resultado);
+  check('sao 4 mensagens', seq.resultado && seq.resultado.mensagens === 4, seq.resultado);
 
-  // --- a regra e simples: chamou o numero, a Aurea responde. sempre. ---
-  const foneD = '11 9' + String(Date.now() + 55).slice(-8);
-  const digD = '55' + foneD.replace(/\D/g, '');
-  await webhook(digD, 'Olá! Tenho interesse na vaga de Gestor de Tráfego Pleno.', 'Sempre Responde');
-  for (const r of ['4 anos', '3 anos cada', 'tenho sim', '2 milhoes', 'Imagine']) await webhook(digD, r);
+  const enviadas = (await adm('logs', null, { limit: 40 })).logs
+    .filter(function (l) { return l.candidate_name === 'Rafaela Souza'; });
+  const corpos = enviadas.map(function (l) { return l.body; }).join('\n---\n');
+  check('a primeira chama pelo nome', /Olá, Rafaela!/.test(corpos), corpos.slice(0, 80));
+  check('manda as 4 perguntas', /Meta Ads e Google Ads/.test(corpos) && /Praia Grande/.test(corpos) &&
+    /rodou em Ads/.test(corpos) && /crescer dentro de uma empresa/.test(corpos));
+  check('pede o video de 1 minuto', /Grave um vídeo de até 1 minuto/.test(corpos));
+  check('agradece e fala do contato', /Entraremos em contato caso você passe/.test(corpos));
+  check('manda as duas redes',
+    /startdigital_oficial/.test(corpos) && /somossangueroxo/.test(corpos));
+  check('todas sairam sem erro', enviadas.every(function (l) { return l.status === 'enviado'; }),
+    enviadas.map(function (l) { return l.status; }));
 
-  const depoisFim = await webhook(digD, 'oi de novo');
-  check('mesmo apos concluir, ela volta a responder',
-    depoisFim.resultado && depoisFim.resultado.ok === true && !depoisFim.resultado.ignorado, depoisFim.resultado);
-  const citaVaga = await webhook(digD, 'na verdade queria a de Gestor de Tráfego Jr');
-  check('e citar outra vaga abre o roteiro dela',
-    citaVaga.resultado && citaVaga.resultado.vaga === 'Gestor de Tráfego Jr', citaVaga.resultado);
+  // ---- 3) "digitando..." antes de cada mensagem ----
+  const presencas = await (await fetch('http://127.0.0.1:54322/__presencas')).json();
+  const minhas = presencas.filter(function (p) { return String(p.number).indexOf(digL.slice(-8)) >= 0; });
+  check('mostrou "digitando" antes de cada mensagem', minhas.length >= 4, minhas.length);
+  check('e o aviso e de digitacao', minhas.every(function (p) { return p.presence === 'composing'; }));
+  check('com pausa de 4 segundos', minhas.every(function (p) { return Number(p.delay) === 4000; }),
+    minhas.map(function (p) { return p.delay; }));
+
+  // ---- 4) uma vez so ----
+  const denovo = await webhook(digL, 'oi de novo');
+  check('a sequencia nao repete', denovo.resultado && denovo.resultado.ignorado === true, denovo.resultado);
+  const depoisDeNovo = (await adm('logs', null, { limit: 40 })).logs
+    .filter(function (l) { return l.candidate_name === 'Rafaela Souza'; });
+  check('e nao mandou mensagem a mais', depoisDeNovo.length === enviadas.length,
+    { antes: enviadas.length, depois: depoisDeNovo.length });
+
+  // ---- 5) trocou de vaga? a sequencia pode ir de novo ----
+  const trocou = await pub('candidatar', {
+    vaga: 'gestor-de-trafego-jr', name: 'Rafaela Souza',
+    phone: foneL, email: 'rafaela.' + SUF + '@exemplo.com'
+  });
+  check('deixa se candidatar a outra vaga', trocou.ok, trocou.error);
+  const seq2 = await webhook(digL, trocou.mensagem);
+  check('e a sequencia roda de novo para a vaga nova',
+    seq2.resultado && seq2.resultado.sequencia === true, seq2.resultado);
 
   console.log('\n5) WEBHOOK — casos que deve ignorar');
   const k = a2.webhook_url.split('k=')[1];
@@ -308,18 +299,15 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
     body: JSON.stringify({ event: 'messages.upsert', data: { key: { remoteJid: '5511999@s.whatsapp.net', fromMe: true }, message: { conversation: 'oi' } } })
   })).json();
   check('ignora mensagem nossa', nossa.ignorado === 'mensagem nossa', nossa);
-  // Numero novo NAO e mais ignorado: e assim que chega quem vem da landing.
-  // Quem quiser o comportamento antigo desliga em Ajustes da Aurea.
-  await adm('aurea_config_save', { value: { atende_desconhecido: false } });
-  const foneFechado = '5511' + String(Date.now() + 101).slice(-9);
-  const desconhecido = await webhook(foneFechado, 'oi');
-  check('com a porta fechada, ignora numero novo',
-    desconhecido.resultado && desconhecido.resultado.ignorado === true, desconhecido);
-  await adm('aurea_config_save', { value: { atende_desconhecido: true } });
-  const foneAberto = '5511' + String(Date.now() + 202).slice(-9);
-  const abriu = await webhook(foneAberto, 'oi');
-  check('com a porta aberta, atende numero novo',
-    abriu.resultado && abriu.resultado.novo === true, abriu);
+  // Quem nunca preencheu o formulario da landing nao recebe nada: a
+  // Aurea so fala com quem se cadastrou. Fica registrado no diario.
+  const foneSolto = '5511' + String(Date.now() + 101).slice(-9);
+  const solto = await webhook(foneSolto, 'oi, tudo bem?');
+  check('numero sem cadastro nao recebe nada',
+    solto.ignorado === 'sem cadastro na landing', solto);
+  const diarioSolto = (await adm('wa_status')).batidas || [];
+  check('mas fica registrado para o time olhar',
+    diarioSolto.some(function (x) { return x.decisao === 'sem cadastro na landing'; }), diarioSolto[0]);
 
   // ---- diario do webhook: precisa registrar ate o que descarta ----
   const diario = await adm('wa_status');

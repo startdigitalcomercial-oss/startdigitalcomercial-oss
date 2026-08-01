@@ -119,16 +119,14 @@ module.exports = async function handler(req, res) {
       order: 'created_at.desc', select: '*', limit: 5
     });
 
-    // Número novo: veio do botão da landing. A Aurea abre a porta,
-    // descobre a vaga pela mensagem e começa a pré-qualificação.
+    // Número que não se cadastrou na landing. A regra do funil é clara:
+    // a Aurea só fala com quem preencheu o formulário. Quem chega solto
+    // fica registrado aqui para alguém do time olhar, e nada é enviado.
     if (!achados.length) {
-      await anota({ decisao: 'entregue (numero novo)', evento: evento, de: de0, texto: texto.slice(0, 60) });
-      const r = await aurea.receberDeDesconhecido({
-        telefone: jid.split('@')[0],
-        nome: d.pushName || d.pushname || (body.data && body.data.pushName) || '',
-        texto: texto
+      await anota({
+        decisao: 'sem cadastro na landing', evento: evento, de: de0, texto: texto.slice(0, 60)
       });
-      return responder({ ok: true, resultado: r });
+      return responder({ ok: true, ignorado: 'sem cadastro na landing' });
     }
 
     // se houver mais de um, prioriza quem tem conversa aberta
@@ -151,9 +149,13 @@ module.exports = async function handler(req, res) {
       return responder({ ok: true, resultado: r });
     }
 
-    // Tem conversa aberta? Continua. Não tem? Então esta é a primeira
-    // mensagem de alguém que já está no banco — trata como chegada nova,
-    // em vez de ficar mudo por "não há conversa em andamento".
+    // ---- quem veio da landing: sequência fixa, uma vez só ----
+    if (candidato.source === 'landing') {
+      const r = await aurea.receberDaLanding(candidato);
+      return responder({ ok: true, resultado: r });
+    }
+
+    // ---- os outros seguem no fluxo antigo, com a Aurea conversando ----
     const r = sessaoAberta
       ? await aurea.receber(candidato, texto)
       : await aurea.receberSemConversa(candidato, texto);

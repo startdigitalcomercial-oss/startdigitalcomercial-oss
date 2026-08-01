@@ -396,6 +396,83 @@ async function receberDeDesconhecido(info) {
   return Object.assign({ novo: true }, r);
 }
 
+// ============================================================
+// SEQUÊNCIA DA LANDING
+// Quem se cadastrou na landing e chamou no WhatsApp recebe estas
+// quatro mensagens, uma vez só, com "digitando…" entre elas.
+// Não é conversa com IA: é um roteiro fixo, que o time edita em
+// Mensagens. A pessoa responde e um humano lê.
+// ============================================================
+const SEQUENCIA = [
+  'landing_wa_1_perguntas',
+  'landing_wa_2_video',
+  'landing_wa_3_obrigado',
+  'landing_wa_4_redes'
+];
+
+const PAUSA_PADRAO = 4000;
+
+async function textoDoModelo(chave, vars, reserva) {
+  const tpl = await db.selectOne('message_templates', { key: 'eq.' + chave, select: 'body' });
+  const corpo = (tpl && tpl.body) || reserva || '';
+  return u.renderTemplate(corpo, vars);
+}
+
+async function mandarSequencia(candidato, vaga, cfg) {
+  cfg = cfg || await config();
+  const inst = await instancia(cfg);
+  const pausa = cfg.pausa_entre_mensagens === undefined ? PAUSA_PADRAO : Number(cfg.pausa_entre_mensagens);
+
+  const empresa = await db.selectOne('settings', { key: 'eq.company', select: 'value' });
+  const vars = Object.assign(
+    u.templateVars(candidato, (empresa && empresa.value) || {}),
+    { vaga: vaga ? vaga.title : (candidato.role_applied || 'a vaga') }
+  );
+
+  const saidas = [];
+  for (let i = 0; i < SEQUENCIA.length; i++) {
+    const texto = await textoDoModelo(SEQUENCIA[i], vars);
+    if (!texto.trim()) continue;
+
+    // A primeira já entra digitando também: a pessoa acabou de mandar
+    // a mensagem e vê a resposta sendo escrita, como com uma pessoa.
+    const r = await send.sendWhatsAppComPausa({
+      to: candidato.phone, text: texto, instance: inst, pausa: pausa
+    });
+    saidas.push({ chave: SEQUENCIA[i], status: r.status, error: r.error || null });
+
+    await db.insert('message_logs', {
+      candidate_id: candidato.id, channel: 'whatsapp', to_address: candidato.phone,
+      subject: SEQUENCIA[i], body: texto,
+      status: r.status, provider: r.provider, error: r.error || null
+    });
+    if (r.status === 'erro') break;
+  }
+
+  await db.update('candidates', {
+    wa_sequencia_em: new Date().toISOString(), updated_at: new Date().toISOString()
+  }, { id: 'eq.' + candidato.id });
+
+  await db.insert('stage_history', {
+    candidate_id: candidato.id, from_stage: candidato.stage_key, to_stage: candidato.stage_key,
+    note: 'Aurea enviou a sequência da landing (' + saidas.length + ' mensagens)'
+  });
+
+  return { ok: true, sequencia: true, mensagens: saidas.length, saidas: saidas };
+}
+
+// Chamado pelo webhook: a pessoa cadastrada na landing chamou no WhatsApp.
+async function receberDaLanding(candidato) {
+  const cfg = await config();
+  if (!cfg.ativa) return { ok: false, ignorado: true, error: 'Aurea desligada.' };
+
+  if (candidato.wa_sequencia_em) {
+    return { ok: false, ignorado: true, error: 'Sequência já enviada para esta pessoa.' };
+  }
+  const vaga = candidato.job_id ? await vagas.porId(candidato.job_id) : null;
+  return await mandarSequencia(candidato, vaga, cfg);
+}
+
 // ------------------------------------------------------------
 // Quem JÁ está cadastrado mas não tem conversa aberta.
 // A regra é simples e sem exceção: chamou o número, a Aurea responde.
@@ -625,5 +702,6 @@ async function testar() {
 module.exports = {
   config, instancia, dentroDoHorario, iniciar, receber, testar, chamarIA,
   grupoComPerguntas, grupoDaVaga,
-  receberDeDesconhecido, receberSemConversa, receberEscolhaDeVaga, abrirRoteiro, perguntaQualVaga
+  receberDeDesconhecido, receberSemConversa, receberEscolhaDeVaga, abrirRoteiro, perguntaQualVaga,
+  receberDaLanding, mandarSequencia, SEQUENCIA
 };

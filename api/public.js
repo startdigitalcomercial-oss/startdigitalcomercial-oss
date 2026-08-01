@@ -108,6 +108,76 @@ module.exports = async function handler(req, res) {
       return u.ok(res, { vaga: vagas.paraPublico(v, u.appUrl(), zap) });
     }
 
+    // ---------------------------------------------------- cadastro da landing
+    // Antes de mandar para o WhatsApp, a pessoa deixa nome, telefone e
+    // e-mail aqui. É este cadastro que autoriza a Aurea a falar com ela.
+    if (action === 'candidatar') {
+      if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
+      const body = await u.readBody(req);
+
+      const nome = String(body.name || '').trim();
+      const email = String(body.email || '').trim().toLowerCase();
+      const phone = String(body.phone || '').trim();
+
+      if (nome.length < 3 || nome.split(/\s+/).filter(Boolean).length < 2) {
+        return u.fail(res, 400, 'Escreva o seu nome e sobrenome.');
+      }
+      if (!u.isEmail(email)) return u.fail(res, 400, 'Confira o seu e-mail.');
+      if (u.normalizePhone(phone).length < 12) return u.fail(res, 400, 'Confira o WhatsApp com DDD.');
+
+      const vaga = await vagas.porApelido(String(body.vaga || ''));
+      if (!vaga) return u.fail(res, 404, 'Esta vaga nao esta mais aberta.');
+
+      // Já se cadastrou antes? Atualiza em vez de duplicar.
+      const tail = u.phoneTail(phone);
+      let cand = null;
+      if (tail) {
+        cand = await db.selectOne('candidates', {
+          phone_digits: 'like.*' + tail, archived: 'eq.false',
+          order: 'created_at.desc', select: '*'
+        });
+      }
+      if (!cand) {
+        cand = await db.selectOne('candidates', { email: 'eq.' + email, archived: 'eq.false', select: '*' });
+      }
+
+      const dados = {
+        name: nome, email: email, phone: phone,
+        role_applied: vaga.title, job_id: vaga.id,
+        source: 'landing', source_detail: 'Landing page — ' + vaga.title,
+        updated_at: new Date().toISOString()
+      };
+
+      if (cand) {
+        // Troca de vaga? A sequência pode ir de novo, com o roteiro certo.
+        if (cand.job_id !== vaga.id) dados.wa_sequencia_em = null;
+        cand = await db.update('candidates', dados, { id: 'eq.' + cand.id }) || cand;
+        await db.insert('stage_history', {
+          candidate_id: cand.id, from_stage: cand.stage_key, to_stage: cand.stage_key,
+          note: 'Cadastrou-se de novo na landing — ' + vaga.title
+        });
+      } else {
+        cand = await db.insert('candidates', Object.assign({
+          token: u.candidateToken(), stage_key: 'triagem'
+        }, dados));
+        await db.insert('stage_history', {
+          candidate_id: cand.id, from_stage: null, to_stage: 'triagem',
+          note: 'Cadastro na landing — ' + vaga.title
+        });
+      }
+
+      const landing = await getSetting('landing', {});
+      const zap = await numeroDaAurea(landing);
+      const frase = 'Olá! Me cadastrei para a vaga (' + vaga.title + ') e quero concluir o processo seletivo.';
+
+      return u.ok(res, {
+        nome: u.firstName(nome),
+        vaga: vaga.title,
+        link_whatsapp: zap ? 'https://wa.me/' + zap + '?text=' + encodeURIComponent(frase) : '',
+        mensagem: frase
+      });
+    }
+
     // ---------------------------------------------------- enviar candidatura
     if (action === 'apply') {
       if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
