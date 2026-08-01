@@ -3,6 +3,64 @@
    ============================================================ */
 let WA_TIMER = null;
 
+/* ------------------------------------------------------------
+   O webhook e a ORELHA do sistema: sem ele a Aurea manda mensagem
+   mas nunca escuta a resposta. Aqui a gente compara o que a
+   Evolution guardou de verdade com o endereco que deveria estar la.
+   ------------------------------------------------------------ */
+function caixaWebhook(d) {
+  const g = d.webhook || {};
+  const mono = 'font-family:ui-monospace,monospace;font-size:12px;word-break:break-all';
+
+  const quando = d.ultima_recebida
+    ? 'Última mensagem recebida de um candidato: <strong>' + dataBr(d.ultima_recebida) + '</strong>.'
+    : '<strong>Nunca chegou mensagem nenhuma de candidato.</strong>';
+
+  // caso 1: nem deu para perguntar para a Evolution
+  if (!g.ok) {
+    return '<div class="alert alert-aviso" style="margin:0">' +
+      '<strong>Não consegui conferir o webhook.</strong> ' + esc(g.erro || '') +
+      '<div class="small" style="margin-top:8px">' + quando + '</div>' +
+      '<div class="small" style="margin-top:8px">Deveria estar assim:<br>' +
+      '<span style="' + mono + '">' + esc(d.webhook_url) + '</span></div></div>';
+  }
+
+  // caso 2: está tudo certo
+  if (g.confere && g.ouve_mensagens) {
+    return '<div class="alert alert-ok" style="margin:0">' +
+      '<strong>Webhook conferido.</strong> A Evolution está mandando as mensagens recebidas para o sistema.' +
+      '<div class="small" style="margin-top:8px">' + quando + '</div></div>';
+  }
+
+  // caso 3: tem algo errado — explica o quê e como resolver
+  let motivo;
+  if (!g.url) {
+    motivo = 'A Evolution está <strong>sem webhook nenhum</strong> nesta instância. ' +
+      'Ou seja: ela recebe as mensagens e não avisa o sistema.';
+  } else if (!g.mesmo_endereco) {
+    motivo = 'O webhook aponta para <strong>outro endereço</strong>. ' +
+      'As mensagens estão indo para um lugar que não é este sistema.';
+  } else if (!g.mesma_chave) {
+    motivo = 'O endereço está certo, mas a <strong>chave mudou</strong> — isso acontece quando o ' +
+      '<code>APP_SECRET</code> é trocado na Vercel. O sistema recusa as mensagens porque a chave não bate.';
+  } else if (g.ligado === false) {
+    motivo = 'O webhook existe mas está <strong>desligado</strong> na Evolution.';
+  } else {
+    motivo = 'O webhook não está ouvindo o evento de mensagem recebida ' +
+      '(<code>MESSAGES_UPSERT</code>), então nada chega aqui.';
+  }
+
+  return '<div class="alert alert-erro" style="margin:0">' +
+    '<strong>É por isso que a Aurea não responde.</strong><br>' + motivo +
+    '<div class="small" style="margin-top:10px">' + quando + '</div>' +
+    '<div class="small" style="margin-top:10px">Na Evolution está:<br>' +
+    '<span style="' + mono + '">' + esc(g.url || '(vazio)') + '</span></div>' +
+    '<div class="small" style="margin-top:8px">Deveria estar:<br>' +
+    '<span style="' + mono + '">' + esc(d.webhook_url) + '</span></div>' +
+    '<div style="margin-top:12px"><button class="btn btn-sm" id="wa-arrumar">Arrumar o webhook agora</button></div>' +
+    '</div>';
+}
+
 async function carregaWhatsApp() {
   const box = document.getElementById('wa-area');
   if (!box) return;
@@ -50,9 +108,7 @@ async function carregaWhatsApp() {
           '<input type="hidden" id="wa-nome" value="' + esc(inst || 'start-rh') + '">' +
         '</div><div id="wa-qr"></div>') +
 
-    '<hr class="sep">' +
-    '<p class="small muted" style="margin:0">Endereço do webhook (o sistema configura sozinho, isto é só para conferência):<br>' +
-    '<span style="font-family:ui-monospace,monospace;font-size:12px;word-break:break-all">' + esc(d.webhook_url) + '</span></p>' +
+    '<hr class="sep">' + caixaWebhook(d) +
 
     ((d.sobrando || []).length
       ? '<hr class="sep"><div class="alert alert-aviso" style="margin:0">' +
@@ -150,9 +206,25 @@ function ligaWhatsApp(inst) {
     });
   }
 
+  if (b('wa-arrumar')) {
+    b('wa-arrumar').addEventListener('click', async function () {
+      this.disabled = true;
+      this.innerHTML = '<span class="spinner"></span> Arrumando…';
+      try {
+        await api('wa_webhook', { body: {} });
+        toast('Webhook arrumado');
+        carregaWhatsApp();
+      } catch (e) {
+        toast(e.message, true);
+        this.disabled = false;
+        this.textContent = 'Arrumar o webhook agora';
+      }
+    });
+  }
+
   if (b('wa-webhook')) {
     b('wa-webhook').addEventListener('click', async function () {
-      try { await api('wa_webhook', { body: {} }); toast('Webhook reconfigurado'); }
+      try { await api('wa_webhook', { body: {} }); toast('Webhook reconfigurado'); carregaWhatsApp(); }
       catch (e) { toast(e.message, true); }
     });
   }

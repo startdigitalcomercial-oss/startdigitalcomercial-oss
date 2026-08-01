@@ -605,6 +605,26 @@ async function waWebhook(nome, url) {
   return { ok: true };
 }
 
+// Le de volta o que a Evolution REALMENTE guardou como webhook.
+// Sem isso a gente configura no escuro: manda o pedido, ela responde
+// "ok", e ninguem confere se o endereco que ficou la e o nosso.
+async function waWebhookAtual(nome) {
+  if (!evoPronta()) return { ok: false, error: 'Evolution nao configurada.' };
+  const r = await evoFetch('/webhook/find/' + encodeURIComponent(nome), { method: 'GET' });
+  if (!r.ok) {
+    return { ok: false, error: 'HTTP ' + r.status, url: null, ligado: null, eventos: [] };
+  }
+  const d = (r.data && r.data.webhook) ? r.data.webhook : (r.data || {});
+  const eventos = d.events || d.Events || [];
+  return {
+    ok: true,
+    url: d.url || d.Url || null,
+    ligado: d.enabled !== undefined ? !!d.enabled : (d.Enabled !== undefined ? !!d.Enabled : null),
+    eventos: Array.isArray(eventos) ? eventos : []
+  };
+}
+
+module.exports.waWebhookAtual = waWebhookAtual;
 module.exports.waCriarInstancia = waCriarInstancia;
 module.exports.waQrCode = waQrCode;
 module.exports.waEstado = waEstado;

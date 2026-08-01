@@ -103,7 +103,15 @@ const server = http.createServer(async function (req, res) {
   }
   if (url.pathname.indexOf('/webhook/set/') === 0) {
     if (!body.webhook) { res.statusCode = 400; return res.end('{"message":"formato v1"}'); }
-    return json({ webhook: { enabled: true, url: body.webhook.url } });
+    global.__waWebhook = { url: body.webhook ? body.webhook.url : body.url };
+    return json({ webhook: { enabled: true, url: global.__waWebhook.url } });
+  }
+
+  // le de volta o webhook guardado (para o painel conferir)
+  if (url.pathname.indexOf('/webhook/find/') === 0) {
+    const g = global.__waWebhook;
+    if (!g) return json({ webhook: { url: null, enabled: false, events: [] } });
+    return json({ webhook: { url: g.url, enabled: true, events: ['MESSAGES_UPSERT'] } });
   }
 
   // ---------------- Resend (e-mail) ----------------

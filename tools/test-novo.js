@@ -95,6 +95,35 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   console.log('\n3) AUREA — configuracao');
   const a1 = await adm('aurea');
   check('aurea carrega', a1.ok, a1.error);
+  // O webhook e a orelha do sistema. O painel precisa CONFERIR o que a
+  // Evolution guardou, nao so mandar configurar e torcer.
+  // finge que alguem deixou o webhook apontando para o lugar errado
+  await fetch('http://127.0.0.1:54322/webhook/set/qualquer', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ webhook: { url: 'https://endereco-errado.exemplo/api/webhook?k=abc' } })
+  });
+  const gan0 = await adm('wa_status');
+  check('status do whatsapp confere o webhook', gan0.ok && !!gan0.webhook, gan0.error);
+  check('flagra webhook apontando para outro lugar',
+    gan0.webhook && gan0.webhook.confere === false && gan0.webhook.mesmo_endereco === false, gan0.webhook);
+  check('mostra o endereco que deveria estar la', /\/api\/webhook\?k=/.test(gan0.webhook_url || ''));
+
+  // e agora a chave errada, que e o que acontece quando o APP_SECRET muda
+  await fetch('http://127.0.0.1:54322/webhook/set/qualquer', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ webhook: { url: (gan0.webhook_url || '').split('?')[0] + '?k=chave-velha' } })
+  });
+  const ganK = await adm('wa_status');
+  check('flagra endereco certo com chave velha',
+    ganK.webhook && ganK.webhook.mesmo_endereco === true && ganK.webhook.mesma_chave === false, ganK.webhook);
+
+  check('configura o webhook', (await adm('wa_webhook', {})).ok);
+  const gan1 = await adm('wa_status');
+  check('depois de configurar, o webhook confere', gan1.webhook && gan1.webhook.confere === true, gan1.webhook);
+  check('e ele ouve mensagem recebida', gan1.webhook && gan1.webhook.ouve_mensagens === true);
+  check('o endereco guardado e o nosso', gan1.webhook && gan1.webhook.url === gan1.webhook_url,
+    gan1.webhook && gan1.webhook.url);
+
   check('mostra o endereco do webhook', a1.ok && /\/api\/webhook\?k=/.test(a1.webhook_url), a1.webhook_url);
   check('detecta a chave de IA', a1.tem_chave_ia === true);
   const teste = await adm('aurea_test');

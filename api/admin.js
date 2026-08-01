@@ -1230,19 +1230,48 @@ module.exports = async function handler(req, res) {
       let estado = null;
       if (escolhida) estado = await send.waEstado(escolhida);
       const sobrando = instancias.filter(function (i) { return i.name !== escolhida; });
+
+      // ---- o webhook: o que DEVERIA estar la x o que esta ----
+      const esperado = u.appUrl() + '/api/webhook?k=' + webhook.chaveWebhook();
+      let gancho = { ok: false, url: null, ligado: null, eventos: [], confere: false };
+      if (escolhida) {
+        const atual = await send.waWebhookAtual(escolhida);
+        const mesmoEndereco = !!atual.url && atual.url.split('?')[0] === esperado.split('?')[0];
+        const mesmaChave = !!atual.url && atual.url === esperado;
+        gancho = {
+          ok: atual.ok,
+          erro: atual.error || null,
+          url: atual.url,
+          ligado: atual.ligado,
+          eventos: atual.eventos,
+          mesmo_endereco: mesmoEndereco,
+          mesma_chave: mesmaChave,
+          ouve_mensagens: !atual.eventos.length ||
+            atual.eventos.some(function (e) { return String(e).toUpperCase().indexOf('MESSAGES_UPSERT') >= 0; }),
+          confere: atual.ok && mesmaChave && atual.ligado !== false
+        };
+      }
+
+      // ---- ja chegou alguma mensagem de fora? ----
+      const ultimaEntrada = await db.selectOne('prequal_messages', {
+        role: 'eq.candidato', order: 'created_at.desc', select: 'created_at'
+      });
+
       return u.ok(res, {
         configurada: send.evoPronta(),
         instancias: instancias,
         sobrando: sobrando,
         escolhida: escolhida,
         estado: estado,
-        webhook_url: u.appUrl() + '/api/webhook?k=' + webhook.chaveWebhook()
+        webhook_url: esperado,
+        webhook: gancho,
+        ultima_recebida: ultimaEntrada ? ultimaEntrada.created_at : null
       });
     }
 
     // pede um QR novo (o QR da Evolution vence em menos de 1 minuto)
     if (action === 'wa_qr') {
-      const nome = params.instance || (await getSetting('whatsapp', {})).instance;
+      const nome = params.instance || (await getSetting('whatsapp', {})).instance || process.env.EVOLUTION_INSTANCE || '';
       if (!nome) return u.fail(res, 400, 'Nenhuma instância escolhida.');
       const r = await send.waQrCode(nome);
       return r.ok ? u.ok(res, r) : u.fail(res, 400, r.error);
@@ -1296,7 +1325,7 @@ module.exports = async function handler(req, res) {
     }
 
     if (action === 'wa_estado') {
-      const nome = params.instance || (await getSetting('whatsapp', {})).instance;
+      const nome = params.instance || (await getSetting('whatsapp', {})).instance || process.env.EVOLUTION_INSTANCE || '';
       if (!nome) return u.fail(res, 400, 'Nenhuma instância escolhida.');
       const r = await send.waEstado(nome);
       return r.ok ? u.ok(res, r) : u.fail(res, 400, r.error);
@@ -1304,7 +1333,7 @@ module.exports = async function handler(req, res) {
 
     if (action === 'wa_webhook') {
       const body = await u.readBody(req);
-      const nome = body.instance || (await getSetting('whatsapp', {})).instance;
+      const nome = body.instance || (await getSetting('whatsapp', {})).instance || process.env.EVOLUTION_INSTANCE || '';
       if (!nome) return u.fail(res, 400, 'Nenhuma instância escolhida.');
       const r = await send.waWebhook(nome, u.appUrl() + '/api/webhook?k=' + webhook.chaveWebhook());
       return r.ok ? u.ok(res, {}) : u.fail(res, 400, r.error);
@@ -1312,7 +1341,7 @@ module.exports = async function handler(req, res) {
 
     if (action === 'wa_desconectar') {
       const body = await u.readBody(req);
-      const nome = body.instance || (await getSetting('whatsapp', {})).instance;
+      const nome = body.instance || (await getSetting('whatsapp', {})).instance || process.env.EVOLUTION_INSTANCE || '';
       if (!nome) return u.fail(res, 400, 'Nenhuma instância escolhida.');
       const r = await send.waDesconectar(nome);
       return r.ok ? u.ok(res, {}) : u.fail(res, 400, r.error);
