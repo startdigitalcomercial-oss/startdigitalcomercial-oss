@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Crie a sua senha do painel — StartDigital</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+  .wrap { max-width: 440px; margin: 8vh auto; padding: 0 22px; }
+  .marca { display: flex; align-items: center; justify-content: center; gap: 9px; font-size: 17px; font-weight: 600; letter-spacing: -.02em; margin-bottom: 22px; }
+  .marca i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: block; }
+  .forca { height: 4px; border-radius: 999px; background: var(--fill-2); margin-top: 9px; overflow: hidden; }
+  .forca > i { display: block; height: 100%; width: 0; border-radius: 999px; transition: width .25s, background .25s; }
+  .forca-txt { font-size: 12.5px; color: var(--label-3); margin-top: 6px; }
+  .quem { background: var(--fill-1); border-radius: var(--r-ctl); padding: 13px 15px; margin-bottom: 20px; }
+  .quem div + div { margin-top: 9px; }
+  .quem span { color: var(--label-3); display: block; font-size: 12.5px; margin-bottom: 2px; }
+  .check { width: 56px; height: 56px; border-radius: 50%; background: var(--accent-tint); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 22px; }
+  .regras { list-style: none; padding: 0; margin: 10px 0 0; font-size: 12.5px; color: var(--label-3); }
+  .regras li { padding-left: 20px; position: relative; line-height: 1.9; }
+  .regras li::before { content: '○'; position: absolute; left: 3px; }
+  .regras li.ok { color: var(--accent); }
+  .regras li.ok::before { content: '●'; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="marca"><i></i> StartDigital</div>
+
+  <div id="carregando" class="loading-page">Carregando…</div>
+
+  <div id="tela-erro" style="display:none">
+    <div class="card"><div class="alert alert-aviso" id="msg-erro" style="margin:0"></div></div>
+  </div>
+
+  <div id="tela-form" style="display:none">
+    <div class="card">
+      <h2>Bem-vindo(a), <span id="nome"></span>!</h2>
+      <p class="sub" id="sub">Escolha a senha que você vai usar para entrar no painel. Só você vai saber qual é.</p>
+
+      <div class="quem">
+        <div><span>Você entra com este e-mail</span><strong id="email"></strong></div>
+        <div><span>Seu nível de acesso</span><strong id="papel"></strong></div>
+      </div>
+
+      <div id="aviso"></div>
+
+      <form id="form">
+        <div class="field">
+          <label>Sua senha</label>
+          <input type="password" id="senha" autocomplete="new-password" autofocus>
+          <div class="forca"><i id="barra"></i></div>
+          <div class="forca-txt" id="forca-txt">&nbsp;</div>
+          <ul class="regras">
+            <li id="r-tam">Pelo menos 8 caracteres</li>
+            <li id="r-letra">Tem letra</li>
+            <li id="r-num">Tem número</li>
+          </ul>
+        </div>
+        <div class="field" style="margin-top:14px">
+          <label>Repita a senha</label>
+          <input type="password" id="senha2" autocomplete="new-password">
+        </div>
+        <label class="row small" style="gap:7px;margin-top:12px;align-items:center">
+          <input type="checkbox" id="ver" style="width:16px;height:16px"> mostrar o que estou digitando
+        </label>
+        <button class="btn btn-block btn-lg" style="margin-top:18px" id="btn">Criar senha e entrar</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="tela-ok" style="display:none">
+    <div class="card center">
+      <div class="check">✓</div>
+      <h2 style="font-size:22px">Senha criada!</h2>
+      <p class="muted" style="margin:12px 0 0;line-height:1.6">Levando você para o painel…</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const T = new URLSearchParams(location.search).get('t') || '';
+const btn = document.getElementById('btn');
+
+function mostrar(id) {
+  ['carregando', 'tela-erro', 'tela-form', 'tela-ok'].forEach(function (t) {
+    document.getElementById(t).style.display = t === id ? 'block' : 'none';
+  });
+}
+function erroFatal(msg) { document.getElementById('msg-erro').textContent = msg; mostrar('tela-erro'); }
+function aviso(msg) {
+  document.getElementById('aviso').innerHTML = msg ? '<div class="alert alert-erro">' + msg + '</div>' : '';
+}
+
+document.getElementById('ver').addEventListener('change', function () {
+  const t = this.checked ? 'text' : 'password';
+  document.getElementById('senha').type = t;
+  document.getElementById('senha2').type = t;
+});
+
+document.getElementById('senha').addEventListener('input', function () {
+  const v = this.value;
+  const tam = v.length >= 8, letra = /[A-Za-zÀ-ÿ]/.test(v), num = /[0-9]/.test(v);
+  document.getElementById('r-tam').className = tam ? 'ok' : '';
+  document.getElementById('r-letra').className = letra ? 'ok' : '';
+  document.getElementById('r-num').className = num ? 'ok' : '';
+
+  let pontos = 0;
+  if (tam) pontos++;
+  if (v.length >= 12) pontos++;
+  if (/[A-Z]/.test(v) && /[a-z]/.test(v)) pontos++;
+  if (num) pontos++;
+  if (/[^A-Za-z0-9]/.test(v)) pontos++;
+  const nivel = !tam ? 0 : Math.min(3, Math.max(1, pontos - 1));
+  const cores = ['var(--fill-2)', 'var(--red)', 'var(--orange)', 'var(--accent)'];
+  const textos = ['', 'Senha fraca — dá para melhorar', 'Senha razoável', 'Senha forte'];
+  const larguras = ['0%', '33%', '66%', '100%'];
+  const b = document.getElementById('barra');
+  b.style.width = larguras[nivel];
+  b.style.background = cores[nivel];
+  document.getElementById('forca-txt').innerHTML = textos[nivel] || '&nbsp;';
+});
+
+document.getElementById('form').addEventListener('submit', async function (ev) {
+  ev.preventDefault();
+  aviso('');
+  const s1 = document.getElementById('senha').value;
+  const s2 = document.getElementById('senha2').value;
+  if (s1.length < 8) return aviso('A senha precisa ter pelo menos 8 caracteres.');
+  if (/^\d+$/.test(s1)) return aviso('Não use só números. Misture letras.');
+  if (s1 !== s2) return aviso('As duas senhas não são iguais. Confira e tente de novo.');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Criando…';
+  try {
+    const r = await (await fetch('/api/admin?action=convite_senha', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ t: T, password: s1 })
+    })).json();
+    if (!r.ok) throw new Error(r.error || 'Não foi possível criar a senha.');
+    localStorage.setItem('start_rh_token', r.token);
+    mostrar('tela-ok');
+    setTimeout(function () { location.href = '/admin'; }, 1200);
+  } catch (e) {
+    aviso(e.message);
+    btn.disabled = false;
+    btn.textContent = 'Criar senha e entrar';
+  }
+});
+
+(async function init() {
+  if (!T) return erroFatal('Link inválido. Use o link que chegou no seu e-mail.');
+  let r;
+  try { r = await (await fetch('/api/admin?action=convite_info&t=' + encodeURIComponent(T))).json(); }
+  catch (e) { return erroFatal('Não deu para abrir esta página agora. Tente de novo em instantes.'); }
+  if (!r.ok) return erroFatal(r.error || 'Não foi possível abrir esta página.');
+  document.getElementById('nome').textContent = r.primeiro_nome || r.nome;
+  document.getElementById('email').textContent = r.email;
+  document.getElementById('papel').textContent = r.papel_nome;
+  mostrar('tela-form');
+})();
+</script>
+</body>
+</html>

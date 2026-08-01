@@ -41,6 +41,10 @@
       "destination": "/criar-senha.html"
     },
     {
+      "source": "/criar-senha-painel",
+      "destination": "/criar-senha-painel.html"
+    },
+    {
       "source": "/equipe",
       "destination": "/equipe.html"
     },

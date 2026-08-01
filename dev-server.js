@@ -41,6 +41,7 @@ const ROTAS = {
   '/integracao': '/portal.html',
   '/entrar': '/entrar.html',
   '/criar-senha': '/criar-senha.html',
+  '/criar-senha-painel': '/criar-senha-painel.html',
   '/equipe': '/equipe.html',
   '/time': '/equipe.html',
   '/colaborador': '/equipe.html'

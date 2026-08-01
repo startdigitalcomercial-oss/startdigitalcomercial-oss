@@ -5,6 +5,27 @@ let USUARIOS = [];
 let PAPEIS = [];
 let PAPEL_ESCOLHIDO = 'rh';
 
+// Caixa que aparece depois de criar um acesso ou reenviar o convite.
+// Se o e-mail sair, e so avisar. Se falhar, mostra o link para copiar
+// e mandar na mao — o acesso ja existe, so falta a pessoa abrir.
+function caixaConvite(nome, email, c) {
+  c = c || {};
+  if (c.enviado) {
+    return '<div class="alert alert-ok" style="margin-top:18px">' +
+      '<strong>Convite enviado para ' + esc(email) + '.</strong><br>' +
+      '<span class="small">' + esc(nome) + ' abre o e-mail, clica no botão e escolhe a senha. ' +
+      'O link vale 72 horas e só funciona uma vez. Se não chegar, olhe o spam ou reenvie em Editar.</span></div>';
+  }
+  return '<div class="alert alert-aviso" style="margin-top:18px">' +
+    '<strong>O acesso foi criado, mas o e-mail não saiu.</strong><br>' +
+    '<span class="small">Motivo: ' + esc(c.erro || 'desconhecido') + '</span>' +
+    (c.link
+      ? '<div class="small" style="margin-top:10px">Copie este link e mande para ' + esc(nome) + ':</div>' +
+        '<div class="senha-nova" style="word-break:break-all;margin-top:6px">' + esc(c.link) + '</div>'
+      : '') +
+    '</div>';
+}
+
 async function carregaUsuarios() {
   const box = document.getElementById('painel-usuarios');
   box.innerHTML = '<div class="loading-page">Carregando…</div>';
@@ -36,8 +57,8 @@ async function carregaUsuarios() {
     // ---------- novo usuário ----------
     '<div class="card">' +
       '<h2 style="margin:0 0 4px">Dar acesso a alguém</h2>' +
-      '<p class="sub" style="margin:0 0 18px">O sistema gera uma senha inicial. Você passa para a pessoa, ' +
-      'e ela troca no primeiro acesso.</p>' +
+      '<p class="sub" style="margin:0 0 18px">A pessoa recebe um e-mail com um link e cria a própria senha por lá. ' +
+      'Ninguém aqui vê essa senha — nem você.</p>' +
       '<div class="grid grid-2" style="gap:14px">' +
         '<div class="field"><label for="us-nome">Nome</label>' +
         '<input type="text" id="us-nome" placeholder="Maria Aparecida"></div>' +
@@ -109,12 +130,7 @@ function ligaUsuarios(d) {
     this.innerHTML = '<span class="spinner"></span> Criando…';
     try {
       const r = await api('usuario_salvar', { body: { name: nome, email: email, role: PAPEL_ESCOLHIDO } });
-      b('us-saida').innerHTML =
-        '<div class="alert alert-ok" style="margin-top:18px">' +
-        '<strong>Acesso criado para ' + esc(nome) + '.</strong><br>' +
-        'Senha inicial: <span class="senha-nova">' + esc(r.senha_inicial) + '</span><br>' +
-        '<span class="small">Passe para a pessoa junto com o endereço do painel. ' +
-        'Esta senha não aparece de novo — se perder, você gera outra em Editar.</span></div>';
+      b('us-saida').innerHTML = caixaConvite(nome, email, r.convite);
       b('us-nome').value = '';
       b('us-email').value = '';
       setTimeout(function () {
@@ -169,9 +185,9 @@ function abreUsuario(id) {
     '</div>' +
     '<hr class="sep">' +
     '<h3 style="font-size:14px;margin:0 0 8px">Senha</h3>' +
-    '<p class="small muted" style="margin:0 0 12px">Gera uma senha nova e obriga a pessoa a trocar no próximo acesso. ' +
-    'Use quando alguém esquecer a senha.</p>' +
-    '<button class="btn btn-sm btn-ghost" id="ue-senha">Gerar senha nova</button>' +
+    '<p class="small muted" style="margin:0 0 12px">Manda um e-mail novo para a pessoa criar outra senha. ' +
+    'A senha atual dela para de valer na hora. Use quando alguém esquecer a senha.</p>' +
+    '<button class="btn btn-sm btn-ghost" id="ue-senha">Enviar link de senha nova</button>' +
     '<div id="ue-saida"></div>' +
     '<hr class="sep">' +
     '<button class="btn btn-sm btn-ghost" id="ue-excluir" style="color:var(--red)">Excluir este acesso</button>';
@@ -209,14 +225,16 @@ function abreUsuario(id) {
   });
 
   document.getElementById('ue-senha').addEventListener('click', async function () {
-    if (!confirm('Gerar uma senha nova para ' + x.name + '? A senha atual para de funcionar na hora.')) return;
+    if (!confirm('Enviar para ' + x.email + ' um link para criar senha nova?\n\n' +
+      'A senha atual de ' + x.name + ' para de funcionar na hora.')) return;
+    this.disabled = true;
+    this.innerHTML = '<span class="spinner"></span> Enviando…';
     try {
       const r = await api('usuario_senha', { body: { id: x.id } });
-      document.getElementById('ue-saida').innerHTML =
-        '<div class="alert alert-ok" style="margin-top:14px">Senha nova de ' + esc(r.nome) + ':<br>' +
-        '<span class="senha-nova">' + esc(r.senha_inicial) + '</span><br>' +
-        '<span class="small">Passe para a pessoa. Não aparece de novo.</span></div>';
+      document.getElementById('ue-saida').innerHTML = caixaConvite(r.nome, r.email, r.convite);
     } catch (e) { toast(e.message, true); }
+    this.disabled = false;
+    this.textContent = 'Enviar link de senha nova';
   });
 
   document.getElementById('ue-excluir').addEventListener('click', async function () {

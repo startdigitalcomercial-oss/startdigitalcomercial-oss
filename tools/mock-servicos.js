@@ -100,6 +100,19 @@ const server = http.createServer(async function (req, res) {
     return json({ webhook: { enabled: true, url: body.webhook.url } });
   }
 
+  // ---------------- Resend (e-mail) ----------------
+  if (url.pathname === '/__ultimo-email') {
+    return json(global.__resend || {});
+  }
+  if (url.pathname === '/emails') {
+    if (String(req.headers['authorization'] || '') !== 'Bearer chave-resend-teste') {
+      res.statusCode = 401;
+      return res.end(JSON.stringify({ name: 'validation_error', message: 'API key invalida' }));
+    }
+    global.__resend = body;
+    return json({ id: 'email-' + Math.random().toString(36).slice(2, 10) });
+  }
+
   // ---------------- Comtele (API v4 do painel novo) ----------------
   if (url.pathname === '/__ultimo-sms') {
     return json(global.__comtele || {});
