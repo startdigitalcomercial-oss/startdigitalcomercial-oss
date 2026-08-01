@@ -856,9 +856,11 @@ module.exports = async function handler(req, res) {
       const form = await getSetting('form', {});
       const whatsapp = await getSetting('whatsapp', {});
       const landing = await getSetting('landing', {});
+      const conhecimento = await getSetting('conhecimento', {});
       const instances = await send.listWhatsAppInstances();
       return u.ok(res, {
         company: company, form: form, whatsapp: whatsapp, landing: landing,
+        conhecimento: conhecimento,
         wa_instances: instances, providers: send.providerStatus(), app_url: u.appUrl()
       });
     }

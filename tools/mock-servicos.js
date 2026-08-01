@@ -23,8 +23,11 @@ const server = http.createServer(async function (req, res) {
   };
 
   // ---------------- Anthropic ----------------
+  if (url.pathname === '/__ultimo-prompt') return json(global.__prompt || {});
+
   if (url.pathname === '/v1/messages') {
     const sys = String(body.system || '');
+    global.__prompt = { system: sys, ferramenta: (body.tools || [])[0] ? body.tools[0].name : null };
     const tool = (body.tools || [])[0];
 
     if (tool && tool.name === 'responder_candidato') {

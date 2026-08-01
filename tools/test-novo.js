@@ -186,7 +186,18 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   // O funil novo: a pessoa ve a vaga na landing, aperta o botao, cai no
   // WhatsApp, a Aurea reconhece a vaga, faz o roteiro e manda o cadastro.
 
-  await adm('aurea_config_save', { value: { atende_desconhecido: true, enviar_link_cadastro: 'aprovados' } });
+  const cfgPausa = (await adm('aurea')).config || {};
+  check('por padrao a primeira resposta demora 10 segundos', cfgPausa.pausa_primeira === 10000, cfgPausa.pausa_primeira);
+  check('e as seguintes, 4 segundos', cfgPausa.pausa_entre_mensagens === 4000, cfgPausa.pausa_entre_mensagens);
+
+  // para a bateria nao levar 1 minuto de espera de verdade, encurtamos as
+  // pausas aqui. O que importa e que o valor configurado chegue na Evolution.
+  await adm('aurea_config_save', {
+    value: {
+      atende_desconhecido: true, enviar_link_cadastro: 'aprovados',
+      pausa_primeira: 900, pausa_entre_mensagens: 300
+    }
+  });
 
   // trocar a conexao do WhatsApp tem que trocar o botao da landing junto
   const stz = await adm('wa_status');
@@ -273,8 +284,11 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   const minhas = presencas.filter(function (p) { return String(p.number).indexOf(digL.slice(-8)) >= 0; });
   check('mostrou "digitando" antes de cada mensagem', minhas.length >= 2, minhas.length);
   check('e o aviso e de digitacao', minhas.every(function (p) { return p.presence === 'composing'; }));
-  check('com pausa de 4 segundos', minhas.every(function (p) { return Number(p.delay) === 4000; }),
+  check('a primeira espera mais que as outras', Number(minhas[0].delay) === 900, minhas.map(function (p) { return p.delay; }));
+  check('e o valor configurado e o que vai para a Evolution',
+    minhas.slice(1).every(function (p) { return Number(p.delay) === 300; }),
     minhas.map(function (p) { return p.delay; }));
+
 
   // ---- 4) ela tira uma duvida antes de responder ----
   const duvida = await webhook(digL, 'Qual o salário mesmo?');
@@ -283,6 +297,20 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
     duvida.resultado && duvida.resultado.aguardando &&
     duvida.resultado.aguardando.respostas === true && duvida.resultado.aguardando.video === true,
     duvida.resultado);
+
+  // ---- o que a Aurea sabe sobre a empresa foi junto no prompt ----
+  const cn = (await adm('settings')).conhecimento || {};
+  check('a base de conhecimento existe', !!cn.texto, cn);
+  check('e traz os beneficios', /TotalPass/.test(cn.texto) && /Spotify/.test(cn.texto));
+  check('e o prazo do processo', /[Nn]ão existe data/.test(cn.texto));
+  const prompt = await (await fetch('http://127.0.0.1:54322/__ultimo-prompt')).json();
+  check('a IA foi consultada para a duvida', prompt.ferramenta === 'acompanhar_candidato', prompt.ferramenta);
+  check('e recebeu a base da empresa junto', /TotalPass/.test(prompt.system || ''));
+  check('e a ficha da vaga junto', /R\$ 2\.200/.test(prompt.system || ''));
+  check('com a ordem de puxar de volta para as respostas',
+    /ENVIAR as respostas/.test(prompt.system || ''));
+  const salvouCn = await adm('settings_save', { key: 'conhecimento', value: { texto: cn.texto } });
+  check('da para editar pelo painel', salvouCn.ok, salvouCn.error);
 
   // ---- 5) responde tudo, mas ainda sem video ----
   const respondeu = await webhook(digL, '4 anos com Meta Ads e Google Ads, tenho disponibilidade presencial sim, ja rodei 3 milhoes, e sim quero crescer');
@@ -317,6 +345,8 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   const seq2 = await webhook(digL, trocou.mensagem);
   check('e a sequencia de chegada roda de novo para a vaga nova',
     seq2.resultado && seq2.resultado.sequencia === true, seq2.resultado);
+
+  await adm('aurea_config_save', { value: { pausa_primeira: 10000, pausa_entre_mensagens: 4000 } });
 
   console.log('\n5) WEBHOOK — casos que deve ignorar');
   const k = a2.webhook_url.split('k=')[1];

@@ -35,7 +35,10 @@ async function config() {
     atende_desconhecido: true,
     // 'aprovados' = so quem a Aurea recomendou | 'todos' | 'nunca'
     enviar_link_cadastro: 'aprovados',
-    nota_minima: 6
+    nota_minima: 6,
+    // a primeira resposta demora mais, como alguem que foi ler a mensagem
+    pausa_primeira: 10000,
+    pausa_entre_mensagens: 4000
   }, (row && row.value) || {});
 }
 
@@ -157,6 +160,7 @@ function montarSystem(cfg, grupo, perguntas, sessao, candidato) {
   }).join('\n') || '(nenhuma ainda)';
 
   return (cfg.personalidade || '') + '\n\n' +
+    (cfg._conhecimento ? '=== SOBRE A EMPRESA (use só o que está aqui) ===\n' + cfg._conhecimento + '\n\n' : '') +
     '=== CONTEXTO DESTA CONVERSA ===\n' +
     'Candidato: ' + (candidato.name || '') + '\n' +
     'Vaga: ' + (candidato.role_applied || 'não informada') + '\n' +
@@ -416,6 +420,7 @@ const FECHAMENTO = [
 ];
 
 const PAUSA_PADRAO = 4000;
+const PAUSA_PRIMEIRA = 10000;
 
 async function textoDoModelo(chave, vars, reserva) {
   const tpl = await db.selectOne('message_templates', { key: 'eq.' + chave, select: 'body' });
@@ -427,7 +432,8 @@ async function mandarSequencia(candidato, vaga, cfg, chaves) {
   cfg = cfg || await config();
   const lista = chaves || SEQUENCIA;
   const inst = await instancia(cfg);
-  const pausa = cfg.pausa_entre_mensagens === undefined ? PAUSA_PADRAO : Number(cfg.pausa_entre_mensagens);
+  const pausa = pausaDe(cfg);
+  const primeira = cfg.pausa_primeira === undefined ? PAUSA_PRIMEIRA : Number(cfg.pausa_primeira);
 
   const empresa = await db.selectOne('settings', { key: 'eq.company', select: 'value' });
   const vars = Object.assign(
@@ -443,7 +449,8 @@ async function mandarSequencia(candidato, vaga, cfg, chaves) {
     // A primeira já entra digitando também: a pessoa acabou de mandar
     // a mensagem e vê a resposta sendo escrita, como com uma pessoa.
     const r = await send.sendWhatsAppComPausa({
-      to: candidato.phone, text: texto, instance: inst, pausa: pausa
+      to: candidato.phone, text: texto, instance: inst,
+      pausa: (i === 0 && !chaves) ? primeira : pausa
     });
     saidas.push({ chave: lista[i], status: r.status, error: r.error || null });
 
@@ -532,6 +539,12 @@ const FERRAMENTA_ACOMPANHA = {
   }
 };
 
+// O que a Aurea sabe sobre a empresa. Editavel no painel, em Ajustes.
+async function baseDeConhecimento() {
+  const row = await db.selectOne('settings', { key: 'eq.conhecimento', select: 'value' });
+  return (row && row.value && row.value.texto) || '';
+}
+
 function fichaDaVaga(vaga) {
   if (!vaga) return '(nenhuma vaga vinculada)';
   const lista = function (t, a) {
@@ -593,6 +606,8 @@ async function acompanharDaLanding(candidato, texto, tipo) {
   const perguntas = await textoDoModelo('landing_wa_1_perguntas',
     u.templateVars(candidato, {}));
 
+  const conhecimento = await baseDeConhecimento();
+
   const system = (cfg.personalidade || '') + '\n\n' +
     '=== ONDE ESTAMOS ===\n' +
     'Candidato: ' + (candidato.name || '') + '\n' +
@@ -601,15 +616,21 @@ async function acompanharDaLanding(candidato, texto, tipo) {
     'Também já pediram a ele um vídeo de até 1 minuto se apresentando.\n' +
     'Vídeo recebido até agora: ' + (videoEm ? 'SIM' : 'AINDA NÃO') + '\n\n' +
     '=== A VAGA (use só o que está aqui) ===\n' + fichaDaVaga(vaga) + '\n\n' +
+    (conhecimento ? '=== SOBRE A EMPRESA (use só o que está aqui) ===\n' + conhecimento + '\n\n' : '') +
     '=== O QUE VOCÊ FAZ AGORA ===\n' +
-    '1. Se ele fez uma pergunta sobre a vaga, responda com o que está na ficha acima. ' +
-    'Se a resposta não estiver ali, diga com honestidade que vai confirmar com o time.\n' +
-    '2. Se ele ainda não respondeu todas as quatro perguntas, peça com gentileza só o que falta — ' +
-    'sem repetir a lista inteira.\n' +
-    (videoEm ? '3. O vídeo já chegou, não peça de novo.\n'
-             : '3. Se as quatro respostas já vieram e o vídeo não, lembre do vídeo de 1 minuto.\n') +
-    '4. Nunca prometa aprovação, prazo ou vaga garantida.\n' +
-    '5. Não agradeça pelo encerramento: quem fecha o processo é o sistema, não você.\n\n' +
+    'A sua missão em toda mensagem é a mesma: fazer o candidato ENVIAR as respostas e o vídeo. ' +
+    'Tudo que você escrever termina puxando ele de volta para isso.\n\n' +
+    '1. Se ele fez uma pergunta, responda primeiro — com o que está na ficha da vaga ou no bloco ' +
+    'sobre a empresa. Se a resposta não estiver em nenhum dos dois, diga com honestidade que vai ' +
+    'confirmar com o time. Nunca invente.\n' +
+    '2. Logo depois de responder, retome: peça com gentileza o que ainda falta para ele ' +
+    'participar do processo seletivo.\n' +
+    '3. Se ele ainda não respondeu as quatro perguntas, peça só o que falta — sem repetir a lista inteira.\n' +
+    (videoEm ? '4. O vídeo já chegou, não peça de novo.\n'
+             : '4. Se as quatro respostas já vieram e o vídeo não, lembre do vídeo de 1 minuto.\n') +
+    '5. Incentive sem pressionar: uma frase curta de encorajamento basta. Nada de cobrança dura.\n' +
+    '6. Nunca prometa aprovação, prazo ou vaga garantida.\n' +
+    '7. Não agradeça pelo encerramento: quem fecha o processo é o sistema, não você.\n\n' +
     'Marque respostas_completas=true SÓ quando as quatro perguntas estiverem respondidas ' +
     'somando tudo que ele já escreveu na conversa.';
 
@@ -758,6 +779,7 @@ async function receber(candidato, textoRecebido) {
   }
 
   let saida;
+  cfg._conhecimento = await baseDeConhecimento();
   try {
     saida = await chamarIA({
       modelo: cfg.modelo,

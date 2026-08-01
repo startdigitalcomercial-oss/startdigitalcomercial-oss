@@ -100,6 +100,7 @@ async function carregaAjustes() {
   box.innerHTML = '<div class="loading-page">Carregando…</div>';
   const d = await api('settings');
   const f = d.form || {}, c = d.company || {}, w = d.whatsapp || {}, L = d.landing || {};
+  const CN = d.conhecimento || {};
   const p = d.providers || {};
   box.innerHTML =
     '<div class="card"><h2>Formulário público</h2>' +
@@ -150,6 +151,20 @@ async function carregaAjustes() {
     '<span class="hint">Deixe uma linha em branco entre um parágrafo e outro.</span>' +
     '<textarea id="l-stexto" style="min-height:130px">' + esc(L.sobre_texto || '') + '</textarea></div>' +
     '<div class="row" style="margin-top:14px"><button class="btn btn-sm" id="btn-landing-salvar">Salvar a landing</button></div>' +
+    '</div>' +
+
+    // ---------- o que a Aurea sabe ----------
+    '<div class="card"><h2>O que a Aurea sabe sobre a empresa</h2>' +
+    '<p class="sub">Ela consulta este texto antes de responder qualquer dúvida do candidato: endereço, ' +
+    'horário, benefícios, tipo de contrato. <strong>O que não estiver escrito aqui ela não inventa</strong> — ' +
+    'diz que vai confirmar com o time.</p>' +
+    '<div class="field"><label for="cn-texto">Texto de referência</label>' +
+    '<span class="hint">Escreva em blocos, com um título em maiúsculas e as informações embaixo. ' +
+    'As informações de cada vaga (salário, local, requisitos) vêm do cadastro da vaga — aqui é só o que ' +
+    'vale para a empresa toda.</span>' +
+    '<textarea id="cn-texto" style="min-height:340px;font-family:ui-monospace,monospace;font-size:13px">' +
+    esc(CN.texto || '') + '</textarea></div>' +
+    '<div class="row" style="margin-top:14px"><button class="btn btn-sm" id="btn-cn-salvar">Salvar</button></div>' +
     '</div>' +
 
     '<div class="card"><h2>Canais de envio</h2>' +
@@ -226,6 +241,17 @@ async function carregaAjustes() {
         }
       });
       toast('Landing salva');
+    } catch (e) { toast(e.message, true); }
+    this.disabled = false;
+  });
+
+  document.getElementById('btn-cn-salvar').addEventListener('click', async function () {
+    this.disabled = true;
+    try {
+      await api('settings_save', {
+        body: { key: 'conhecimento', value: { texto: document.getElementById('cn-texto').value } }
+      });
+      toast('Salvo — a Aurea já usa a partir da próxima mensagem');
     } catch (e) { toast(e.message, true); }
     this.disabled = false;
   });
