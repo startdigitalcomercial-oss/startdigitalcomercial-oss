@@ -190,10 +190,16 @@ module.exports = async function handler(req, res) {
     // MOSTRAR_SENHA_LOGIN estiver como "true" na Vercel.
     // Para desligar: troque para false (ou apague) e faca Redeploy.
     if (action === 'dica_senha') {
+      // "primeiro_acesso" avisa a tela de login que ainda nao existe nenhum
+      // Dono cadastrado — nessa fase a entrada e so com a senha mestra, com o
+      // campo de e-mail vazio. Isso vai sempre, mesmo com a dica desligada.
+      let primeiro = false;
+      try { primeiro = await senhaMestraVale(await usuariosAtivos()); } catch (e) { }
       const ligado = String(process.env.MOSTRAR_SENHA_LOGIN || '').toLowerCase() === 'true';
-      if (!ligado) return u.ok(res, { mostrar: false });
+      if (!ligado) return u.ok(res, { mostrar: false, primeiro_acesso: primeiro });
       return u.ok(res, {
         mostrar: true,
+        primeiro_acesso: primeiro,
         senha: process.env.ADMIN_PASSWORD || process.env.ADMIN_SECRET || ''
       });
     }
