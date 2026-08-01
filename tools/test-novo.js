@@ -182,13 +182,22 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
 
   await adm('aurea_config_save', { value: { atende_desconhecido: true, enviar_link_cadastro: 'aprovados' } });
 
+  // trocar a conexao do WhatsApp tem que trocar o botao da landing junto
+  const stz = await adm('wa_status');
+  check('painel enxerga o numero conectado', !!stz.numero_conectado, stz.numero_conectado);
+  const landDepois = (await adm('settings')).landing || {};
+  check('o numero da landing acompanha o WhatsApp conectado',
+    landDepois.whatsapp === stz.numero_conectado, { landing: landDepois.whatsapp, conectado: stz.numero_conectado });
+
   const pub1 = await pub('vagas');
   check('landing lista as vagas', pub1.ok && pub1.vagas.length === 2, pub1.error);
   check('landing devolve os filtros por area', pub1.areas.indexOf('Tráfego Pago') >= 0, pub1.areas);
   const vagaPleno = pub1.vagas.filter(function (v) { return v.slug === 'gestor-de-trafego-pleno'; })[0];
   check('vaga tem salario', vagaPleno && vagaPleno.salary === 'R$ 2.200 + Comissões', vagaPleno && vagaPleno.salary);
-  check('botao leva pro whatsapp certo',
-    /^https:\/\/wa\.me\/5513996003897\?text=/.test(vagaPleno.link_whatsapp), vagaPleno.link_whatsapp);
+  // O botao TEM que levar para o numero conectado na Evolution — nao para
+  // um numero digitado a mao, que pode ficar velho quando trocam a conexao.
+  check('botao leva para o numero conectado na Evolution',
+    /^https:\/\/wa\.me\/5513988887777\?text=/.test(vagaPleno.link_whatsapp), vagaPleno.link_whatsapp);
   check('mensagem do botao cita a vaga',
     decodeURIComponent(vagaPleno.link_whatsapp.split('text=')[1]).indexOf('Gestor de Tráfego Pleno') >= 0);
   check('landing nao vaza o roteiro de perguntas', vagaPleno.prequal_group_id === undefined);
@@ -270,16 +279,17 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   check('aceita a vaga escolhida pelo numero',
     escolha.resultado && escolha.resultado.vaga === 'Gestor de Tráfego Jr', escolha.resultado);
 
-  // --- descanso: quem acabou de concluir nao e reiniciado por um "obrigado" ---
+  // --- a regra e simples: chamou o numero, a Aurea responde. sempre. ---
   const foneD = '11 9' + String(Date.now() + 55).slice(-8);
   const digD = '55' + foneD.replace(/\D/g, '');
-  await webhook(digD, 'Olá! Tenho interesse na vaga de Gestor de Tráfego Pleno.', 'Descanso Teste');
+  await webhook(digD, 'Olá! Tenho interesse na vaga de Gestor de Tráfego Pleno.', 'Sempre Responde');
   for (const r of ['4 anos', '3 anos cada', 'tenho sim', '2 milhoes', 'Imagine']) await webhook(digD, r);
-  const depoisFim = await webhook(digD, 'obrigado!');
-  check('depois de concluir, um obrigado nao reinicia o roteiro',
-    depoisFim.resultado && depoisFim.resultado.ignorado === true, depoisFim.resultado);
+
+  const depoisFim = await webhook(digD, 'oi de novo');
+  check('mesmo apos concluir, ela volta a responder',
+    depoisFim.resultado && depoisFim.resultado.ok === true && !depoisFim.resultado.ignorado, depoisFim.resultado);
   const citaVaga = await webhook(digD, 'na verdade queria a de Gestor de Tráfego Jr');
-  check('mas citar outra vaga recomeca',
+  check('e citar outra vaga abre o roteiro dela',
     citaVaga.resultado && citaVaga.resultado.vaga === 'Gestor de Tráfego Jr', citaVaga.resultado);
 
   console.log('\n5) WEBHOOK — casos que deve ignorar');

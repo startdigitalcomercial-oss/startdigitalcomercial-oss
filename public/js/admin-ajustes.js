@@ -119,9 +119,15 @@ async function carregaAjustes() {
       'As vagas em si você cadastra no menu <strong>Vagas</strong>.</p>' +
 
     '<div class="field"><label>WhatsApp que recebe os candidatos</label>' +
-    '<span class="hint">Só números, com DDI e DDD. Ex.: 5513996003897. É para este número que o botão da vaga leva — ' +
-    'e é nele que a Aurea precisa estar conectada.</span>' +
-    '<input type="text" id="l-zap" value="' + esc(L.whatsapp || '') + '" placeholder="5513996003897"></div>' +
+    '<span class="hint">Vem sozinho do WhatsApp conectado no card abaixo — o botão da vaga sempre leva para o ' +
+    'mesmo número em que a Aurea está. Trocou o número lá, troca aqui junto.</span>' +
+    (L.whatsapp
+      ? '<div class="alert alert-ok small" style="margin:6px 0 0">Levando os candidatos para <strong>' +
+        esc(L.whatsapp) + '</strong></div>'
+      : '<div class="alert alert-aviso small" style="margin:6px 0 0">' +
+        '<strong>Nenhum WhatsApp conectado ainda.</strong> Conecte no card WhatsApp aqui embaixo — ' +
+        'sem isso o botão da vaga não abre conversa nenhuma.</div>') +
+    '<input type="hidden" id="l-zap" value="' + esc(L.whatsapp || '') + '"></div>' +
 
     '<hr class="sep"><h3 style="font-size:14px;margin:0 0 4px">Topo da página</h3>' +
     '<p class="small muted" style="margin:0 0 12px">O título fica em três pedaços. O do meio sai colorido.</p>' +
@@ -205,8 +211,8 @@ async function carregaAjustes() {
   });
   document.getElementById('btn-landing-salvar').addEventListener('click', async function () {
     const v = function (i) { return document.getElementById(i).value.trim(); };
+    // o numero nao e digitado: vem do WhatsApp conectado
     const zap = v('l-zap').replace(/\D/g, '');
-    if (zap && zap.length < 12) return toast('O WhatsApp precisa do DDI e do DDD. Ex.: 5513996003897', true);
     this.disabled = true;
     try {
       await api('settings_save', {

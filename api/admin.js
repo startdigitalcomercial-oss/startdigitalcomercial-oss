@@ -1257,6 +1257,20 @@ module.exports = async function handler(req, res) {
         role: 'eq.candidato', order: 'created_at.desc', select: 'created_at'
       });
 
+      // O numero da landing e o numero conectado na Evolution — sempre.
+      // Guardamos aqui para a pagina publica nao precisar perguntar para
+      // a Evolution a cada visita.
+      const eu = instancias.filter(function (i) { return i.name === escolhida; })[0];
+      const numeroConectado = (eu && eu.number) || '';
+      if (numeroConectado) {
+        const land = await getSetting('landing', {});
+        if (land.whatsapp !== numeroConectado) {
+          await db.upsert('settings', {
+            key: 'landing', value: Object.assign({}, land, { whatsapp: numeroConectado })
+          }, 'key');
+        }
+      }
+
       // as ultimas batidas do webhook, inclusive as descartadas
       const diario = await getSetting('webhook_log', {});
 
@@ -1269,6 +1283,7 @@ module.exports = async function handler(req, res) {
         webhook_url: esperado,
         webhook: gancho,
         ultima_recebida: ultimaEntrada ? ultimaEntrada.created_at : null,
+        numero_conectado: numeroConectado,
         batidas: (diario && diario.itens) || []
       });
     }

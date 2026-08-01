@@ -374,6 +374,7 @@ async function receberDeDesconhecido(info) {
   const abertas = await vagas.ativas();
   const vaga = vagas.reconhecer(info.texto, abertas);
 
+
   // cria a porta de entrada: ainda não é candidatura, é um contato
   const candidato = await db.insert('candidates', {
     token: u.candidateToken(),
@@ -397,39 +398,16 @@ async function receberDeDesconhecido(info) {
 
 // ------------------------------------------------------------
 // Quem JÁ está cadastrado mas não tem conversa aberta.
-// Acontece o tempo todo: a pessoa preencheu o formulário semanas
-// atrás, hoje vê a landing e aperta o botão. Antes disso aqui, o
-// sistema recebia a mensagem e ficava mudo, porque só sabia
-// continuar conversa começada.
+// A regra é simples e sem exceção: chamou o número, a Aurea responde.
+// Não importa se a pessoa já é candidata, se já conversou antes ou
+// se acabou de terminar um roteiro. Sempre responde.
 // ------------------------------------------------------------
-const HORAS_DESCANSO = 12;
-
 async function receberSemConversa(candidato, texto) {
   const cfg = await config();
   if (!cfg.ativa) return { ok: false, ignorado: true, error: 'Aurea desligada.' };
-  if (cfg.atende_desconhecido === false) {
-    return { ok: false, ignorado: true, error: 'Aurea não puxa conversa sozinha.' };
-  }
 
   const abertas = await vagas.ativas();
-  const vaga = vagas.reconhecer(texto, abertas);
-
-  // Acabou de conversar e agora mandou um "obrigado"? Fica quieta.
-  // Só volta a falar se a mensagem citar uma vaga de verdade.
-  if (!vaga) {
-    const ultima = await db.selectOne('prequal_sessions', {
-      candidate_id: 'eq.' + candidato.id, finished_at: 'not.is.null',
-      order: 'finished_at.desc', select: 'finished_at'
-    });
-    if (ultima && ultima.finished_at) {
-      const horas = (Date.now() - new Date(ultima.finished_at).getTime()) / 3600000;
-      if (horas < HORAS_DESCANSO) {
-        return { ok: false, ignorado: true, error: 'Conversa recém-encerrada — deixando quieto.' };
-      }
-    }
-  }
-
-  const r = await comecarPelaVaga(candidato, texto, cfg, abertas, vaga);
+  const r = await comecarPelaVaga(candidato, texto, cfg, abertas, null);
   return Object.assign({ recomecou: true }, r);
 }
 

@@ -191,7 +191,11 @@ const server = http.createServer(async function (req, res) {
     }));
   }
   if (url.pathname === '/instance/fetchInstances') {
-    return json([{ instance: { instanceName: 'start-comercial', connectionStatus: 'open', owner: '5511999999999' } }]);
+    // a Evolution de verdade devolve o numero conectado em ownerJid
+    return json([
+      { instance: { instanceName: 'start-comercial', connectionStatus: 'open', ownerJid: '5511999999999@s.whatsapp.net' } },
+      { instance: { instanceName: 'start-rh', connectionStatus: 'open', ownerJid: '5513988887777@s.whatsapp.net' } }
+    ]);
   }
 
   res.statusCode = 404;

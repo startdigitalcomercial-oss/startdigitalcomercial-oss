@@ -23,6 +23,30 @@ async function getSetting(key, fallback) {
   return row ? row.value : fallback;
 }
 
+// O botao da vaga tem que levar para o MESMO numero em que a Aurea esta
+// conectada — senao o candidato manda mensagem para um telefone que
+// ninguem escuta. Por isso perguntamos para a Evolution qual e, e so
+// usamos o numero digitado no painel se ela nao souber responder.
+let ZAP_CACHE = { numero: '', em: 0 };
+
+async function numeroDaAurea(landing) {
+  const agora = Date.now();
+  if (ZAP_CACHE.numero && agora - ZAP_CACHE.em < 5 * 60 * 1000) return ZAP_CACHE.numero;
+  try {
+    const w = await getSetting('whatsapp', {});
+    const escolhida = (w && w.instance) || process.env.EVOLUTION_INSTANCE || '';
+    const lista = await send.listWhatsAppInstances();
+    const eu = lista.filter(function (i) { return i.name === escolhida; })[0];
+    if (eu && eu.number) {
+      ZAP_CACHE = { numero: eu.number, em: agora };
+      return eu.number;
+    }
+  } catch (e) { /* cai no numero salvo */ }
+  const salvo = (landing && landing.whatsapp) || '';
+  if (salvo) ZAP_CACHE = { numero: salvo, em: agora };
+  return salvo;
+}
+
 async function candidateByToken(token) {
   if (!token) return null;
   return db.selectOne('candidates', { token: 'eq.' + token, select: '*' });
@@ -59,7 +83,7 @@ module.exports = async function handler(req, res) {
     if (action === 'vagas') {
       const landing = await getSetting('landing', {});
       const company = await getSetting('company', {});
-      const zap = landing.whatsapp || (await getSetting('whatsapp', {})).numero || '';
+      const zap = await numeroDaAurea(landing);
       const lista = await vagas.ativas();
       const areas = [];
       lista.forEach(function (v) {
@@ -79,7 +103,7 @@ module.exports = async function handler(req, res) {
       const v = await vagas.porApelido(String(q.slug || ''));
       if (!v) return u.fail(res, 404, 'Vaga nao encontrada ou ja encerrada.');
       const landing = await getSetting('landing', {});
-      const zap = landing.whatsapp || (await getSetting('whatsapp', {})).numero || '';
+      const zap = await numeroDaAurea(landing);
       db.update('jobs', { views: (v.views || 0) + 1 }, { id: 'eq.' + v.id }).catch(function () { });
       return u.ok(res, { vaga: vagas.paraPublico(v, u.appUrl(), zap) });
     }

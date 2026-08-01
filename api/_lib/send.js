@@ -203,10 +203,14 @@ async function listWhatsAppInstances() {
     const arr = Array.isArray(data) ? data : (data && data.instances) || [];
     return arr.map(function (it) {
       const inst = it.instance || it;
+      // O numero conectado vem em nomes diferentes conforme a versao
+      // da Evolution. Pega o primeiro que existir e deixa so digitos.
+      const cru = inst.ownerJid || inst.owner || inst.number ||
+        inst.wuid || (inst.profile && inst.profile.wuid) || '';
       return {
         name: inst.instanceName || inst.name || '',
         status: inst.connectionStatus || inst.status || inst.state || '',
-        number: inst.owner || inst.number || ''
+        number: String(cru).split('@')[0].replace(/\D/g, '')
       };
     }).filter(function (i) { return i.name; });
   } catch (e) {
