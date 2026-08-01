@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Painel de Recrutamento — StartDigital</title>
+<title>Portal do Colaborador — StartDigital</title>
+<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest">
 <link rel="stylesheet" href="/ui.css">
 <style>
   html, body { background: var(--canvas); min-height: 100%; }
@@ -98,8 +99,9 @@
   .app-shell { display: flex; min-height: 100vh; }
   .sidebar { width: 218px; flex: none; background: #101828; display: flex; flex-direction: column; padding: 20px 12px 16px; position: sticky; top: 0; height: 100vh; }
   .logo { display: flex; align-items: center; gap: 9px; color: #fff; font-weight: 600; font-size: 15px; letter-spacing: -.014em; padding: 2px 10px 14px; }
-  .logo .dot { width: 8px; height: 8px; border-radius: 50%; background: #1fbf6e; display: block; }
-  .logo small { color: #667085; font-weight: 400; font-size: 12px; }
+  .logo .logo-img { width: 24px; height: 24px; display: block; flex: none; }
+  .logo .logo-txt { display: flex; flex-direction: column; line-height: 1.25; }
+  .logo small { color: #8a94a6; font-weight: 400; font-size: 11px; letter-spacing: 0; }
   .nav-sec { font-size: 10.5px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: #475467; padding: 16px 10px 7px; }
   #abas { display: block; }
   #abas button, .sidebar .fim button {
@@ -121,6 +123,7 @@
     .app-shell { flex-direction: column; }
     .sidebar { width: 100%; height: auto; position: static; flex-direction: row; align-items: center; gap: 4px; padding: 10px 12px; overflow-x: auto; }
     .logo { padding: 0 8px 0 2px; }
+    .logo small { display: none; }
     #abas { display: flex; gap: 2px; }
     #abas button, .sidebar .fim button { width: auto; white-space: nowrap; }
     #abas button span { display: none; }
@@ -328,10 +331,10 @@
 <div id="tela-login" style="display:none">
   <div class="login-wrap">
     <div class="brand" style="justify-content:center;margin-bottom:18px;color:var(--tinta)">
-      <span class="dot"></span> StartDigital
+      <img src="/favicon-32.png" alt="" style="width:26px;height:26px"> StartDigital
     </div>
     <div class="card">
-      <h2>Painel de Recrutamento</h2>
+      <h2>Portal do Colaborador</h2>
       <p class="sub" id="login-sub">Entre com o seu e-mail e senha.</p>
       <div id="login-erro"></div>
       <form id="form-login">
@@ -354,7 +357,7 @@
   <div class="app-shell">
 
   <aside class="sidebar">
-    <div class="logo"><span class="dot"></span>StartDigital <small>RH</small></div>
+    <div class="logo"><img src="/favicon-32.png" alt="" class="logo-img"><span class="logo-txt">StartDigital<small>Portal do Colaborador</small></span></div>
     <nav id="abas">
       <div class="nav-sec">Principal</div>
       <button data-aba="dashboard" class="on"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3.6" y="3.6" width="7" height="6" rx="1.6"/><rect x="3.6" y="12.4" width="7" height="8" rx="1.6"/><rect x="13.4" y="3.6" width="7" height="10" rx="1.6"/><rect x="13.4" y="16.4" width="7" height="4" rx="1.6"/></svg><span>Dashboard</span></button>
