@@ -91,13 +91,20 @@ document.getElementById('form-login').addEventListener('submit', async function 
   try {
     const res = await fetch('/api/admin?action=login', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: document.getElementById('senha').value })
+      body: JSON.stringify({
+        email: (document.getElementById('email-login') || {}).value || '',
+        password: document.getElementById('senha').value
+      })
     });
     const data = await res.json();
     if (!data.ok) throw new Error(data.error);
     TOKEN = data.token;
     localStorage.setItem(LS, TOKEN);
     document.getElementById('login-erro').innerHTML = '';
+    if (data.trocar_senha) {
+      alert('Esta é a sua senha inicial. Peça ao Dono do painel para trocá-la assim que puder — ' +
+        'ou combine uma senha nova com ele.');
+    }
     iniciar();
   } catch (e) {
     document.getElementById('login-erro').innerHTML = '<div class="alert alert-erro">' + esc(e.message) + '</div>';
@@ -112,7 +119,7 @@ const TITULOS = {
   dashboard: 'Dashboard', triagem: 'Triagem', candidatos: 'Candidatos',
   prequalificacao: 'Pré Qualificação', aurea: 'Aurea', preonboarding: 'Pré Onboarding',
   conteudo: 'Aulas da integração', quiz: 'Quiz de seleção',
-  colaboradores: 'Colaboradores', avisos: 'Avisos para o time',
+  colaboradores: 'Colaboradores', avisos: 'Avisos para o time', usuarios: 'Usuários do painel',
   mensagens: 'Modelos de mensagem', ajustes: 'Ajustes'
 };
 document.getElementById('abas').addEventListener('click', function (ev) {
@@ -129,7 +136,7 @@ document.getElementById('abas').addEventListener('click', function (ev) {
   const carregar = {
     dashboard: carregaDashboard, triagem: carregaBoard, candidatos: carregaCandidatos,
     prequalificacao: carregaPrequal, aurea: carregaAurea, preonboarding: carregaBoasVindas,
-    colaboradores: carregaColaboradores, avisos: carregaAvisos,
+    colaboradores: carregaColaboradores, avisos: carregaAvisos, usuarios: carregaUsuarios,
     conteudo: carregaConteudo, quiz: carregaQuiz, mensagens: carregaTemplates, ajustes: carregaAjustes
   };
   if (carregar[b.dataset.aba]) carregar[b.dataset.aba]();
