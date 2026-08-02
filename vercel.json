@@ -1,6 +1,26 @@
 {
   "rewrites": [
     {
+      "source": "/favicon-32.png",
+      "destination": "/api/icone?s=32"
+    },
+    {
+      "source": "/favicon.ico",
+      "destination": "/api/icone?s=48&f=ico"
+    },
+    {
+      "source": "/apple-touch-icon.png",
+      "destination": "/api/icone?s=180"
+    },
+    {
+      "source": "/icone-192.png",
+      "destination": "/api/icone?s=192"
+    },
+    {
+      "source": "/icone-512.png",
+      "destination": "/api/icone?s=512"
+    },
+    {
       "source": "/trabalhe-conosco",
       "destination": "/vagas.html"
     },
