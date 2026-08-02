@@ -51,9 +51,29 @@ const ROTAS = {
   '/colaborador': '/equipe.html'
 };
 
+// Os icones sao gerados por codigo. Na Vercel isso e um rewrite no
+// vercel.json; aqui o espelho local precisa fazer o mesmo, senao ele
+// mente sobre como a producao se comporta.
+const ICONES = {
+  '/favicon-32.png': 's=32',
+  '/favicon.ico': 's=48&f=ico',
+  '/apple-touch-icon.png': 's=180',
+  '/icone-192.png': 's=192',
+  '/icone-512.png': 's=512'
+};
+
 const server = http.createServer(async function (req, res) {
   const url = new URL(req.url, 'http://localhost');
   let pathname = url.pathname;
+
+  if (ICONES[pathname]) {
+    // Reescreve o req.url de verdade: o handler le a query dali. Se a
+    // gente so trocasse o caminho, o espelho responderia diferente da
+    // producao e o teste local nao valeria nada.
+    req.url = '/api/icone?' + ICONES[pathname];
+    pathname = '/api/icone';
+  }
+
 
   if (pathname.startsWith('/api/')) {
     const nome = pathname.replace('/api/', '').replace(/\/+$/, '');
