@@ -54,7 +54,7 @@ const DB = {
 
   settings: [
     { key: 'company', value: { name: 'StartDigital', primary_color: '#22c55e', logo_url: '', site: '', support_email: 'startdigitalcomercial@gmail.com' } },
-    { key: 'aurea', value: { nome: 'Aurea', ativa: true, pausa_primeira: 10000, pausa_entre_mensagens: 4000, auto_ao_receber_formulario: true, horario_comercial: false, hora_inicio: 8, hora_fim: 20, modelo: 'claude-sonnet-4-6', instancia_whatsapp: '', personalidade: 'Você é a Aurea, assistente de recrutamento da StartDigital. Fale em português do Brasil, informal e curto.' } },
+    { key: 'aurea', value: { nome: 'Aurea', ativa: true, pausa_primeira: 10000, pausa_entre_mensagens: 4000, auto_ao_receber_formulario: true, horario_comercial: false, hora_inicio: 8, hora_fim: 20, modelo: 'claude-sonnet-4-6', instancia_whatsapp: '', personalidade: 'Você é a Aurea, do time de recrutamento da StartDigital.\n\nCOMO VOCÊ ESCREVE\nComo uma pessoa de verdade no WhatsApp. Frases curtas.\nNUNCA use travessão (— ou –). Use vírgula, ponto ou quebre em duas frases.\nNão diz que é uma IA, um bot ou um assistente virtual.' } },
     { key: 'conhecimento', value: { texto: 'ONDE FICA\nA StartDigital fica em Praia Grande, São Paulo.\n\nHORÁRIO\n08h45 às 18h.\n\nCONTRATAÇÃO\nPor enquanto todas as vagas são no regime PJ.\n\nBENEFÍCIOS\n🏋️ TotalPass\n📚 Amazon — R$ 100,00 em livros a cada trimestre\n🎧 Spotify Premium\n🛡️ Seguro de vida sem custo\n🦷 Plano odontológico sem custo\n📈 Plano de carreira interno (PDI)\n💰 Bônus por meta anual\n🎖️ Premiações por tempo de empresa\n\nPRAZO DO PROCESSO SELETIVO\nNão existe data definida. O processo segue até ser concluído.' } },
     { key: 'origens', value: { lista: ['Formulário do site', 'Indeed', 'LinkedIn', 'Catho'] } },
     { key: 'landing', value: { whatsapp: '5513996003897', badge: 'Estamos contratando', headline_1: 'Se o seu trabalho é', headline_destaque: 'extraordinário,', headline_2: 'seu lugar é aqui.', sub: 'Somos um time movido por resultado, cultura e gente boa de verdade!', sobre_titulo_1: 'Uma agência que', sobre_destaque: 'transforma negócios', sobre_titulo_2: 'de verdade', sobre_texto: 'A Start é uma agência digital focada em performance, construída para entregar o que realmente importa: resultado.\n\nSomos um time com 💜 sangue roxo, que joga em alta performance, evolui rápido e cresce junto.\n\nSe você curte desafio, evolução constante o seu lugar é aqui.' } },
@@ -62,8 +62,10 @@ const DB = {
   ],
 
   message_templates: [
+    { key: 'landing_wa_1_ola', channel: 'whatsapp', name: 'Landing 1 — saudação', subject: null, body: 'Oi {{primeiro_nome}}, tudo bem?\n\nAqui é a Aurea, do time da StartDigital. Que bom ter você por aqui!' },
+    { key: 'landing_wa_3_cadastro', channel: 'whatsapp', name: 'Landing 3 — link do cadastro', subject: null, body: 'E pra fechar, preenche o seu cadastro neste link:\n{{link_cadastro}}\n\nÉ rapidinho e é por ele que a gente organiza tudo por aqui.' },
     { key: 'landing_wa_1_perguntas', channel: 'whatsapp', name: 'Landing 1 — saudação e perguntas', subject: null, body: 'Olá, {{primeiro_nome}}!\n\nAntes de avançar para a próxima fase, me responde:\n\n1.) Quanto tempo de experiência você tem com Meta Ads e Google Ads?\n\n2.) Tem disponibilidade pra trabalhar presencial em Praia Grande, das 08h40 às 18h?\n\n3.) E quanto você já rodou em Ads?\n\n4.) Está disposto a crescer dentro de uma empresa no setor de Marketing em Praia Grande?' },
-    { key: 'landing_wa_2_video', channel: 'whatsapp', name: 'Landing 2 — pedido do vídeo', subject: null, body: '📽️ Grave um vídeo de até 1 minuto se apresentando: fale sobre sua trajetória profissional.' },
+    { key: 'landing_wa_2_video', channel: 'whatsapp', name: 'Landing 2 — pedido do vídeo', subject: null, body: '📽️ Envie um vídeo de até 1 minuto se apresentando e falando da sua trajetória profissional na área de {{vaga}}. 😄\n\nO vídeo é usado só no nosso processo seletivo interno e não vai ser divulgado.' },
     { key: 'landing_wa_3_obrigado', channel: 'whatsapp', name: 'Landing 3 — agradecimento', subject: null, body: 'Recebido, {{primeiro_nome}}! 💜\n\nObrigada por participar do nosso processo seletivo.\n\nEntraremos em contato caso você passe para a próxima fase.' },
     { key: 'landing_wa_4_redes', channel: 'whatsapp', name: 'Landing 4 — nossas redes', subject: null, body: 'Enquanto isso, dá uma olhada na gente:\n\n*Perfil oficial da Start*\ninstagram.com/startdigital_oficial\n\n*Perfil de carreiras*\ninstagram.com/somossangueroxo' },
     { key: 'welcome_email_senha', channel: 'email', name: 'Boas-vindas com criação de senha', subject: 'Bem-vindo(a) à StartDigital, {{primeiro_nome}}!', body: 'Olá {{primeiro_nome}}!\n\nVocê foi aprovado(a) para {{vaga}}.\n\nCrie a sua senha aqui:\n{{link_senha}}\n\nSeu e-mail de acesso: {{email}}\n\nEquipe StartDigital' },
@@ -164,6 +166,7 @@ const DB = {
       requirements: ['Experiência como gestor de tráfego', 'Meta Ads e Google Ads'],
       responsibilities: ['Planejar e subir campanhas'], benefits: ['Comissão por resultado'],
       prequal_group_id: 'gggg1111-1111-4111-8111-111111111111', whatsapp_message: null,
+      wa_perguntas: 'Antes de avançar para a próxima fase, me responde:\n\n1.) Quanto tempo de experiência você tem com Meta Ads e Google Ads?\n\n2.) Você já rodou quanto em Ads?\n\n3.) Qual curso você já fez de tráfego pago?',
       active: true, featured: true, position: 1, views: 0,
       created_at: agora(), updated_at: agora()
     },
@@ -176,6 +179,7 @@ const DB = {
       location: 'Praia Grande, SP', schedule: '08h45 às 18h', area: 'Tráfego Pago', seniority: 'Júnior',
       requirements: ['Noções de Meta Ads'], responsibilities: ['Apoiar as campanhas'], benefits: ['Treinamento'],
       prequal_group_id: 'gggg1111-1111-4111-8111-111111111111', whatsapp_message: null,
+      wa_perguntas: 'Antes de avançar para a próxima fase, me responde:\n\n1.) Quanto tempo de experiência você tem com Meta Ads e Google Ads?\n\n2.) Você já rodou quanto em Ads?\n\n3.) Qual curso você já fez de tráfego pago?',
       active: true, featured: false, position: 2, views: 0,
       created_at: agora(), updated_at: agora()
     }
@@ -197,7 +201,7 @@ const DB = {
 
 /* ---------------- defaults por tabela ---------------- */
 const DEFAULTS = {
-  candidates: function () { return { id: uuid(), extra: {}, wa_sequencia_em: null, job_id: null, source: 'formulario', source_detail: null, stage_key: 'triagem', password_hash: null, password_salt: null, rating: null, notes: null, member_access: false, archived: false, created_at: agora(), updated_at: agora() }; },
+  candidates: function () { return { id: uuid(), extra: {}, wa_sequencia_em: null, cadastro_em: null, job_id: null, source: 'formulario', source_detail: null, stage_key: 'triagem', password_hash: null, password_salt: null, rating: null, notes: null, member_access: false, archived: false, created_at: agora(), updated_at: agora() }; },
   stage_history: function () { return { id: seq('stage_history'), created_at: agora(), note: null, from_stage: null, to_stage: null }; },
   disc_results: function () { return { id: uuid(), answers: {}, created_at: agora() }; },
   quiz_attempts: function () { return { id: uuid(), answers: {}, score: null, max_score: null, percent: null, passed: null, focus_lost: 0, paste_blocked: 0, integrity_flags: [], started_at: agora(), finished_at: null }; },
@@ -210,7 +214,7 @@ const DEFAULTS = {
   disc_questions: function () { return { id: seq('disc_questions'), active: true }; },
   settings: function () { return { value: {} }; },
   message_templates: function () { return { id: seq('message_templates'), updated_at: agora() }; },
-  jobs: function () { return { id: uuid(), requirements: [], responsibilities: [], benefits: [], active: true, featured: false, position: 1, views: 0, prequal_group_id: null, created_at: agora(), updated_at: agora() }; },
+  jobs: function () { return { id: uuid(), requirements: [], responsibilities: [], benefits: [], active: true, featured: false, position: 1, views: 0, prequal_group_id: null, wa_perguntas: null, created_at: agora(), updated_at: agora() }; },
   prequal_groups: function () { return { id: uuid(), active: true, is_default: false, auto_on_apply: true, job_id: null, created_at: agora() }; },
   prequal_questions: function () { return { id: uuid(), position: 1, required: true, weight: 1, objective: null }; },
   prequal_sessions: function () { return { id: uuid(), channel: 'whatsapp', status: 'aguardando', current_index: 0, answers: [], score: null, recommendation: null, summary: null, job_id: null, video_em: null, respostas_ok: false, last_message_at: null, started_at: agora(), finished_at: null, error: null }; },

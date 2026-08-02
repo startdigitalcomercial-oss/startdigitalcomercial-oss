@@ -188,6 +188,9 @@ function abreVaga(id) {
     'ela cai no WhatsApp com esta frase já escrita — e a Aurea usa o roteiro escolhido abaixo.</p>' +
     campo('vg-zapmsg', 'Frase do botão', d.whatsapp_message,
       'Deixe em branco para usar: "Olá! Tenho interesse na vaga de ' + esc(d.title || '…') + '."') +
+    campo('vg-perguntas', 'Perguntas desta vaga no WhatsApp', d.wa_perguntas,
+      'A Aurea manda estas perguntas logo na saudação. Deixe em branco e ela só pede o vídeo e o cadastro, ' +
+      'que é o padrão de toda vaga.', 'area') +
     '<div class="field" style="margin-top:14px"><label for="vg-grupo">Roteiro de perguntas</label>' +
       '<span class="hint">O que a Aurea vai perguntar para quem se candidatar a esta vaga.</span>' +
       '<select id="vg-grupo">' +
@@ -224,7 +227,8 @@ function abreVaga(id) {
       work_mode: val('vg-mode'), location: val('vg-location'), schedule: val('vg-schedule'),
       description: val('vg-description'),
       responsibilities: val('vg-resp'), requirements: val('vg-req'), benefits: val('vg-ben'),
-      whatsapp_message: val('vg-zapmsg'), prequal_group_id: val('vg-grupo') || null,
+      whatsapp_message: val('vg-zapmsg'), wa_perguntas: val('vg-perguntas'),
+      prequal_group_id: val('vg-grupo') || null,
       active: document.getElementById('vg-ativa').checked,
       featured: document.getElementById('vg-destaque').checked
     };

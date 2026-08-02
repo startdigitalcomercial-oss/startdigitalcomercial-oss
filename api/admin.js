@@ -973,7 +973,7 @@ module.exports = async function handler(req, res) {
 
       const patch = {};
       ['summary', 'description', 'salary', 'employment_type', 'location', 'schedule',
-       'area', 'seniority', 'whatsapp_message'].forEach(function (k) {
+       'area', 'seniority', 'whatsapp_message', 'wa_perguntas'].forEach(function (k) {
         if (body[k] !== undefined) patch[k] = String(body[k] || '').trim() || null;
       });
       ['requirements', 'responsibilities', 'benefits'].forEach(function (k) {

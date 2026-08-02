@@ -196,29 +196,37 @@ module.exports = async function handler(req, res) {
       if (!u.isEmail(email)) return u.fail(res, 400, 'Informe um e-mail valido.');
       if (u.normalizePhone(phone).length < 12) return u.fail(res, 400, 'Informe um WhatsApp valido com DDD.');
 
-      const existente = await db.selectOne('candidates', {
-        email: 'eq.' + email, archived: 'eq.false', select: 'id,name,created_at'
-      });
-      if (existente) {
-        return u.fail(res, 409, 'Ja recebemos uma candidatura com este e-mail. Se precisar atualizar alguma informacao, responda o e-mail de confirmacao que enviamos.');
-      }
-
-      // Quem veio pela landing ja conversou com a Aurea no WhatsApp e existe
-      // aqui dentro so como contato. Nesse caso a gente COMPLETA o cadastro
-      // dele em vez de criar um segundo — senao a mesma pessoa vira dois.
+      // ---- quem já está no sistema? ----
+      // Achar a pessoa ANTES de reclamar de e-mail repetido: senão quem se
+      // cadastrou na landing e usa o mesmo e-mail aqui leva um "já recebemos
+      // sua candidatura", e vira dois registros da mesma pessoa.
       let lead = null;
+
+      // 1) o token do link é prova de identidade. Se veio, é ele.
       if (body.t) {
         const porToken = await candidateByToken(String(body.t));
-        if (porToken && porToken.source === 'whatsapp' && !porToken.email) lead = porToken;
+        if (porToken && porToken.archived !== true) lead = porToken;
       }
+      // 2) senão, pelo telefone, entre quem ainda não completou o cadastro
       if (!lead) {
         const tail = u.phoneTail(phone);
         if (tail) {
-          lead = await db.selectOne('candidates', {
-            phone_digits: 'like.*' + tail, source: 'eq.whatsapp', email: 'eq.',
-            archived: 'eq.false', order: 'created_at.desc', select: '*'
+          const mesmos = await db.select('candidates', {
+            phone_digits: 'like.*' + tail, archived: 'eq.false',
+            order: 'created_at.desc', select: '*', limit: 5
           });
+          lead = mesmos.filter(function (c) {
+            return !c.cadastro_em && (c.source === 'landing' || c.source === 'whatsapp');
+          })[0] || null;
         }
+      }
+
+      // e-mail já usado por OUTRA pessoa continua barrado
+      const existente = await db.selectOne('candidates', {
+        email: 'eq.' + email, archived: 'eq.false', select: 'id,name,created_at'
+      });
+      if (existente && (!lead || existente.id !== lead.id)) {
+        return u.fail(res, 409, 'Ja recebemos uma candidatura com este e-mail. Se precisar atualizar alguma informacao, responda o e-mail de confirmacao que enviamos.');
       }
 
       // a vaga escolhida na landing
@@ -226,7 +234,10 @@ module.exports = async function handler(req, res) {
       if (body.vaga) vagaEscolhida = await vagas.porApelido(String(body.vaga));
       if (!vagaEscolhida && lead && lead.job_id) vagaEscolhida = await vagas.porId(lead.job_id);
 
-      const row = { stage_key: 'triagem', source: 'formulario', source_detail: 'Formulário do site' };
+      const row = {
+        stage_key: 'triagem', source: 'formulario', source_detail: 'Formulário do site',
+        cadastro_em: new Date().toISOString()
+      };
       CAMPOS_FORM.forEach(function (c) {
         if (body[c] !== undefined && body[c] !== null) {
           row[c] = c === 'email' ? email : String(body[c]).trim().slice(0, 4000);
@@ -243,8 +254,10 @@ module.exports = async function handler(req, res) {
 
       let cand;
       if (lead) {
-        row.source = 'whatsapp';
-        row.source_detail = 'Landing → WhatsApp → cadastro';
+        // Preserva a origem: quem veio da landing continua no funil da
+        // landing depois de preencher o cadastro.
+        row.source = lead.source === 'landing' ? 'landing' : 'whatsapp';
+        row.source_detail = (lead.source === 'landing' ? 'Landing page' : 'Landing → WhatsApp') + ' → cadastro completo';
         row.updated_at = new Date().toISOString();
         cand = await db.update('candidates', row, { id: 'eq.' + lead.id }) || lead;
         await db.insert('stage_history', {

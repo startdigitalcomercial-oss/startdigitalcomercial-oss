@@ -303,6 +303,11 @@ document.getElementById('form').addEventListener('submit', async function (ev) {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Enviando…';
   try {
+    // Quem veio pelo link da Aurea traz o token e a vaga na URL. Com eles
+    // o sistema completa o cadastro que ja existe, em vez de criar outro.
+    const url = new URLSearchParams(location.search);
+    if (url.get('t')) dados.t = url.get('t');
+    if (url.get('v')) dados.vaga = url.get('v');
     const r = await api('apply', { method: 'POST', body: dados });
     if (!r.ok) throw new Error(r.error || 'Não foi possível enviar.');
     document.getElementById('nome-ok').textContent = dados.name.split(' ')[0];

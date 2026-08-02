@@ -64,8 +64,11 @@ const server = http.createServer(async function (req, res) {
       const temVideo = /V[ií]deo recebido at[ée] agora: SIM/i.test(sys);
       const desistiu = /(n[ãa]o tenho interesse|desisto|para de|parar)/i.test(conversa);
       // considera respondido quando a pessoa falou dos quatro assuntos
-      const completas = /meta ads|google ads/.test(conversa) && /presencial|disponibilidade|sim/.test(conversa) &&
-        /(mil|milh|r\$|rodei)/.test(conversa) && /(crescer|sim|claro)/.test(conversa);
+      const semPerguntas = /esta vaga não tem perguntas/i.test(sys);
+      const completas = semPerguntas || (
+        /meta ads|google ads/.test(conversa) &&
+        /(mil|milh|r\$|rodei)/.test(conversa) &&
+        /curso|sobral|formaç/.test(conversa));
       return json({
         content: [{
           type: 'tool_use', name: tool.name,

@@ -407,17 +407,31 @@ async function receberDeDesconhecido(info) {
 // Não é conversa com IA: é um roteiro fixo, que o time edita em
 // Mensagens. A pessoa responde e um humano lê.
 // ============================================================
-// Na chegada vao so estas duas. O agradecimento e as redes ficam
-// para o fim, quando a pessoa entrega tudo.
+// Na chegada: saudação (com as perguntas da vaga, se ela tiver),
+// o pedido do vídeo e o link do cadastro. O agradecimento e as redes
+// ficam para o fim, quando a pessoa entrega tudo.
 const SEQUENCIA = [
-  'landing_wa_1_perguntas',
-  'landing_wa_2_video'
+  'landing_wa_1_ola',
+  'landing_wa_2_video',
+  'landing_wa_3_cadastro'
 ];
 
 const FECHAMENTO = [
   'landing_wa_3_obrigado',
   'landing_wa_4_redes'
 ];
+
+// Tira a cara de robô do texto que a IA escreveu. O travessão é a
+// marca registrada de texto de máquina; em conversa de WhatsApp
+// ninguém usa.
+function semCaraDeIA(txt) {
+  return String(txt || '')
+    .replace(/\s+[—–]\s+/g, ', ')
+    .replace(/[—–]/g, '-')
+    .replace(/,\s*,/g, ',')
+    .replace(/\s+([,.!?])/g, '$1')
+    .trim();
+}
 
 const PAUSA_PADRAO = 4000;
 const PAUSA_PRIMEIRA = 10000;
@@ -426,6 +440,23 @@ async function textoDoModelo(chave, vars, reserva) {
   const tpl = await db.selectOne('message_templates', { key: 'eq.' + chave, select: 'body' });
   const corpo = (tpl && tpl.body) || reserva || '';
   return u.renderTemplate(corpo, vars);
+}
+
+// O link do cadastro vai com o token da pessoa, para o formulário
+// completar o registro dela em vez de criar outro.
+function linkDoCadastro(candidato, vaga) {
+  const base = u.appUrl();
+  if (!base) return '';
+  return base + '/vaga?t=' + candidato.token + (vaga ? '&v=' + vaga.slug : '');
+}
+
+// A saudação leva junto as perguntas da vaga, quando ela tem.
+async function textoDaSequencia(chave, vars, vaga) {
+  const texto = await textoDoModelo(chave, vars);
+  if (chave === 'landing_wa_1_ola' && vaga && String(vaga.wa_perguntas || '').trim()) {
+    return texto + '\n\n' + u.renderTemplate(String(vaga.wa_perguntas).trim(), vars);
+  }
+  return texto;
 }
 
 async function mandarSequencia(candidato, vaga, cfg, chaves) {
@@ -438,12 +469,15 @@ async function mandarSequencia(candidato, vaga, cfg, chaves) {
   const empresa = await db.selectOne('settings', { key: 'eq.company', select: 'value' });
   const vars = Object.assign(
     u.templateVars(candidato, (empresa && empresa.value) || {}),
-    { vaga: vaga ? vaga.title : (candidato.role_applied || 'a vaga') }
+    {
+      vaga: vaga ? vaga.title : (candidato.role_applied || 'a vaga'),
+      link_cadastro: linkDoCadastro(candidato, vaga)
+    }
   );
 
   const saidas = [];
   for (let i = 0; i < lista.length; i++) {
-    const texto = await textoDoModelo(lista[i], vars);
+    const texto = await textoDaSequencia(lista[i], vars, vaga);
     if (!texto.trim()) continue;
 
     // A primeira já entra digitando também: a pessoa acabou de mandar
@@ -498,9 +532,12 @@ async function receberDaLanding(candidato) {
     respostas_ok: false,
     last_message_at: new Date().toISOString()
   });
-  const vars = u.templateVars(candidato, {});
+  const vars = Object.assign(u.templateVars(candidato, {}), {
+    vaga: vaga ? vaga.title : (candidato.role_applied || 'a vaga'),
+    link_cadastro: linkDoCadastro(candidato, vaga)
+  });
   for (const ch of SEQUENCIA) {
-    await registrar(sessao.id, 'aurea', await textoDoModelo(ch, vars));
+    await registrar(sessao.id, 'aurea', await textoDaSequencia(ch, vars, vaga));
   }
   return Object.assign({ session_id: sessao.id }, r);
 }
@@ -603,18 +640,22 @@ async function acompanharDaLanding(candidato, texto, tipo) {
     messages.unshift({ role: 'user', content: '(início da conversa)' });
   }
 
-  const perguntas = await textoDoModelo('landing_wa_1_perguntas',
-    u.templateVars(candidato, {}));
+  const temPerguntas = !!(vaga && String(vaga.wa_perguntas || '').trim());
+  const perguntas = temPerguntas ? String(vaga.wa_perguntas).trim() : '';
+  const cadastroOk = !!candidato.cadastro_em;
 
   const conhecimento = await baseDeConhecimento();
 
   const system = (cfg.personalidade || '') + '\n\n' +
     '=== ONDE ESTAMOS ===\n' +
     'Candidato: ' + (candidato.name || '') + '\n' +
-    'Ele se candidatou pela landing page e já recebeu esta mensagem com as perguntas:\n---\n' +
-    perguntas + '\n---\n' +
-    'Também já pediram a ele um vídeo de até 1 minuto se apresentando.\n' +
-    'Vídeo recebido até agora: ' + (videoEm ? 'SIM' : 'AINDA NÃO') + '\n\n' +
+    'Ele se candidatou pela landing page. Já pedimos três coisas a ele:\n' +
+    (temPerguntas
+      ? '1) Responder estas perguntas:\n---\n' + perguntas + '\n---\n'
+      : '1) (esta vaga não tem perguntas, pule este item)\n') +
+    '2) Um vídeo de até 1 minuto se apresentando. Recebido: ' + (videoEm ? 'SIM' : 'AINDA NÃO') + '\n' +
+    '3) Preencher o cadastro completo neste link: ' + linkDoCadastro(candidato, vaga) + '\n' +
+    '   Cadastro preenchido: ' + (cadastroOk ? 'SIM' : 'AINDA NÃO') + '\n\n' +
     '=== A VAGA (use só o que está aqui) ===\n' + fichaDaVaga(vaga) + '\n\n' +
     (conhecimento ? '=== SOBRE A EMPRESA (use só o que está aqui) ===\n' + conhecimento + '\n\n' : '') +
     '=== O QUE VOCÊ FAZ AGORA ===\n' +
@@ -625,14 +666,14 @@ async function acompanharDaLanding(candidato, texto, tipo) {
     'confirmar com o time. Nunca invente.\n' +
     '2. Logo depois de responder, retome: peça com gentileza o que ainda falta para ele ' +
     'participar do processo seletivo.\n' +
-    '3. Se ele ainda não respondeu as quatro perguntas, peça só o que falta — sem repetir a lista inteira.\n' +
-    (videoEm ? '4. O vídeo já chegou, não peça de novo.\n'
-             : '4. Se as quatro respostas já vieram e o vídeo não, lembre do vídeo de 1 minuto.\n') +
-    '5. Incentive sem pressionar: uma frase curta de encorajamento basta. Nada de cobrança dura.\n' +
-    '6. Nunca prometa aprovação, prazo ou vaga garantida.\n' +
-    '7. Não agradeça pelo encerramento: quem fecha o processo é o sistema, não você.\n\n' +
-    'Marque respostas_completas=true SÓ quando as quatro perguntas estiverem respondidas ' +
-    'somando tudo que ele já escreveu na conversa.';
+    '3. Cobre só o que ainda falta da lista acima. Nunca peça de novo o que já chegou.\n' +
+    '4. Incentive sem pressionar. Uma frase curta de encorajamento basta, nada de cobrança dura.\n' +
+    '5. Nunca prometa aprovação, prazo ou vaga garantida.\n' +
+    '6. Não agradeça pelo encerramento. Quem fecha o processo é o sistema, não você.\n\n' +
+    (temPerguntas
+      ? 'Marque respostas_completas=true SÓ quando TODAS as perguntas acima estiverem respondidas, ' +
+        'somando tudo que ele já escreveu na conversa.'
+      : 'Esta vaga não tem perguntas, então marque respostas_completas=true sempre.');
 
   let saida;
   try {
@@ -645,13 +686,15 @@ async function acompanharDaLanding(candidato, texto, tipo) {
     return { ok: false, error: e.message };
   }
 
-  const respostasOk = sessao.respostas_ok === true || saida.respostas_completas === true;
+  const respostasOk = !temPerguntas || sessao.respostas_ok === true || saida.respostas_completas === true;
 
   // ---- desistiu ----
+  const fala = semCaraDeIA(saida.mensagem);
+
   if (saida.desistiu) {
-    if (saida.mensagem) {
-      await send.sendWhatsAppComPausa({ to: candidato.phone, text: saida.mensagem, instance: inst, pausa: pausaDe(cfg) });
-      await registrar(sessao.id, 'aurea', saida.mensagem);
+    if (fala) {
+      await send.sendWhatsAppComPausa({ to: candidato.phone, text: fala, instance: inst, pausa: pausaDe(cfg) });
+      await registrar(sessao.id, 'aurea', fala);
     }
     await db.update('prequal_sessions', {
       status: 'sem_interesse', finished_at: new Date().toISOString(),
@@ -661,11 +704,11 @@ async function acompanharDaLanding(candidato, texto, tipo) {
   }
 
   // ---- fala o que tiver para falar ----
-  if (saida.mensagem && saida.mensagem.trim()) {
+  if (fala) {
     await send.sendWhatsAppComPausa({
-      to: candidato.phone, text: saida.mensagem, instance: inst, pausa: pausaDe(cfg)
+      to: candidato.phone, text: fala, instance: inst, pausa: pausaDe(cfg)
     });
-    await registrar(sessao.id, 'aurea', saida.mensagem);
+    await registrar(sessao.id, 'aurea', fala);
   }
 
   const patch = {
@@ -674,8 +717,8 @@ async function acompanharDaLanding(candidato, texto, tipo) {
   };
   if (saida.resumo_respostas) patch.summary = saida.resumo_respostas;
 
-  // ---- entregou tudo? aí sim fecha ----
-  const concluiu = respostasOk && !!videoEm;
+  // ---- entregou as três coisas? aí sim fecha ----
+  const concluiu = respostasOk && !!videoEm && cadastroOk;
   if (concluiu) {
     patch.status = 'concluida';
     patch.finished_at = new Date().toISOString();
@@ -683,7 +726,7 @@ async function acompanharDaLanding(candidato, texto, tipo) {
   await db.update('prequal_sessions', patch, { id: 'eq.' + sessao.id });
 
   if (!concluiu) {
-    return { ok: true, aguardando: { respostas: !respostasOk, video: !videoEm } };
+    return { ok: true, aguardando: { respostas: !respostasOk, video: !videoEm, cadastro: !cadastroOk } };
   }
 
   // agradecimento + redes, só agora
@@ -694,7 +737,7 @@ async function acompanharDaLanding(candidato, texto, tipo) {
   }
   await db.insert('stage_history', {
     candidate_id: candidato.id, from_stage: candidato.stage_key, to_stage: candidato.stage_key,
-    note: 'Candidato concluiu: respondeu tudo e enviou o vídeo'
+    note: 'Candidato concluiu: respostas, vídeo e cadastro completo'
   });
   return { ok: true, concluiu: true, mensagens: r.mensagens };
 }
@@ -807,8 +850,9 @@ async function receber(candidato, textoRecebido) {
 
   const acabou = !!saida.encerrar || indice >= pacote.perguntas.length;
 
-  await enviarWhats(candidato, saida.mensagem, cfg);
-  await registrar(sessao.id, 'aurea', saida.mensagem);
+  const dito = semCaraDeIA(saida.mensagem);
+  await enviarWhats(candidato, dito, cfg);
+  await registrar(sessao.id, 'aurea', dito);
 
   const patch = {
     answers: answers,
@@ -934,5 +978,5 @@ module.exports = {
   config, instancia, dentroDoHorario, iniciar, receber, testar, chamarIA,
   grupoComPerguntas, grupoDaVaga,
   receberDeDesconhecido, receberSemConversa, receberEscolhaDeVaga, abrirRoteiro, perguntaQualVaga,
-  receberDaLanding, acompanharDaLanding, mandarSequencia, SEQUENCIA, FECHAMENTO
+  receberDaLanding, acompanharDaLanding, mandarSequencia, semCaraDeIA, SEQUENCIA, FECHAMENTO
 };

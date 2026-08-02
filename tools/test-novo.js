@@ -260,10 +260,10 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   check('marcado como vindo da landing', leadR && leadR.source === 'landing', leadR && leadR.source);
   check('ja nasce ligado a vaga', leadR && !!leadR.job_id);
 
-  // ---- 2) ela chama no WhatsApp: chegam SO as perguntas e o pedido do video ----
+  // ---- 2) ela chama no WhatsApp: saudacao + perguntas da vaga, video, cadastro ----
   const seq = await webhook(digL, cad.mensagem, NOME_RAFA);
   check('a sequencia de chegada dispara', seq.resultado && seq.resultado.sequencia === true, seq.resultado);
-  check('sao 2 mensagens, nao 4', seq.resultado && seq.resultado.mensagens === 2, seq.resultado);
+  check('sao 3 mensagens', seq.resultado && seq.resultado.mensagens === 3, seq.resultado);
 
   function logsDela() {
     return adm('logs', null, { limit: 60 }).then(function (l) {
@@ -272,61 +272,80 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   }
   let enviadas = await logsDela();
   let corpos = enviadas.map(function (l) { return l.body; }).join('\n---\n');
-  check('a primeira chama pelo nome', /Olá, Rafaela!/.test(corpos), corpos.slice(0, 80));
-  check('manda as 4 perguntas', /Meta Ads e Google Ads/.test(corpos) && /Praia Grande/.test(corpos) &&
-    /rodou em Ads/.test(corpos) && /crescer dentro de uma empresa/.test(corpos));
-  check('pede o video de 1 minuto', /Grave um vídeo de até 1 minuto/.test(corpos));
-  check('NAO agradece ainda', !/Obrigada por participar/.test(corpos) && !/Recebido/.test(corpos));
+  check('a saudacao chama pelo nome', /Oi Rafaela, tudo bem\?/.test(corpos), corpos.slice(0, 80));
+  check('e vem com as perguntas desta vaga',
+    /Meta Ads e Google Ads/.test(corpos) && /rodou quanto em Ads/.test(corpos) &&
+    /curso você já fez de tráfego pago/.test(corpos), corpos.slice(0, 300));
+  check('pede o video citando a vaga',
+    /vídeo de até 1 minuto/.test(corpos) && /Gestor de Tráfego Pleno/.test(corpos));
+  check('avisa que o video nao e divulgado', /não vai ser divulgado/.test(corpos));
+  check('manda o link do cadastro com o token da pessoa',
+    /\/vaga\?t=[a-zA-Z0-9]+&v=gestor-de-trafego-pleno/.test(corpos), corpos.slice(-160));
+  check('NAO agradece ainda', !/Recebido, Rafaela/.test(corpos));
   check('NAO manda as redes ainda', !/somossangueroxo/.test(corpos));
+  check('nenhuma mensagem tem travessao', corpos.indexOf('—') < 0 && corpos.indexOf('–') < 0);
 
   // ---- 3) "digitando..." antes de cada mensagem ----
   const presencas = await (await fetch('http://127.0.0.1:54322/__presencas')).json();
   const minhas = presencas.filter(function (p) { return String(p.number).indexOf(digL.slice(-8)) >= 0; });
-  check('mostrou "digitando" antes de cada mensagem', minhas.length >= 2, minhas.length);
+  check('mostrou "digitando" antes de cada mensagem', minhas.length >= 3, minhas.length);
   check('e o aviso e de digitacao', minhas.every(function (p) { return p.presence === 'composing'; }));
   check('a primeira espera mais que as outras', Number(minhas[0].delay) === 900, minhas.map(function (p) { return p.delay; }));
   check('e o valor configurado e o que vai para a Evolution',
     minhas.slice(1).every(function (p) { return Number(p.delay) === 300; }),
     minhas.map(function (p) { return p.delay; }));
 
-
   // ---- 4) ela tira uma duvida antes de responder ----
   const duvida = await webhook(digL, 'Qual o salário mesmo?');
   check('a Aurea continua conversando', duvida.resultado && duvida.resultado.ok === true, duvida.resultado);
-  check('ainda esta esperando as duas coisas',
+  check('esta esperando as tres coisas',
     duvida.resultado && duvida.resultado.aguardando &&
-    duvida.resultado.aguardando.respostas === true && duvida.resultado.aguardando.video === true,
+    duvida.resultado.aguardando.respostas === true &&
+    duvida.resultado.aguardando.video === true &&
+    duvida.resultado.aguardando.cadastro === true,
     duvida.resultado);
 
   // ---- o que a Aurea sabe sobre a empresa foi junto no prompt ----
   const cn = (await adm('settings')).conhecimento || {};
   check('a base de conhecimento existe', !!cn.texto, cn);
   check('e traz os beneficios', /TotalPass/.test(cn.texto) && /Spotify/.test(cn.texto));
-  check('e o prazo do processo', /[Nn]ão existe data/.test(cn.texto));
   const prompt = await (await fetch('http://127.0.0.1:54322/__ultimo-prompt')).json();
   check('a IA foi consultada para a duvida', prompt.ferramenta === 'acompanhar_candidato', prompt.ferramenta);
   check('e recebeu a base da empresa junto', /TotalPass/.test(prompt.system || ''));
   check('e a ficha da vaga junto', /R\$ 2\.200/.test(prompt.system || ''));
-  check('com a ordem de puxar de volta para as respostas',
-    /ENVIAR as respostas/.test(prompt.system || ''));
-  const salvouCn = await adm('settings_save', { key: 'conhecimento', value: { texto: cn.texto } });
-  check('da para editar pelo painel', salvouCn.ok, salvouCn.error);
+  check('e as perguntas desta vaga', /curso você já fez de tráfego pago/.test(prompt.system || ''));
+  check('sabe o que ainda falta', /Cadastro preenchido: AINDA NÃO/.test(prompt.system || ''));
+  check('e proibe o travessao', /NUNCA use travessão/.test(prompt.system || ''));
 
-  // ---- 5) responde tudo, mas ainda sem video ----
-  const respondeu = await webhook(digL, '4 anos com Meta Ads e Google Ads, tenho disponibilidade presencial sim, ja rodei 3 milhoes, e sim quero crescer');
+  // ---- 5) responde tudo: ainda falta video e cadastro ----
+  const respondeu = await webhook(digL, '4 anos com Meta Ads e Google Ads, ja rodei 3 milhoes, fiz o curso do Pedro Sobral');
   check('respostas completas nao fecham sozinhas',
     respondeu.resultado && respondeu.resultado.aguardando &&
     respondeu.resultado.aguardando.respostas === false &&
     respondeu.resultado.aguardando.video === true, respondeu.resultado);
-  const ultimas = await logsDela();
-  check('e ela cobra o video', /vídeo/i.test(ultimas[0] ? ultimas[0].body : ''), ultimas[0] && ultimas[0].body);
-  check('continua sem agradecer',
-    !ultimas.some(function (l) { return /Recebido, Rafaela/.test(l.body || ''); }));
 
-  // ---- 6) manda o video: agora sim fecha ----
+  // ---- 6) manda o video: ainda falta o cadastro ----
   const comVideo = await webhookVideo(digL);
-  check('com respostas e video, o processo conclui',
-    comVideo.resultado && comVideo.resultado.concluiu === true, comVideo.resultado);
+  check('so com o video ainda nao conclui',
+    comVideo.resultado && comVideo.resultado.concluiu !== true &&
+    comVideo.resultado.aguardando && comVideo.resultado.aguardando.cadastro === true, comVideo.resultado);
+
+  // ---- 7) preenche o cadastro pelo link: agora sim fecha ----
+  const fichaL = await adm('candidate', null, { id: leadR.id });
+  const preencheu = await pub('apply', {
+    t: fichaL.candidate.token, vaga: 'gestor-de-trafego-pleno',
+    name: NOME_RAFA, email: 'rafa.form.' + SUF + '@exemplo.com', phone: foneL,
+    experience: 'Quatro anos de agencia.', why_start: 'Quero crescer.'
+  });
+  check('cadastro completo aceito', preencheu.ok, preencheu.error);
+  const todasRafa = (await adm('board')).candidates.filter(function (c) { return c.name === NOME_RAFA; });
+  check('o cadastro completou a mesma pessoa, sem duplicar', todasRafa.length === 1, todasRafa.length);
+  check('e ela continua no funil da landing', todasRafa[0] && todasRafa[0].source === 'landing',
+    todasRafa[0] && todasRafa[0].source);
+
+  const fechou = await webhook(digL, 'pronto, preenchi!');
+  check('com as tres coisas, o processo conclui',
+    fechou.resultado && fechou.resultado.concluiu === true, fechou.resultado);
   corpos = (await logsDela()).map(function (l) { return l.body; }).join('\n---\n');
   check('agora sim agradece', /Recebido, Rafaela/.test(corpos) && /Obrigada por participar/.test(corpos));
   check('e manda as duas redes',

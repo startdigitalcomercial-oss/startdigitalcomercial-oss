@@ -231,7 +231,7 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   check('cria questao', nq.ok);
   check('exclui questao', (await adm('question_delete', { id: nq.question.id })).ok);
   const tplsSms = await adm('templates');
-  check('19 modelos de mensagem', tpls.templates.length === 19, tpls.templates.length);
+  check('21 modelos de mensagem', tpls.templates.length === 21, tpls.templates.length);
   const originalSms = tplsSms.templates.filter(function (t) { return t.key === 'welcome_sms'; })[0].body;
   const salvo = await adm('template_save', { key: 'welcome_sms', body: 'Texto novo {{primeiro_nome}}' });
   check('salva modelo', salvo.ok && salvo.template.body.indexOf('Texto novo') === 0);
