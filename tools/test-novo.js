@@ -276,6 +276,10 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   check('e vem com as perguntas desta vaga',
     /Meta Ads e Google Ads/.test(corpos) && /rodou quanto em Ads/.test(corpos) &&
     /curso você já fez de tráfego pago/.test(corpos), corpos.slice(0, 300));
+  check('e com as duas perguntas padrao, que valem para toda vaga',
+    /música favorita/.test(corpos) && /preço do combustível/.test(corpos), corpos.slice(0, 400));
+  check('nada de trabalho remoto em lugar nenhum',
+    !/remoto|remota|home office|híbrid/i.test(corpos), corpos.slice(0, 200));
   check('pede o video citando a vaga',
     /vídeo de até 1 minuto/.test(corpos) && /Gestor de Tráfego Pleno/.test(corpos));
   check('avisa que o video nao e divulgado', /não vai ser divulgado/.test(corpos));
