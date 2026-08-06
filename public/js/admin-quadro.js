@@ -166,7 +166,7 @@ function gavetaDados() {
   const campos = [
     ['E-mail', c.email], ['WhatsApp', c.phone], ['Cidade / UF', [c.city, c.state].filter(Boolean).join(' / ')],
     ['Nascimento', c.birth_date], ['Vaga', c.role_applied], ['Pretensão', c.salary_expectation],
-    ['Disponibilidade', c.availability], ['Computador', c.has_computer], ['Internet', c.internet_speed],
+    ['Disponibilidade', c.availability], ['Mora em', c.has_computer], ['Vem de', c.internet_speed],
     ['Formação', c.education], ['Inglês', c.english_level], ['Ferramentas', c.tools],
     ['LinkedIn', c.linkedin], ['Instagram / portfólio', c.instagram],
     ['Onde nos conheceu', c.extra && c.extra.onde_conheceu]

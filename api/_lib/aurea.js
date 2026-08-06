@@ -450,13 +450,23 @@ function linkDoCadastro(candidato, vaga) {
   return base + '/vaga?t=' + candidato.token + (vaga ? '&v=' + vaga.slug : '');
 }
 
-// A saudação leva junto as perguntas da vaga, quando ela tem.
+// A saudação leva junto as perguntas da vaga (quando ela tem) e depois
+// as perguntas padrão, que valem para todas as vagas.
+async function perguntasDaVaga(vaga, vars) {
+  const partes = [];
+  if (vaga && String(vaga.wa_perguntas || '').trim()) {
+    partes.push(u.renderTemplate(String(vaga.wa_perguntas).trim(), vars));
+  }
+  const padrao = (await textoDoModelo('landing_wa_perguntas_padrao', vars)).trim();
+  if (padrao) partes.push(padrao);
+  return partes.join('\n\n');
+}
+
 async function textoDaSequencia(chave, vars, vaga) {
   const texto = await textoDoModelo(chave, vars);
-  if (chave === 'landing_wa_1_ola' && vaga && String(vaga.wa_perguntas || '').trim()) {
-    return texto + '\n\n' + u.renderTemplate(String(vaga.wa_perguntas).trim(), vars);
-  }
-  return texto;
+  if (chave !== 'landing_wa_1_ola') return texto;
+  const perg = await perguntasDaVaga(vaga, vars);
+  return perg ? texto + '\n\n' + perg : texto;
 }
 
 async function mandarSequencia(candidato, vaga, cfg, chaves) {
@@ -640,8 +650,8 @@ async function acompanharDaLanding(candidato, texto, tipo) {
     messages.unshift({ role: 'user', content: '(início da conversa)' });
   }
 
-  const temPerguntas = !!(vaga && String(vaga.wa_perguntas || '').trim());
-  const perguntas = temPerguntas ? String(vaga.wa_perguntas).trim() : '';
+  const perguntas = await perguntasDaVaga(vaga, u.templateVars(candidato, {}));
+  const temPerguntas = !!perguntas;
   const cadastroOk = !!candidato.cadastro_em;
 
   const conhecimento = await baseDeConhecimento();
