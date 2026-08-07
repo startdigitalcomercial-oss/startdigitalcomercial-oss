@@ -69,8 +69,8 @@ function sair() {
 document.getElementById('btn-sair').addEventListener('click', sair);
 
 // Enquanto durar a fase de testes, a senha aparece na tela e o campo ja vem
-// preenchido. Quem manda nisso e a variavel MOSTRAR_SENHA_LOGIN na Vercel —
-// trocar para false e fazer Redeploy faz este bloco sumir, sem mexer no codigo.
+// preenchido. Isso vem LIGADO de fabrica. Para desligar, e so criar a
+// variavel MOSTRAR_SENHA_LOGIN com o valor false na Vercel + Redeploy.
 let PRIMEIRO_ACESSO = false;
 
 (async function dicaDaSenha() {
@@ -108,8 +108,9 @@ let PRIMEIRO_ACESSO = false;
     alvo.insertAdjacentHTML('beforebegin',
       '<div class="alert alert-info small" style="margin-bottom:16px">' +
       'Fase de testes — senha: <code>' + esc(r.senha) + '</code><br>' +
-      '<span class="muted">O campo já vem preenchido. Para esconder isto: variável ' +
-      '<code>MOSTRAR_SENHA_LOGIN</code> como <code>false</code> na Vercel + Redeploy.</span></div>');
+      '<span class="muted">O campo já vem preenchido, é só clicar em Entrar. ' +
+      'Para esconder isto quando os testes acabarem: crie a variável ' +
+      '<code>MOSTRAR_SENHA_LOGIN</code> com o valor <code>false</code> na Vercel + Redeploy.</span></div>');
   } catch (e) { /* se nao der, a tela de login funciona igual */ }
 })();
 
