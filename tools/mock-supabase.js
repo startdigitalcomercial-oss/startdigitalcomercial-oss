@@ -169,6 +169,7 @@ const DB = {
       prequal_group_id: 'gggg1111-1111-4111-8111-111111111111', whatsapp_message: null,
       wa_perguntas: 'Antes de avançar para a próxima fase, me responde:\n\n1.) Quanto tempo de experiência você tem com Meta Ads e Google Ads?\n\n2.) Você já rodou quanto em Ads?\n\n3.) Qual curso você já fez de tráfego pago?',
       campos_form: ['pretensao', 'cpf', 'cidade', 'indicacao', 'curriculo'],
+      usa_whatsapp: true,
       active: true, featured: true, position: 1, views: 0,
       created_at: agora(), updated_at: agora()
     },
@@ -182,7 +183,23 @@ const DB = {
       requirements: ['Noções de Meta Ads'], responsibilities: ['Apoiar as campanhas'], benefits: ['Treinamento'],
       prequal_group_id: 'gggg1111-1111-4111-8111-111111111111', whatsapp_message: null,
       wa_perguntas: 'Antes de avançar para a próxima fase, me responde:\n\n1.) Quanto tempo de experiência você tem com Meta Ads e Google Ads?\n\n2.) Você já rodou quanto em Ads?\n\n3.) Qual curso você já fez de tráfego pago?',
+      usa_whatsapp: true,
       active: true, featured: false, position: 2, views: 0,
+      created_at: agora(), updated_at: agora()
+    },
+    // Uma vaga que NAO passa pelo WhatsApp: a inscricao termina no site.
+    {
+      id: 'aaaa3333-3333-4333-8333-333333333333',
+      slug: 'assistente-administrativo', title: 'Assistente Administrativo',
+      summary: 'Rotinas administrativas e apoio ao time comercial.',
+      description: 'Organização, planilhas e atendimento interno.',
+      salary: 'R$ 1.800', employment_type: 'PJ', work_mode: 'presencial',
+      location: 'Praia Grande, SP', schedule: '08h45 às 18h', area: 'Administrativo', seniority: 'Júnior',
+      requirements: ['Organização'], responsibilities: ['Cuidar das rotinas'], benefits: ['Vale transporte'],
+      prequal_group_id: null, whatsapp_message: null, wa_perguntas: null,
+      campos_form: ['cidade', 'experiencia'],
+      usa_whatsapp: false,
+      active: true, featured: false, position: 3, views: 0,
       created_at: agora(), updated_at: agora()
     }
   ],
@@ -216,7 +233,7 @@ const DEFAULTS = {
   disc_questions: function () { return { id: seq('disc_questions'), active: true }; },
   settings: function () { return { value: {} }; },
   message_templates: function () { return { id: seq('message_templates'), updated_at: agora() }; },
-  jobs: function () { return { id: uuid(), requirements: [], responsibilities: [], benefits: [], campos_form: [], active: true, featured: false, position: 1, views: 0, prequal_group_id: null, wa_perguntas: null, created_at: agora(), updated_at: agora() }; },
+  jobs: function () { return { id: uuid(), requirements: [], responsibilities: [], benefits: [], campos_form: [], usa_whatsapp: true, active: true, featured: false, position: 1, views: 0, prequal_group_id: null, wa_perguntas: null, created_at: agora(), updated_at: agora() }; },
   prequal_groups: function () { return { id: uuid(), active: true, is_default: false, auto_on_apply: true, job_id: null, created_at: agora() }; },
   prequal_questions: function () { return { id: uuid(), position: 1, required: true, weight: 1, objective: null }; },
   prequal_sessions: function () { return { id: uuid(), channel: 'whatsapp', status: 'aguardando', current_index: 0, answers: [], score: null, recommendation: null, summary: null, job_id: null, video_em: null, respostas_ok: false, last_message_at: null, started_at: agora(), finished_at: null, error: null }; },
