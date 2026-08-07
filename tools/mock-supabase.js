@@ -168,6 +168,7 @@ const DB = {
       responsibilities: ['Planejar e subir campanhas'], benefits: ['Comissão por resultado'],
       prequal_group_id: 'gggg1111-1111-4111-8111-111111111111', whatsapp_message: null,
       wa_perguntas: 'Antes de avançar para a próxima fase, me responde:\n\n1.) Quanto tempo de experiência você tem com Meta Ads e Google Ads?\n\n2.) Você já rodou quanto em Ads?\n\n3.) Qual curso você já fez de tráfego pago?',
+      campos_form: ['pretensao', 'cpf', 'cidade', 'indicacao', 'curriculo'],
       active: true, featured: true, position: 1, views: 0,
       created_at: agora(), updated_at: agora()
     },
@@ -202,7 +203,7 @@ const DB = {
 
 /* ---------------- defaults por tabela ---------------- */
 const DEFAULTS = {
-  candidates: function () { return { id: uuid(), extra: {}, wa_sequencia_em: null, cadastro_em: null, job_id: null, source: 'formulario', source_detail: null, stage_key: 'triagem', password_hash: null, password_salt: null, rating: null, notes: null, member_access: false, archived: false, created_at: agora(), updated_at: agora() }; },
+  candidates: function () { return { id: uuid(), extra: {}, wa_sequencia_em: null, cadastro_em: null, job_id: null, indicacao: null, curriculo_url: null, curriculo_nome: null, source: 'formulario', source_detail: null, stage_key: 'triagem', password_hash: null, password_salt: null, rating: null, notes: null, member_access: false, archived: false, created_at: agora(), updated_at: agora() }; },
   stage_history: function () { return { id: seq('stage_history'), created_at: agora(), note: null, from_stage: null, to_stage: null }; },
   disc_results: function () { return { id: uuid(), answers: {}, created_at: agora() }; },
   quiz_attempts: function () { return { id: uuid(), answers: {}, score: null, max_score: null, percent: null, passed: null, focus_lost: 0, paste_blocked: 0, integrity_flags: [], started_at: agora(), finished_at: null }; },
@@ -215,7 +216,7 @@ const DEFAULTS = {
   disc_questions: function () { return { id: seq('disc_questions'), active: true }; },
   settings: function () { return { value: {} }; },
   message_templates: function () { return { id: seq('message_templates'), updated_at: agora() }; },
-  jobs: function () { return { id: uuid(), requirements: [], responsibilities: [], benefits: [], active: true, featured: false, position: 1, views: 0, prequal_group_id: null, wa_perguntas: null, created_at: agora(), updated_at: agora() }; },
+  jobs: function () { return { id: uuid(), requirements: [], responsibilities: [], benefits: [], campos_form: [], active: true, featured: false, position: 1, views: 0, prequal_group_id: null, wa_perguntas: null, created_at: agora(), updated_at: agora() }; },
   prequal_groups: function () { return { id: uuid(), active: true, is_default: false, auto_on_apply: true, job_id: null, created_at: agora() }; },
   prequal_questions: function () { return { id: uuid(), position: 1, required: true, weight: 1, objective: null }; },
   prequal_sessions: function () { return { id: uuid(), channel: 'whatsapp', status: 'aguardando', current_index: 0, answers: [], score: null, recommendation: null, summary: null, job_id: null, video_em: null, respostas_ok: false, last_message_at: null, started_at: agora(), finished_at: null, error: null }; },
@@ -311,6 +312,29 @@ const server = http.createServer(function (req, res) {
     Object.keys(headers || {}).forEach(function (h) { res.setHeader(h, headers[h]); });
     res.end(JSON.stringify(data));
   };
+  // ---------- Storage (curriculos) ----------
+  // O espelho guarda o arquivo em memoria so para o teste conferir que
+  // ele chegou inteiro e que o link temporario e gerado.
+  if (url.pathname.indexOf('/storage/v1/object/sign/') === 0) {
+    const caminho = url.pathname.replace('/storage/v1/object/sign/', '');
+    if (!global.__arquivos || !global.__arquivos[caminho]) {
+      return responder(404, { message: 'arquivo nao encontrado' });
+    }
+    return responder(200, { signedURL: '/object/sign/' + caminho + '?token=falso' });
+  }
+  if (url.pathname.indexOf('/storage/v1/object/') === 0) {
+    const caminho = url.pathname.replace('/storage/v1/object/', '');
+    let bytes = 0;
+    req.on('data', function (c) { bytes += c.length; });
+    req.on('end', function () {
+      global.__arquivos = global.__arquivos || {};
+      global.__arquivos[caminho] = { bytes: bytes, tipo: req.headers['content-type'] };
+      responder(200, { Key: caminho });
+    });
+    return;
+  }
+  if (url.pathname === '/__arquivos') return responder(200, global.__arquivos || {});
+
   if (!m) return responder(404, { message: 'rota nao suportada: ' + url.pathname });
 
   const tabela = m[1];

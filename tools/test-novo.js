@@ -186,9 +186,12 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   // O funil novo: a pessoa ve a vaga na landing, aperta o botao, cai no
   // WhatsApp, a Aurea reconhece a vaga, faz o roteiro e manda o cadastro.
 
+  // Uma rodada anterior pode ter deixado as pausas curtas. Volta ao padrao
+  // antes de conferir, senao o teste depende do que sobrou de antes.
+  await adm('aurea_config_save', { value: { pausa_primeira: 10000, pausa_entre_mensagens: 4000 } });
   const cfgPausa = (await adm('aurea')).config || {};
-  check('por padrao a primeira resposta demora 10 segundos', cfgPausa.pausa_primeira === 10000, cfgPausa.pausa_primeira);
-  check('e as seguintes, 4 segundos', cfgPausa.pausa_entre_mensagens === 4000, cfgPausa.pausa_entre_mensagens);
+  check('o padrao e 10 segundos na primeira resposta', cfgPausa.pausa_primeira === 10000, cfgPausa.pausa_primeira);
+  check('e 4 segundos nas seguintes', cfgPausa.pausa_entre_mensagens === 4000, cfgPausa.pausa_entre_mensagens);
 
   // para a bateria nao levar 1 minuto de espera de verdade, encurtamos as
   // pausas aqui. O que importa e que o valor configurado chegue na Evolution.
@@ -236,11 +239,33 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
     semCad.ignorado === 'sem cadastro na landing', semCad);
 
   // ---- 1) a pessoa preenche o formulario da landing ----
-  const cad = await pub('candidatar', {
-    vaga: 'gestor-de-trafego-pleno', name: NOME_RAFA,
-    phone: foneL, email: 'rafaela.' + SUF + '@exemplo.com'
-  });
+  // ---- os campos extras que ESTA vaga pede ----
+  const vagaCampos = (pub1.vagas.filter(function (v) { return v.slug === 'gestor-de-trafego-pleno'; })[0] || {}).campos || [];
+  check('a landing sabe quais campos a vaga pede', vagaCampos.length === 5, vagaCampos.length);
+  check('e diz o tipo de cada um',
+    vagaCampos.filter(function (c) { return c.chave === 'cpf'; })[0].tipo === 'cpf' &&
+    vagaCampos.filter(function (c) { return c.chave === 'curriculo'; })[0].tipo === 'arquivo',
+    vagaCampos.map(function (c) { return c.chave + ':' + c.tipo; }));
+  check('indicacao e opcional, o resto nao',
+    vagaCampos.filter(function (c) { return c.chave === 'indicacao'; })[0].obrigatorio === false &&
+    vagaCampos.filter(function (c) { return c.chave === 'cidade'; })[0].obrigatorio === true);
+  const vagaJr = pub1.vagas.filter(function (v) { return v.slug === 'gestor-de-trafego-jr'; })[0];
+  check('vaga sem campos extras nao pede nada a mais', (vagaJr.campos || []).length === 0, vagaJr.campos);
+
+  const baseCad = { vaga: 'gestor-de-trafego-pleno', name: NOME_RAFA, phone: foneL, email: 'rafaela.' + SUF + '@exemplo.com' };
+  check('recusa quando falta um campo obrigatorio da vaga',
+    !(await pub('candidatar', baseCad)).ok);
+  check('recusa CPF invalido',
+    !(await pub('candidatar', Object.assign({}, baseCad, {
+      pretensao: 'R$ 3.000', cpf: '111.111.111-11', cidade: 'Praia Grande'
+    }))).ok);
+
+  const cad = await pub('candidatar', Object.assign({}, baseCad, {
+    pretensao: 'R$ 3.000', cpf: '529.982.247-25', cidade: 'Praia Grande', indicacao: 'Jhow do time'
+  }));
   check('cadastro da landing aceito', cad.ok, cad.error);
+  check('devolve o token para anexar o curriculo', !!cad.token, cad.token);
+  check('e avisa que esta vaga pede curriculo', cad.pede_curriculo === true, cad.pede_curriculo);
   check('devolve o primeiro nome', cad.nome === 'Rafaela', cad.nome);
   check('a mensagem do botao leva o titulo da vaga',
     (cad.mensagem || '').indexOf('(Gestor de Tráfego Pleno)') >= 0, cad.mensagem);
@@ -259,6 +284,35 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   check('cadastro entrou no sistema', !!leadR, leadR);
   check('marcado como vindo da landing', leadR && leadR.source === 'landing', leadR && leadR.source);
   check('ja nasce ligado a vaga', leadR && !!leadR.job_id);
+
+  const fichaExtras = (await adm('candidate', null, { id: leadR.id })).candidate;
+  check('guardou a pretensao', fichaExtras.salary_expectation === 'R$ 3.000', fichaExtras.salary_expectation);
+  check('guardou o CPF formatado', fichaExtras.cpf === '529.982.247-25', fichaExtras.cpf);
+  check('guardou a cidade', fichaExtras.city === 'Praia Grande', fichaExtras.city);
+  check('guardou quem indicou', fichaExtras.indicacao === 'Jhow do time', fichaExtras.indicacao);
+
+  // ---- currículo ----
+  const pdfFalso = Buffer.from('%PDF-1.4 teste de curriculo').toString('base64');
+  const semToken = await pub('curriculo', { t: 'token-que-nao-existe', nome: 'cv.pdf', tipo: 'application/pdf', arquivo: pdfFalso });
+  check('curriculo exige token valido', !semToken.ok, semToken.error);
+  const tipoRuim = await pub('curriculo', { t: cad.token, nome: 'cv.exe', tipo: 'application/x-msdownload', arquivo: pdfFalso });
+  check('recusa formato que nao aceitamos', !tipoRuim.ok, tipoRuim.error);
+  const subiu = await pub('curriculo', { t: cad.token, nome: 'curriculo-rafaela.pdf', tipo: 'application/pdf', arquivo: pdfFalso });
+  check('curriculo aceito', subiu.ok, subiu.error);
+
+  const guardados = await (await fetch('http://127.0.0.1:54321/__arquivos')).json();
+  const chaves = Object.keys(guardados).filter(function (k) { return k.indexOf('curriculos/' + leadR.id) === 0; });
+  check('o arquivo foi mesmo guardado', chaves.length === 1, Object.keys(guardados));
+  check('e chegou inteiro', guardados[chaves[0]].bytes === Buffer.from(pdfFalso, 'base64').length,
+    guardados[chaves[0]]);
+
+  const fichaCv = (await adm('candidate', null, { id: leadR.id })).candidate;
+  check('a ficha mostra o nome do arquivo', fichaCv.curriculo_nome === 'curriculo-rafaela.pdf', fichaCv.curriculo_nome);
+  check('e nao guarda endereco publico', !/^https?:/.test(fichaCv.curriculo_url || ''), fichaCv.curriculo_url);
+  const linkCv = await adm('curriculo_link', null, { id: leadR.id });
+  check('o painel gera um link temporario', linkCv.ok && /object\/sign\//.test(linkCv.link || ''), linkCv.error);
+  check('quem nao anexou nao tem link',
+    !(await adm('curriculo_link', null, { id: 'nao-existe' })).ok);
 
   // ---- 2) ela chama no WhatsApp: saudacao + perguntas da vaga, video, cadastro ----
   const seq = await webhook(digL, cad.mensagem, NOME_RAFA);
