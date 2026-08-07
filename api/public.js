@@ -10,6 +10,7 @@ const disc = require('./_lib/disc');
 const send = require('./_lib/send');
 const aurea = require('./_lib/aurea');
 const vagas = require('./_lib/vagas');
+const campos = require('./_lib/campos');
 
 const CAMPOS_FORM = [
   'name', 'email', 'phone', 'cpf', 'birth_date', 'city', 'state', 'role_applied',
@@ -90,7 +91,11 @@ module.exports = async function handler(req, res) {
         if (v.area && areas.indexOf(v.area) < 0) areas.push(v.area);
       });
       return u.ok(res, {
-        vagas: lista.map(function (v) { return vagas.paraPublico(v, u.appUrl(), zap); }),
+        vagas: lista.map(function (v) {
+          return Object.assign(vagas.paraPublico(v, u.appUrl(), zap), {
+            campos: campos.paraFormulario(v.campos_form)
+          });
+        }),
         areas: areas,
         landing: landing,
         empresa: { nome: company.name || 'StartDigital', site: company.site || '' },
@@ -105,7 +110,11 @@ module.exports = async function handler(req, res) {
       const landing = await getSetting('landing', {});
       const zap = await numeroDaAurea(landing);
       db.update('jobs', { views: (v.views || 0) + 1 }, { id: 'eq.' + v.id }).catch(function () { });
-      return u.ok(res, { vaga: vagas.paraPublico(v, u.appUrl(), zap) });
+      return u.ok(res, {
+        vaga: Object.assign(vagas.paraPublico(v, u.appUrl(), zap), {
+          campos: campos.paraFormulario(v.campos_form)
+        })
+      });
     }
 
     // ---------------------------------------------------- cadastro da landing
@@ -141,12 +150,16 @@ module.exports = async function handler(req, res) {
         cand = await db.selectOne('candidates', { email: 'eq.' + email, archived: 'eq.false', select: '*' });
       }
 
-      const dados = {
+      // os campos extras que ESTA vaga pede
+      const extras = campos.validar(vaga.campos_form, body);
+      if (extras.erro) return u.fail(res, 400, extras.erro);
+
+      const dados = Object.assign({
         name: nome, email: email, phone: phone,
         role_applied: vaga.title, job_id: vaga.id,
         source: 'landing', source_detail: 'Landing page — ' + vaga.title,
         updated_at: new Date().toISOString()
-      };
+      }, extras.dados);
 
       if (cand) {
         // Troca de vaga? A sequência pode ir de novo, com o roteiro certo.
@@ -173,9 +186,55 @@ module.exports = async function handler(req, res) {
       return u.ok(res, {
         nome: u.firstName(nome),
         vaga: vaga.title,
+        token: cand.token,
+        pede_curriculo: campos.pedeCurriculo(vaga.campos_form),
         link_whatsapp: zap ? 'https://wa.me/' + zap + '?text=' + encodeURIComponent(frase) : '',
         mensagem: frase
       });
+    }
+
+    // ---------------------------------------------------- currículo
+    // O arquivo vem em base64 logo depois do cadastro. O token diz de
+    // quem é. Guardamos num balde privado, e o painel pede um link
+    // temporário na hora de abrir.
+    if (action === 'curriculo') {
+      if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
+      const body = await u.readBody(req);
+
+      const cand = await candidateByToken(String(body.t || ''));
+      if (!cand) return u.fail(res, 404, 'Cadastro nao encontrado.');
+
+      const nomeArq = String(body.nome || 'curriculo').slice(0, 120);
+      const tipo = String(body.tipo || 'application/octet-stream');
+      const permitidos = ['application/pdf', 'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'image/jpeg', 'image/png'];
+      if (permitidos.indexOf(tipo) < 0) {
+        return u.fail(res, 400, 'Formato nao aceito. Envie PDF, Word, JPG ou PNG.');
+      }
+
+      const base64 = String(body.arquivo || '').split(',').pop();
+      if (!base64) return u.fail(res, 400, 'Arquivo vazio.');
+      let bytes;
+      try { bytes = Buffer.from(base64, 'base64'); }
+      catch (e) { return u.fail(res, 400, 'Arquivo invalido.'); }
+      if (!bytes.length) return u.fail(res, 400, 'Arquivo vazio.');
+      if (bytes.length > 8 * 1024 * 1024) return u.fail(res, 400, 'O arquivo passou de 8 MB.');
+
+      const ext = (nomeArq.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5);
+      const caminho = cand.id + '/' + Date.now() + '.' + ext;
+
+      try {
+        await db.subirArquivo('curriculos', caminho, bytes, tipo);
+      } catch (e) {
+        return u.fail(res, 500, e.message);
+      }
+
+      await db.update('candidates', {
+        curriculo_url: caminho, curriculo_nome: nomeArq, updated_at: new Date().toISOString()
+      }, { id: 'eq.' + cand.id });
+
+      return u.ok(res, { guardado: true, nome: nomeArq });
     }
 
     // ---------------------------------------------------- enviar candidatura

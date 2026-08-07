@@ -12,6 +12,7 @@ const aurea = require('./_lib/aurea');
 const webhook = require('./webhook');
 const perms = require('./_lib/perms');
 const vagas = require('./_lib/vagas');
+const campos = require('./_lib/campos');
 
 const SESSION_HOURS = 12;
 
@@ -508,6 +509,19 @@ module.exports = async function handler(req, res) {
     }
 
     // ---------------------------------------------------- FICHA DO CANDIDATO
+    // Link temporário do currículo. O balde é privado: o link vale 10
+    // minutos e some. Nunca guardamos endereço público de documento.
+    if (action === 'curriculo_link') {
+      const cand = await db.selectOne('candidates', {
+        id: 'eq.' + (params.id || ''), select: 'id,name,curriculo_url,curriculo_nome'
+      });
+      if (!cand || !cand.curriculo_url) return u.fail(res, 404, 'Este candidato nao anexou curriculo.');
+      const link = await db.linkTemporario('curriculos', cand.curriculo_url, 600);
+      if (!link) return u.fail(res, 500, 'Nao consegui abrir o arquivo agora.');
+      await anota(session, 'curriculo_aberto', cand.name, {});
+      return u.ok(res, { link: link, nome: cand.curriculo_nome || 'curriculo' });
+    }
+
     if (action === 'candidate') {
       const cand = await db.selectOne('candidates', { id: 'eq.' + params.id, select: '*' });
       if (!cand) return u.fail(res, 404, 'Candidato nao encontrado.');
@@ -963,7 +977,11 @@ module.exports = async function handler(req, res) {
         }),
         grupos: grupos,
         landing: landing,
-        modos: vagas.MODOS
+        modos: vagas.MODOS,
+        catalogo_campos: campos.CATALOGO.map(function (c) {
+          return { chave: c.chave, rotulo: c.rotulo, dica: c.dica, tipo: c.tipo };
+        }),
+        campos_fixos: campos.FIXOS
       });
     }
 
@@ -985,6 +1003,9 @@ module.exports = async function handler(req, res) {
       }
       if (body.prequal_group_id !== undefined) {
         patch.prequal_group_id = body.prequal_group_id || null;
+      }
+      if (body.campos_form !== undefined) {
+        patch.campos_form = campos.normaliza(body.campos_form);
       }
       if (body.active !== undefined) patch.active = !!body.active;
       if (body.featured !== undefined) patch.featured = !!body.featured;
