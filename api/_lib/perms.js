@@ -72,7 +72,8 @@ const ACOES = {
   // --- gestao de usuarios: so o dono ---
   usuarios: 'usuarios', usuario_salvar: 'usuarios', usuario_excluir: 'usuarios',
   usuario_senha: 'usuarios', auditoria: 'usuarios',
-  vagas: 'ver', vaga_salvar: 'mexer', vaga_excluir: 'mexer', vaga_ordem: 'mexer'
+  vagas: 'ver', vaga_salvar: 'mexer', vaga_excluir: 'mexer', vaga_ordem: 'mexer',
+  curriculo_link: 'ver'
 };
 
 function papelValido(p) { return PAPEIS.indexOf(p) >= 0; }

@@ -110,4 +110,43 @@ async function count(table, query) {
   return parseInt(range.split('/')[1] || '0', 10);
 }
 
-module.exports = { rest, select, selectOne, insert, upsert, update, remove, count };
+// ---------------- Arquivos (Supabase Storage) ----------------
+// O balde e privado. O arquivo sobe por aqui, com a chave de servico,
+// e depois o painel pede um link temporario para ver.
+async function subirArquivo(balde, caminho, bytes, tipo) {
+  const url = baseUrl() + '/storage/v1/object/' + balde + '/' + caminho;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      apikey: key(),
+      Authorization: 'Bearer ' + key(),
+      'Content-Type': tipo || 'application/octet-stream',
+      'x-upsert': 'true'
+    },
+    body: bytes
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(function () { return ''; });
+    throw new Error('Nao consegui guardar o arquivo: ' + (txt || res.status));
+  }
+  return balde + '/' + caminho;
+}
+
+// Link que vale por alguns minutos, so para quem esta no painel.
+async function linkTemporario(balde, caminho, segundos) {
+  const url = baseUrl() + '/storage/v1/object/sign/' + balde + '/' + caminho;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { apikey: key(), Authorization: 'Bearer ' + key(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expiresIn: segundos || 600 })
+  });
+  if (!res.ok) return null;
+  const d = await res.json().catch(function () { return {}; });
+  if (!d.signedURL && !d.signedUrl) return null;
+  return baseUrl() + '/storage/v1' + (d.signedURL || d.signedUrl);
+}
+
+module.exports = {
+  rest, select, selectOne, insert, upsert, update, remove, count,
+  subirArquivo, linkTemporario
+};

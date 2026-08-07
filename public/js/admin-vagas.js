@@ -4,6 +4,8 @@
 let VAGAS_LISTA = [];
 let VAGAS_GRUPOS = [];
 let VAGAS_LANDING = {};
+let VAGAS_CATALOGO = [];
+let VAGAS_FIXOS = [];
 
 const VG_MODO = { presencial: 'Presencial', remoto: 'Remoto', hibrido: 'Híbrido' };
 
@@ -21,6 +23,8 @@ async function carregaVagas() {
   VAGAS_LISTA = d.vagas || [];
   VAGAS_GRUPOS = d.grupos || [];
   VAGAS_LANDING = d.landing || {};
+  VAGAS_CATALOGO = d.catalogo_campos || [];
+  VAGAS_FIXOS = d.campos_fixos || [];
   const ativas = VAGAS_LISTA.filter(function (v) { return v.active !== false; });
   const semZap = !VAGAS_LANDING.whatsapp;
 
@@ -78,6 +82,8 @@ function vgItem(v) {
         (v.salary ? '<span class="tag">' + esc(v.salary) + '</span>' : '') +
         (local ? '<span class="tag">' + esc(local) + '</span>' : '') +
         '<span class="tag">' + (v.candidatos || 0) + ' candidato(s)</span>' +
+        ((v.campos_form || []).length
+          ? '<span class="tag">+' + v.campos_form.length + ' no formulário</span>' : '') +
       '</div>' +
     '</div>' +
     '<button class="btn btn-sm btn-ghost vg-editar" data-id="' + esc(v.id) + '">Editar</button>' +
@@ -183,6 +189,29 @@ function abreVaga(id) {
     campo('vg-ben', 'O que oferecemos', vgLinhas(d.benefits), 'Um item por linha.', 'area') +
 
     '<hr class="sep">' +
+    '<h3 style="font-size:14px;margin:0 0 4px">O que o formulário pergunta</h3>' +
+    '<p class="small muted" style="margin:0 0 12px">Antes de ir para o WhatsApp, o candidato preenche este ' +
+    'formulário na página da vaga. Marque o que <strong>esta vaga</strong> precisa saber.</p>' +
+    '<div class="cp-fixos">' +
+      VAGAS_FIXOS.map(function (f) {
+        return '<span class="cp-fixo">' + esc(f.rotulo) + '</span>';
+      }).join('') +
+      '<span class="cp-nota">sempre pedidos</span>' +
+    '</div>' +
+    '<div class="cp-lista">' +
+      VAGAS_CATALOGO.map(function (c) {
+        const marcado = (d.campos_form || []).indexOf(c.chave) >= 0;
+        return '<label class="cp-item' + (marcado ? ' on' : '') + '">' +
+          '<input type="checkbox" class="cp-check" value="' + esc(c.chave) + '"' +
+          (marcado ? ' checked' : '') + '>' +
+          '<span><strong>' + esc(c.rotulo) + '</strong>' +
+          (c.tipo === 'arquivo' ? ' <span class="tag">anexo</span>' : '') +
+          (c.dica ? '<em>' + esc(c.dica) + '</em>' : '') + '</span>' +
+        '</label>';
+      }).join('') +
+    '</div>' +
+
+    '<hr class="sep">' +
     '<h3 style="font-size:14px;margin:0 0 8px">Conversa no WhatsApp</h3>' +
     '<p class="small muted" style="margin:0 0 12px">Quando a pessoa clica em "Quero me candidatar", ' +
     'ela cai no WhatsApp com esta frase já escrita — e a Aurea usa o roteiro escolhido abaixo.</p>' +
@@ -218,6 +247,12 @@ function abreVaga(id) {
   document.getElementById('fundo').style.display = 'block';
   document.getElementById('gaveta').style.display = 'flex';
 
+  document.querySelectorAll('.cp-check').forEach(function (c) {
+    c.addEventListener('change', function () {
+      c.closest('.cp-item').classList.toggle('on', c.checked);
+    });
+  });
+
   const val = function (i) { return (document.getElementById(i) || {}).value || ''; };
 
   document.getElementById('vg-salvar').addEventListener('click', async function () {
@@ -228,6 +263,8 @@ function abreVaga(id) {
       description: val('vg-description'),
       responsibilities: val('vg-resp'), requirements: val('vg-req'), benefits: val('vg-ben'),
       whatsapp_message: val('vg-zapmsg'), wa_perguntas: val('vg-perguntas'),
+      campos_form: Array.from(document.querySelectorAll('.cp-check:checked'))
+        .map(function (x) { return x.value; }),
       prequal_group_id: val('vg-grupo') || null,
       active: document.getElementById('vg-ativa').checked,
       featured: document.getElementById('vg-destaque').checked
