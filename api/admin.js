@@ -1007,6 +1007,7 @@ module.exports = async function handler(req, res) {
       if (body.campos_form !== undefined) {
         patch.campos_form = campos.normaliza(body.campos_form);
       }
+      if (body.usa_whatsapp !== undefined) patch.usa_whatsapp = !!body.usa_whatsapp;
       if (body.active !== undefined) patch.active = !!body.active;
       if (body.featured !== undefined) patch.featured = !!body.featured;
       if (body.position !== undefined) patch.position = Number(body.position) || 1;
