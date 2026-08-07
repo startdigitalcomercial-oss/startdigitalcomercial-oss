@@ -272,6 +272,32 @@
   .campo input:focus { border-color: var(--uva); box-shadow: 0 0 0 4px rgba(141,56,163,.18); }
   .campo .erro { display: block; margin-top: 7px; font-size: 13px; color: #ff6b8a; }
 
+  .campo textarea {
+    width: 100%; padding: 15px 17px; border-radius: 14px; font-family: inherit; font-size: 16px;
+    color: #fff; background: var(--fundo); border: 1.5px solid var(--fio-forte); outline: none;
+    min-height: 110px; resize: vertical; transition: border-color .2s, box-shadow .2s;
+  }
+  .campo textarea::placeholder { color: #5c5f85; }
+  .campo textarea:focus { border-color: var(--uva); box-shadow: 0 0 0 4px rgba(141,56,163,.18); }
+  .campo .dica {
+    display: block; margin: -2px 0 8px; font-size: 12.5px; font-weight: 400;
+    line-height: 1.5; color: var(--tinta-3);
+  }
+
+  .anexo {
+    display: flex; align-items: center; gap: 14px; padding: 16px 18px; cursor: pointer;
+    border: 1.5px dashed var(--fio-forte); border-radius: 14px; background: var(--fundo);
+    transition: border-color .2s, background .2s;
+  }
+  .anexo:hover { border-color: var(--uva); background: rgba(141,56,163,.06); }
+  .anexo.tem { border-style: solid; border-color: #1faa53; background: rgba(37,211,102,.08); }
+  .anexo svg { width: 22px; height: 22px; stroke: var(--tinta-2); fill: none; stroke-width: 1.8;
+               stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .anexo.tem svg { stroke: #25d366; }
+  .anexo b { display: block; font-size: 14.5px; font-weight: 600; word-break: break-all; }
+  .anexo b + span { display: block; font-size: 12.5px; color: var(--tinta-3); margin-top: 2px; }
+  .anexo input { display: none; }
+
   .trilho { height: 8px; border-radius: 999px; background: var(--fundo-alto); overflow: hidden; }
   .trilho > i { display: block; height: 100%; width: 0; border-radius: 999px; background: var(--grad); transition: width .9s cubic-bezier(.2,.8,.3,1); }
   .trilho-txt { margin-top: 10px; font-size: 12.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--tinta-3); }
@@ -548,6 +574,35 @@ function mascaraFone(v) {
 }
 
 function telaFormulario(v) {
+  const extras = v.campos || [];
+
+  function campoHtml(c) {
+    const id = 'x-' + c.chave;
+    const rot = esc(c.rotulo) + (c.obrigatorio ? '' : ' <span style="color:var(--tinta-3);font-weight:400">(opcional)</span>');
+
+    if (c.tipo === 'arquivo') {
+      return '<div class="campo"><label>' + rot + '</label>' +
+        (c.dica ? '<span class="dica">' + esc(c.dica) + '</span>' : '') +
+        '<label class="anexo" id="a-' + esc(c.chave) + '">' +
+          '<svg viewBox="0 0 24 24"><path d="M12 16.5V4.8M7.8 9l4.2-4.2L16.2 9"/>' +
+          '<path d="M4.5 15v2.7a1.8 1.8 0 0 0 1.8 1.8h11.4a1.8 1.8 0 0 0 1.8-1.8V15"/></svg>' +
+          '<span style="flex:1"><b id="a-nome-' + esc(c.chave) + '">Escolher arquivo</b>' +
+          '<span>PDF, Word, JPG ou PNG</span></span>' +
+          '<input type="file" id="' + id + '" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">' +
+        '</label></div>';
+    }
+    if (c.tipo === 'texto_longo') {
+      return '<div class="campo"><label for="' + id + '">' + rot + '</label>' +
+        (c.dica ? '<span class="dica">' + esc(c.dica) + '</span>' : '') +
+        '<textarea id="' + id + '" placeholder="' + esc(c.exemplo) + '"></textarea></div>';
+    }
+    return '<div class="campo"><label for="' + id + '">' + rot + '</label>' +
+      (c.dica ? '<span class="dica">' + esc(c.dica) + '</span>' : '') +
+      '<input type="text" id="' + id + '"' +
+      (c.tipo === 'cpf' ? ' inputmode="numeric" maxlength="14"' : '') +
+      ' placeholder="' + esc(c.exemplo) + '"></div>';
+  }
+
   el('p-area').textContent = v.title;
   el('p-corpo').innerHTML =
     '<h2>Falta pouco</h2>' +
@@ -560,12 +615,35 @@ function telaFormulario(v) {
       '<input type="tel" id="c-fone" autocomplete="tel" inputmode="numeric" placeholder="(11) 91234-5678"></div>' +
       '<div class="campo"><label for="c-email">Seu melhor e-mail</label>' +
       '<input type="email" id="c-email" autocomplete="email" placeholder="maria@email.com"></div>' +
+      extras.map(campoHtml).join('') +
       '<div id="c-erro"></div>' +
       '<button class="btn btn-lg" id="c-enviar" style="width:100%;margin-top:24px">Continuar</button>' +
     '</form>';
 
-  const fone = el('c-fone');
-  fone.addEventListener('input', function () { this.value = mascaraFone(this.value); });
+  el('c-fone').addEventListener('input', function () { this.value = mascaraFone(this.value); });
+
+  const cpf = el('x-cpf');
+  if (cpf) cpf.addEventListener('input', function () {
+    const d = this.value.replace(/\D/g, '').slice(0, 11);
+    this.value = d.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+      .replace(/\.(\d{3})(\d{1,2})$/, '.$1-$2');
+  });
+
+  // o arquivo fica guardado aqui até o cadastro ser aceito
+  var ARQUIVO = null;
+  const inpArq = el('x-curriculo');
+  if (inpArq) inpArq.addEventListener('change', function () {
+    const f = this.files && this.files[0];
+    if (!f) return;
+    if (f.size > 8 * 1024 * 1024) {
+      el('a-nome-curriculo').textContent = 'Arquivo grande demais (máximo 8 MB)';
+      this.value = '';
+      return;
+    }
+    ARQUIVO = f;
+    el('a-curriculo').classList.add('tem');
+    el('a-nome-curriculo').textContent = f.name;
+  });
 
   el('f-cand').addEventListener('submit', async function (ev) {
     ev.preventDefault();
@@ -579,21 +657,58 @@ function telaFormulario(v) {
     if (tel.replace(/\D/g, '').length < 10) return erro('Confira o WhatsApp com DDD.');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(mail)) return erro('Confira o e-mail.');
 
+    const corpo = { vaga: v.slug, name: nome, phone: tel, email: mail };
+    for (const c of extras) {
+      if (c.tipo === 'arquivo') continue;
+      const campo = el('x-' + c.chave);
+      const valor = campo ? campo.value.trim() : '';
+      if (c.obrigatorio && !valor) return erro('Preencha: ' + c.rotulo.toLowerCase() + '.');
+      corpo[c.chave] = valor;
+    }
+
     const b = el('c-enviar');
     b.disabled = true;
     b.textContent = 'Enviando…';
     try {
       const r = await (await fetch('/api/public?action=candidatar', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vaga: v.slug, name: nome, phone: tel, email: mail })
+        body: JSON.stringify(corpo)
       })).json();
       if (!r.ok) throw new Error(r.error || 'Não deu para enviar agora.');
+
+      if (ARQUIVO && r.token) {
+        b.textContent = 'Enviando o currículo…';
+        try { await mandaCurriculo(r.token, ARQUIVO); }
+        catch (e) { /* o cadastro já valeu; o currículo o time pede depois */ }
+      }
       telaWhatsApp(v, r);
     } catch (e) {
       erro(e.message);
       b.disabled = false;
       b.textContent = 'Continuar';
     }
+  });
+}
+
+function mandaCurriculo(token, arquivo) {
+  return new Promise(function (ok, falhou) {
+    const leitor = new FileReader();
+    leitor.onerror = function () { falhou(new Error('não consegui ler o arquivo')); };
+    leitor.onload = async function () {
+      try {
+        const r = await (await fetch('/api/public?action=curriculo', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            t: token, nome: arquivo.name,
+            tipo: arquivo.type || 'application/octet-stream',
+            arquivo: String(leitor.result).split(',').pop()
+          })
+        })).json();
+        if (!r.ok) throw new Error(r.error);
+        ok(r);
+      } catch (e) { falhou(e); }
+    };
+    leitor.readAsDataURL(arquivo);
   });
 }
 

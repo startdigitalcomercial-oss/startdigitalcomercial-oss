@@ -159,6 +159,20 @@ function desenhaGaveta(sub) {
   });
   if (sub === 'acoes') ligaAcoes();
   if (sub === 'quiz') ligaQuizNotas();
+
+  const bc = document.getElementById('btn-curriculo');
+  if (bc) bc.addEventListener('click', async function () {
+    this.disabled = true;
+    this.innerHTML = '<span class="spinner"></span> Abrindo…';
+    try {
+      // o link vale 10 minutos e some: documento de gente nao fica
+      // em endereco publico eterno
+      const r = await api('curriculo_link', { params: { id: atualCand.candidate.id } });
+      window.open(r.link, '_blank', 'noopener');
+    } catch (e) { toast(e.message, true); }
+    this.disabled = false;
+    this.textContent = 'Abrir currículo';
+  });
 }
 
 function gavetaDados() {
@@ -167,14 +181,22 @@ function gavetaDados() {
     ['E-mail', c.email], ['WhatsApp', c.phone], ['Cidade / UF', [c.city, c.state].filter(Boolean).join(' / ')],
     ['Nascimento', c.birth_date], ['Vaga', c.role_applied], ['Pretensão', c.salary_expectation],
     ['Disponibilidade', c.availability], ['Mora em', c.has_computer], ['Vem de', c.internet_speed],
+    ['Indicado por', c.indicacao],
     ['Formação', c.education], ['Inglês', c.english_level], ['Ferramentas', c.tools],
     ['LinkedIn', c.linkedin], ['Instagram / portfólio', c.instagram],
+    ['CPF', c.cpf],
     ['Onde nos conheceu', c.extra && c.extra.onde_conheceu]
   ].filter(function (p) { return p[1]; });
 
   let html = '<div class="card"><h2>Dados do formulário</h2><dl class="kv">' +
     campos.map(function (p) { return '<dt>' + p[0] + '</dt><dd>' + esc(p[1]) + '</dd>'; }).join('') +
-    '</dl></div>';
+    '</dl>' +
+    (c.curriculo_url
+      ? '<hr class="sep"><div class="row" style="gap:12px;align-items:center;flex-wrap:wrap">' +
+        '<button class="btn btn-sm" id="btn-curriculo">Abrir currículo</button>' +
+        '<span class="small muted">' + esc(c.curriculo_nome || 'arquivo anexado') + '</span></div>'
+      : '') +
+    '</div>';
 
   const textos = [['Experiência profissional', c.experience], ['Por que a StartDigital', c.why_start],
     ['Pontos fortes', c.strengths], ['A melhorar', c.weaknesses]].filter(function (p) { return p[1]; });
