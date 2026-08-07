@@ -549,7 +549,9 @@ function abrir(slug) {
     listaHtml('O que oferecemos', v.benefits) +
     '<div class="painel-pe">' +
       '<button class="btn btn-lg" id="p-candidatar">Quero me candidatar</button>' +
-      '<small>Leva 1 minuto: você deixa seus dados e conclui pelo WhatsApp.</small>' +
+      '<small>' + (v.usa_whatsapp === false
+        ? 'Leva 1 minuto: você preenche seus dados e a gente já recebe a sua inscrição.'
+        : 'Leva 1 minuto: você deixa seus dados e conclui pelo WhatsApp.') + '</small>' +
     '</div>';
 
   el('fundo').classList.add('on');
@@ -681,7 +683,8 @@ function telaFormulario(v) {
         try { await mandaCurriculo(r.token, ARQUIVO); }
         catch (e) { /* o cadastro já valeu; o currículo o time pede depois */ }
       }
-      telaWhatsApp(v, r);
+      if (r.usa_whatsapp === false) telaEnviado(v, r);
+      else telaWhatsApp(v, r);
     } catch (e) {
       erro(e.message);
       b.disabled = false;
@@ -730,6 +733,28 @@ function telaWhatsApp(v, r) {
     var b = el('barra-fim');
     if (b) b.style.width = '70%';
   }, 120);
+}
+
+/* Vaga que não passa pelo WhatsApp: acabou aqui mesmo, 100%. */
+function telaEnviado(v, r) {
+  el('p-area').textContent = 'Inscrição enviada';
+  el('p-corpo').innerHTML =
+    '<div class="trilho"><i id="barra-fim"></i></div>' +
+    '<div class="trilho-txt">100% concluído</div>' +
+    '<div class="final">' +
+      '<h2>Recebemos a sua inscrição</h2>' +
+      '<p style="margin-top:14px">Obrigado, ' + esc(r.nome || '') + '. Sua inscrição para ' +
+      '<strong>' + esc(r.vaga || v.title) + '</strong> chegou aqui.</p>' +
+      '<p style="margin-top:10px">Nosso time vai analisar e, se o seu perfil for para a próxima etapa, ' +
+      'a gente entra em contato pelo WhatsApp ou pelo e-mail que você deixou.</p>' +
+      '<button class="btn btn-lg" id="c-fim" style="margin-top:28px">Ver outras vagas</button>' +
+    '</div>';
+  setTimeout(function () {
+    var b = el('barra-fim');
+    if (b) b.style.width = '100%';
+  }, 120);
+  var f = el('c-fim');
+  if (f) f.addEventListener('click', fechar);
 }
 
 function fechar() {
