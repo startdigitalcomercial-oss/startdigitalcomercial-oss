@@ -876,11 +876,34 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   check('senha mestra volta a valer sem nenhum dono', ds.senha_mestra_vale === true);
 
   console.log('\n5c) SEGURANCA — trava de senha e fim de sessao');
-  // a dica da senha na tela de login so aparece se a variavel estiver ligada
+  // a dica da senha na tela de login
   const dica = await (await fetch(BASE + '/api/admin?action=dica_senha')).json();
   check('dica da senha responde sem precisar de login', dica.ok === true, dica.error);
-  check('dica so mostra a senha quando esta ligada',
+  check('quando mostra a dica, vem a senha junto',
     dica.mostrar === false || (dica.mostrar === true && !!dica.senha), dica);
+  if (dica.mostrar === true) {
+    check('a senha mostrada e a que realmente entra', dica.senha === SENHA_PAINEL);
+  }
+
+  // A chave liga/desliga de verdade. Testo a funcao que o servidor usa,
+  // nao uma copia dela — copia de logica em teste so serve para mentir.
+  {
+    const guardado = process.env.MOSTRAR_SENHA_LOGIN;
+    delete require.cache[require.resolve('../api/_lib/util.js')];
+    const util = require('../api/_lib/util.js');
+    delete process.env.MOSTRAR_SENHA_LOGIN;
+    check('sem configurar nada, a senha aparece', util.mostrarSenhaNoLogin() === true);
+    ['false', 'FALSE', ' nao ', '0', 'off', 'no'].forEach(function (v) {
+      process.env.MOSTRAR_SENHA_LOGIN = v;
+      check('"' + v.trim() + '" esconde a senha', util.mostrarSenhaNoLogin() === false);
+    });
+    ['true', 'sim', '1'].forEach(function (v) {
+      process.env.MOSTRAR_SENHA_LOGIN = v;
+      check('"' + v + '" mantem a senha na tela', util.mostrarSenhaNoLogin() === true);
+    });
+    if (guardado === undefined) delete process.env.MOSTRAR_SENHA_LOGIN;
+    else process.env.MOSTRAR_SENHA_LOGIN = guardado;
+  }
 
   async function tentaLogin(senha) {
     return (await fetch(BASE + '/api/admin?action=login', {
