@@ -84,6 +84,9 @@ function vgItem(v) {
         '<span class="tag">' + (v.candidatos || 0) + ' candidato(s)</span>' +
         ((v.campos_form || []).length
           ? '<span class="tag">+' + v.campos_form.length + ' no formulário</span>' : '') +
+        (v.usa_whatsapp === false
+          ? '<span class="tag">termina no site</span>'
+          : '<span class="tag tag-verde">vai pro WhatsApp</span>') +
       '</div>' +
     '</div>' +
     '<button class="btn btn-sm btn-ghost vg-editar" data-id="' + esc(v.id) + '">Editar</button>' +
@@ -190,8 +193,8 @@ function abreVaga(id) {
 
     '<hr class="sep">' +
     '<h3 style="font-size:14px;margin:0 0 4px">O que o formulário pergunta</h3>' +
-    '<p class="small muted" style="margin:0 0 12px">Antes de ir para o WhatsApp, o candidato preenche este ' +
-    'formulário na página da vaga. Marque o que <strong>esta vaga</strong> precisa saber.</p>' +
+    '<p class="small muted" style="margin:0 0 12px">Na página da vaga, o candidato preenche este ' +
+    'formulário para se inscrever. Marque o que <strong>esta vaga</strong> precisa saber.</p>' +
     '<div class="cp-fixos">' +
       VAGAS_FIXOS.map(function (f) {
         return '<span class="cp-fixo">' + esc(f.rotulo) + '</span>';
@@ -212,8 +215,16 @@ function abreVaga(id) {
     '</div>' +
 
     '<hr class="sep">' +
-    '<h3 style="font-size:14px;margin:0 0 8px">Conversa no WhatsApp</h3>' +
-    '<p class="small muted" style="margin:0 0 12px">Quando a pessoa clica em "Quero me candidatar", ' +
+    '<h3 style="font-size:14px;margin:0 0 8px">Depois do formulário</h3>' +
+    '<label class="cp-item cp-chave' + (d.usa_whatsapp !== false ? ' on' : '') + '" id="vg-zap-chave">' +
+      '<input type="checkbox" id="vg-usazap"' + (d.usa_whatsapp !== false ? ' checked' : '') + '>' +
+      '<span><strong>Mandar o candidato para o WhatsApp da Aurea</strong>' +
+      '<em>Ligado: ela pede o vídeo de apresentação e faz a pré-qualificação. ' +
+      'Desligado: a inscrição termina no site e a pessoa cai direto na Triagem.</em></span>' +
+    '</label>' +
+
+    '<div id="vg-zap-bloco"' + (d.usa_whatsapp === false ? ' style="display:none"' : '') + '>' +
+    '<p class="small muted" style="margin:14px 0 12px">Quando a pessoa clica em "Quero me candidatar", ' +
     'ela cai no WhatsApp com esta frase já escrita — e a Aurea usa o roteiro escolhido abaixo.</p>' +
     campo('vg-zapmsg', 'Frase do botão', d.whatsapp_message,
       'Deixe em branco para usar: "Olá! Tenho interesse na vaga de ' + esc(d.title || '…') + '."') +
@@ -229,6 +240,7 @@ function abreVaga(id) {
             esc(g.name) + (g.is_default ? ' (padrão)' : '') + '</option>';
         }).join('') +
       '</select></div>' +
+    '</div>' +
 
     '<hr class="sep">' +
     '<div class="row row-wrap" style="gap:18px;align-items:center">' +
@@ -253,6 +265,17 @@ function abreVaga(id) {
     });
   });
 
+  // A chave do WhatsApp esconde o que só existe por causa dele: frase do
+  // botão, perguntas e roteiro. Vaga que não vai pro WhatsApp não precisa
+  // ver nada disso.
+  const chaveZap = document.getElementById('vg-usazap');
+  if (chaveZap) {
+    chaveZap.addEventListener('change', function () {
+      document.getElementById('vg-zap-chave').classList.toggle('on', chaveZap.checked);
+      document.getElementById('vg-zap-bloco').style.display = chaveZap.checked ? '' : 'none';
+    });
+  }
+
   const val = function (i) { return (document.getElementById(i) || {}).value || ''; };
 
   document.getElementById('vg-salvar').addEventListener('click', async function () {
@@ -266,6 +289,7 @@ function abreVaga(id) {
       campos_form: Array.from(document.querySelectorAll('.cp-check:checked'))
         .map(function (x) { return x.value; }),
       prequal_group_id: val('vg-grupo') || null,
+      usa_whatsapp: document.getElementById('vg-usazap').checked,
       active: document.getElementById('vg-ativa').checked,
       featured: document.getElementById('vg-destaque').checked
     };
