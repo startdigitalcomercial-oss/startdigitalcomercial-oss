@@ -179,17 +179,21 @@ module.exports = async function handler(req, res) {
         });
       }
 
-      const landing = await getSetting('landing', {});
-      const zap = await numeroDaAurea(landing);
+      // Vaga que nao passa pelo WhatsApp: a inscricao termina aqui mesmo.
+      // Nem link, nem frase — a tela final e a de "recebemos".
+      const vaiPraZap = vaga.usa_whatsapp !== false;
+      const landing = vaiPraZap ? await getSetting('landing', {}) : {};
+      const zap = vaiPraZap ? await numeroDaAurea(landing) : '';
       const frase = 'Olá! Me cadastrei para a vaga (' + vaga.title + ') e quero concluir o processo seletivo.';
 
       return u.ok(res, {
         nome: u.firstName(nome),
         vaga: vaga.title,
         token: cand.token,
+        usa_whatsapp: vaiPraZap,
         pede_curriculo: campos.pedeCurriculo(vaga.campos_form),
-        link_whatsapp: zap ? 'https://wa.me/' + zap + '?text=' + encodeURIComponent(frase) : '',
-        mensagem: frase
+        link_whatsapp: (vaiPraZap && zap) ? 'https://wa.me/' + zap + '?text=' + encodeURIComponent(frase) : '',
+        mensagem: vaiPraZap ? frase : ''
       });
     }
 
