@@ -210,7 +210,7 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
     landDepois.whatsapp === stz.numero_conectado, { landing: landDepois.whatsapp, conectado: stz.numero_conectado });
 
   const pub1 = await pub('vagas');
-  check('landing lista as vagas', pub1.ok && pub1.vagas.length === 2, pub1.error);
+  check('landing lista as vagas', pub1.ok && pub1.vagas.length === 3, pub1.error);
   check('landing devolve os filtros por area', pub1.areas.indexOf('Tráfego Pago') >= 0, pub1.areas);
   const vagaPleno = pub1.vagas.filter(function (v) { return v.slug === 'gestor-de-trafego-pleno'; })[0];
   check('vaga tem salario', vagaPleno && vagaPleno.salary === 'R$ 2.200 + Comissões', vagaPleno && vagaPleno.salary);
@@ -225,6 +225,36 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   check('landing nao vaza o roteiro de perguntas', vagaPleno.prequal_group_id === undefined);
   check('vaga sozinha pelo apelido', (await pub('vaga', null, { slug: 'gestor-de-trafego-jr' })).ok);
   check('apelido que nao existe da 404', !(await pub('vaga', null, { slug: 'nao-existe' })).ok);
+
+  // ------------------------------------------------------------
+  // A CHAVE: esta vaga vai pro WhatsApp ou termina no site?
+  // ------------------------------------------------------------
+  const vagaSemZap = pub1.vagas.filter(function (v) { return v.slug === 'assistente-administrativo'; })[0];
+  check('vaga marcada como "termina no site" diz isso na landing',
+    vagaSemZap && vagaSemZap.usa_whatsapp === false, vagaSemZap && vagaSemZap.usa_whatsapp);
+  // O botao TEM que vir vazio. Se vier preenchido, a landing desenha um
+  // botao de WhatsApp numa vaga que nao deveria ter nenhum.
+  check('vaga sem WhatsApp nao devolve link de WhatsApp',
+    vagaSemZap.link_whatsapp === '', vagaSemZap.link_whatsapp);
+  check('vaga de WhatsApp continua marcada como tal', vagaPleno.usa_whatsapp === true);
+
+  const foneAdm = '11 9' + String(Date.now() + 31).slice(-8);
+  const digAdm = '55' + foneAdm.replace(/\D/g, '');
+  const cadSemZap = await pub('candidatar', {
+    vaga: 'assistente-administrativo', name: 'Bruna Alves ' + SUF,
+    phone: foneAdm, email: 'bruna.adm.' + SUF + '@exemplo.com',
+    cidade: 'Praia Grande', experiencia: 'Rotinas administrativas'
+  });
+  check('cadastro na vaga sem WhatsApp e aceito', cadSemZap.ok, cadSemZap.error);
+  check('a resposta avisa que nao vai pro WhatsApp', cadSemZap.usa_whatsapp === false, cadSemZap);
+  check('e nao manda link nem frase de WhatsApp',
+    cadSemZap.link_whatsapp === '' && cadSemZap.mensagem === '', cadSemZap);
+
+  // Se a pessoa chamar assim mesmo, a Aurea responde — mas NAO dispara a
+  // sequencia de video e pre-qualificacao, que e o que a chave desliga.
+  const zapSemZap = await webhook(digAdm, 'Oi, me candidatei na vaga', 'Bruna Alves ' + SUF);
+  check('vaga sem WhatsApp nao dispara a sequencia da landing',
+    zapSemZap.resultado && zapSemZap.resultado.sequencia !== true, zapSemZap.resultado);
 
   // ============================================================
   // O funil de verdade: formulario na landing -> WhatsApp -> sequencia
