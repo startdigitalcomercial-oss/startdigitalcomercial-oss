@@ -84,7 +84,11 @@ function paraPublico(v, base, whatsapp) {
     responsibilities: Array.isArray(v.responsibilities) ? v.responsibilities : [],
     benefits: Array.isArray(v.benefits) ? v.benefits : [],
     featured: v.featured === true,
-    link_whatsapp: linkWhatsApp(v, whatsapp)
+    // Esta vaga termina no WhatsApp com a Aurea, ou acaba no proprio site?
+    // Quem nao tem a coluna preenchida continua indo pro WhatsApp, que e
+    // como o sistema sempre funcionou.
+    usa_whatsapp: v.usa_whatsapp !== false,
+    link_whatsapp: v.usa_whatsapp === false ? '' : linkWhatsApp(v, whatsapp)
   };
 }
 
