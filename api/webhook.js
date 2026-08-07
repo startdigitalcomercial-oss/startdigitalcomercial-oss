@@ -9,6 +9,17 @@ const crypto = require('crypto');
 const db = require('./_lib/db');
 const u = require('./_lib/util');
 const aurea = require('./_lib/aurea');
+const vagas = require('./_lib/vagas');
+
+// A vaga desta pessoa termina no WhatsApp ou no site?
+// Sem vaga (ou sem a coluna preenchida) vale o de sempre: WhatsApp.
+async function vagaUsaWhatsApp(candidato) {
+  if (!candidato || !candidato.job_id) return true;
+  try {
+    const v = await vagas.porId(candidato.job_id);
+    return !v || v.usa_whatsapp !== false;
+  } catch (e) { return true; }
+}
 
 // chave derivada do APP_SECRET — não precisa de variável nova
 function chaveWebhook() {
@@ -177,7 +188,10 @@ module.exports = async function handler(req, res) {
     // Primeira mensagem: dispara as perguntas e o pedido do vídeo.
     // Depois disso: a Aurea conversa, tira dúvidas, e só fecha quando
     // recebe as respostas E o vídeo.
-    if (candidato.source === 'landing') {
+    // Só entra aqui se a vaga dela for de WhatsApp. Vaga marcada para
+    // terminar no site não dispara vídeo nem pré-qualificação — se a
+    // pessoa chamar assim mesmo, cai no fluxo normal e a Aurea conversa.
+    if (candidato.source === 'landing' && await vagaUsaWhatsApp(candidato)) {
       const r = candidato.wa_sequencia_em
         ? await aurea.acompanharDaLanding(candidato, texto, tipo)
         : await aurea.receberDaLanding(candidato);
