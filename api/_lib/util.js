@@ -34,6 +34,17 @@ async function readBody(req) {
   try { return JSON.parse(raw); } catch (e) { return {}; }
 }
 
+// Mostrar (ou nao) a senha na tela de login, durante a fase de testes.
+// Vem LIGADO de fabrica de proposito: nao adianta depender de alguem
+// lembrar de criar uma variavel na Vercel. Quem quiser esconder escreve
+// false (ou nao / 0 / off) em MOSTRAR_SENHA_LOGIN e faz Redeploy.
+function mostrarSenhaNoLogin() {
+  const escolha = String(process.env.MOSTRAR_SENHA_LOGIN || '').trim().toLowerCase();
+  if (!escolha) return true;
+  return !(escolha === 'false' || escolha === 'nao' || escolha === 'não' ||
+    escolha === '0' || escolha === 'off' || escolha === 'no');
+}
+
 // ---------- Tokens e assinatura ----------
 function appSecret() {
   return process.env.APP_SECRET || process.env.ADMIN_SECRET || 'start-rh-dev-secret';
@@ -429,5 +440,6 @@ module.exports = {
   signSession, verifySession, requireAdmin, candidateToken, safeEqual,
   firstName, appUrl, setBaseFromReq, candidateLinks, renderTemplate, templateVars,
   hashPassword, checkPassword, signCandidateSession, candidateFromRequest, phoneTail,
-  escapeHtml, textToEmailHtml, normalizePhone, isEmail
+  escapeHtml, textToEmailHtml, normalizePhone, isEmail,
+  mostrarSenhaNoLogin
 };
