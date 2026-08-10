@@ -150,11 +150,54 @@ const TITULOS = {
   prequalificacao: 'Pré Qualificação', aurea: 'Aurea', preonboarding: 'Pré Onboarding',
   conteudo: 'Aulas da integração', quiz: 'Quiz de seleção',
   colaboradores: 'Colaboradores', avisos: 'Avisos para o time', usuarios: 'Usuários do painel',
-  mensagens: 'Modelos de mensagem', ajustes: 'Ajustes'
+  mensagens: 'Modelos de mensagem', ajustes: 'Ajustes',
+  financeiro: 'Financeiro', findash: 'Dashboard financeiro'
 };
+/* ---------------------------------------------- sanfona do menu
+   Um grupo aberto por vez. O grupo da página em que você está abre
+   sozinho; os outros ficam fechados, com um pontinho verde quando
+   escondem a página ativa. A escolha fica salva no navegador, então
+   ao voltar o menu está do jeito que você deixou. */
+const LS_MENU = 'start_rh_menu_aberto';
+
+function grupoDaAba(aba) {
+  const b = document.querySelector('#abas button[data-aba="' + aba + '"]');
+  return b ? b.closest('.nav-grupo') : null;
+}
+
+function abreGrupo(g, guardar) {
+  if (!g) return;
+  document.querySelectorAll('#abas .nav-grupo').forEach(function (x) {
+    x.classList.toggle('on', x === g);
+  });
+  if (guardar !== false) {
+    try { localStorage.setItem(LS_MENU, g.dataset.grupo || ''); } catch (e) { }
+  }
+}
+
+function marcaGrupoAtivo() {
+  document.querySelectorAll('#abas .nav-grupo').forEach(function (g) {
+    g.classList.toggle('tem-ativa', !!g.querySelector('button[data-aba].on'));
+  });
+}
+
 document.getElementById('abas').addEventListener('click', function (ev) {
+  const cab = ev.target.closest('.nav-cab');
+  if (cab) {
+    const g = cab.closest('.nav-grupo');
+    // clicou no que já estava aberto? então fecha e não sobra nenhum.
+    if (g.classList.contains('on')) {
+      g.classList.remove('on');
+      try { localStorage.setItem(LS_MENU, ''); } catch (e) { }
+    } else {
+      abreGrupo(g);
+    }
+    return;
+  }
+
   const b = ev.target.closest('button[data-aba]');
   if (!b) return;
+  abreGrupo(b.closest('.nav-grupo'));
   document.querySelectorAll('#abas button').forEach(function (x) { x.classList.toggle('on', x === b); });
   document.getElementById('titulo-pagina').textContent = TITULOS[b.dataset.aba] || '';
   document.querySelectorAll('section[data-painel]').forEach(function (s) {
@@ -167,7 +210,23 @@ document.getElementById('abas').addEventListener('click', function (ev) {
     dashboard: carregaDashboard, vagas: carregaVagas, triagem: carregaBoard, candidatos: carregaCandidatos,
     prequalificacao: carregaPrequal, aurea: carregaAurea, preonboarding: carregaBoasVindas,
     colaboradores: carregaColaboradores, avisos: carregaAvisos, usuarios: carregaUsuarios,
-    conteudo: carregaConteudo, quiz: carregaQuiz, mensagens: carregaTemplates, ajustes: carregaAjustes
+    conteudo: carregaConteudo, quiz: carregaQuiz, mensagens: carregaTemplates, ajustes: carregaAjustes,
+    financeiro: carregaFinanceiro, findash: carregaFinDash
   };
+  marcaGrupoAtivo();
   if (carregar[b.dataset.aba]) carregar[b.dataset.aba]();
 });
+
+// Ao abrir o painel: o grupo salvo, ou o da página em que a gente está.
+(function menuInicial() {
+  let salvo = null;
+  try { salvo = localStorage.getItem(LS_MENU); } catch (e) { }
+
+  // salvo === '' quer dizer "eu fechei tudo de propósito". Respeita.
+  if (salvo === '') { marcaGrupoAtivo(); return; }
+
+  const pelaMemoria = salvo && document.querySelector('#abas .nav-grupo[data-grupo="' + salvo + '"]');
+  const ativa = document.querySelector('#abas button[data-aba].on');
+  abreGrupo(pelaMemoria || grupoDaAba(ativa ? ativa.dataset.aba : 'dashboard'), false);
+  marcaGrupoAtivo();
+})();

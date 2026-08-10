@@ -248,13 +248,8 @@ async function escondeFinanceiroSeNaoPode() {
     })).json();
     if (!r.ok || !Array.isArray(r.menu)) return;
     if (r.menu.indexOf('financeiro') >= 0) return;
-    ['financeiro', 'findash'].forEach(function (aba) {
-      const b = document.querySelector('#abas button[data-aba="' + aba + '"]');
-      if (b) b.style.display = 'none';
-    });
-    const sec = Array.from(document.querySelectorAll('#abas .nav-sec'))
-      .filter(function (s) { return s.textContent.trim() === 'Financeiro'; })[0];
-    if (sec) sec.style.display = 'none';
+    const grupo = document.querySelector('#abas .nav-grupo[data-grupo="financeiro"]');
+    if (grupo) grupo.style.display = 'none';
   } catch (e) { /* na dúvida, deixa o botão: o servidor barra */ }
 }
 
