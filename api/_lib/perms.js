@@ -34,14 +34,20 @@ const DESCRICOES = {
 // O que cada papel PODE fazer, por area.
 // ver = enxergar a tela. mexer = alterar/criar/excluir. enviar = disparar mensagem.
 const PODE = {
-  dono:      { ver: '*', mexer: '*', enviar: true, usuarios: true, ajustes: true },
-  rh:        { ver: '*', mexer: '*', enviar: true, usuarios: false, ajustes: true },
+  dono:      { ver: '*', mexer: '*', enviar: true, usuarios: true, ajustes: true,
+               financeiro: true, financeiro_mexer: true },
+  rh:        { ver: '*', mexer: '*', enviar: true, usuarios: false, ajustes: true,
+               financeiro: true, financeiro_mexer: true },
   avaliador: {
     ver: ['dashboard', 'candidatos', 'quiz', 'aulas', 'time'],
     mexer: ['quiz_nota', 'candidato_nota'],
-    enviar: false, usuarios: false, ajustes: false
+    enviar: false, usuarios: false, ajustes: false,
+    financeiro: false, financeiro_mexer: false
   },
-  leitura:   { ver: '*', mexer: [], enviar: false, usuarios: false, ajustes: false }
+  // Leitura ve quase tudo, mas dinheiro nao. Valor de contrato e
+  // telefone de cliente nao sao coisa de "so olhar".
+  leitura:   { ver: '*', mexer: [], enviar: false, usuarios: false, ajustes: false,
+               financeiro: false, financeiro_mexer: false }
 };
 
 // Cada acao da API declara o que exige.
@@ -73,7 +79,11 @@ const ACOES = {
   usuarios: 'usuarios', usuario_salvar: 'usuarios', usuario_excluir: 'usuarios',
   usuario_senha: 'usuarios', auditoria: 'usuarios',
   vagas: 'ver', vaga_salvar: 'mexer', vaga_excluir: 'mexer', vaga_ordem: 'mexer',
-  curriculo_link: 'ver'
+  curriculo_link: 'ver',
+
+  // --- financeiro: so quem cuida do dinheiro ---
+  fin_lista: 'financeiro', fin_resumo: 'financeiro', fin_relatorio: 'financeiro',
+  fin_salvar: 'financeiro_mexer', fin_excluir: 'financeiro_mexer'
 };
 
 function papelValido(p) { return PAPEIS.indexOf(p) >= 0; }
@@ -89,6 +99,8 @@ function permite(papel, acao) {
   if (exige === 'enviar') return regra.enviar === true;
   if (exige === 'usuarios') return regra.usuarios === true;
   if (exige === 'ajustes') return regra.ajustes === true;
+  if (exige === 'financeiro') return regra.financeiro === true;
+  if (exige === 'financeiro_mexer') return regra.financeiro_mexer === true;
 
   if (exige === 'ver') {
     return regra.ver === '*' || (Array.isArray(regra.ver) && regra.ver.length > 0);
@@ -105,6 +117,9 @@ function recado(papel, acao) {
   const exige = ACOES[acao] || 'mexer';
   const nome = NOMES[papel] || papel;
   if (exige === 'usuarios') return 'Só o Dono pode mexer nos usuários do painel.';
+  if (exige === 'financeiro' || exige === 'financeiro_mexer') {
+    return 'O seu acesso (' + nome + ') não enxerga o financeiro.';
+  }
   if (exige === 'enviar') return 'O seu acesso (' + nome + ') não permite disparar mensagens.';
   if (exige === 'ajustes') return 'O seu acesso (' + nome + ') não permite mudar as configurações.';
   return 'O seu acesso (' + nome + ') é só de consulta — esta ação não é permitida.';
@@ -115,11 +130,13 @@ function recado(papel, acao) {
 function menuDoPapel(papel) {
   if (papel === 'dono') {
     return ['dashboard', 'vagas', 'triagem', 'candidatos', 'prequalificacao', 'aurea', 'preonboarding',
-      'colaboradores', 'avisos', 'conteudo', 'quiz', 'mensagens', 'ajustes', 'usuarios'];
+      'colaboradores', 'avisos', 'conteudo', 'quiz', 'mensagens',
+      'financeiro', 'findash', 'ajustes', 'usuarios'];
   }
   if (papel === 'rh') {
     return ['dashboard', 'vagas', 'triagem', 'candidatos', 'prequalificacao', 'aurea', 'preonboarding',
-      'colaboradores', 'avisos', 'conteudo', 'quiz', 'mensagens', 'ajustes'];
+      'colaboradores', 'avisos', 'conteudo', 'quiz', 'mensagens',
+      'financeiro', 'findash', 'ajustes'];
   }
   if (papel === 'avaliador') {
     return ['dashboard', 'vagas', 'triagem', 'candidatos', 'quiz', 'conteudo'];
