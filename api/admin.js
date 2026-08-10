@@ -13,6 +13,7 @@ const webhook = require('./webhook');
 const perms = require('./_lib/perms');
 const vagas = require('./_lib/vagas');
 const campos = require('./_lib/campos');
+const porta = require('./_lib/porta');
 
 const SESSION_HOURS = 12;
 
@@ -428,31 +429,12 @@ module.exports = async function handler(req, res) {
     }
 
     // ---------------------------------------------------- daqui pra baixo exige login
-    const session = u.requireAdmin(req, res);
-    if (!session) return;
-
-    // Sessao assinada antes do ultimo "encerrar todas" nao vale mais.
-    const epocaAtual = await epocaSessao();
-    if (session.epoca && session.epoca < epocaAtual) {
-      return u.fail(res, 401, 'Sua sessao foi encerrada. Faca login novamente.');
-    }
-
-    // Quem foi desligado do painel perde o acesso na hora, sem esperar a sessao vencer.
-    const papel = session.papel || 'dono';
-    if (session.uid) {
-      const eu = await db.selectOne('panel_users', { id: 'eq.' + session.uid, select: '*' });
-      if (!eu || eu.active === false) {
-        return u.fail(res, 401, 'O seu acesso foi desativado. Fale com o Dono do painel.');
-      }
-      if (eu.role !== papel) {
-        return u.fail(res, 401, 'O seu nível de acesso mudou. Entre novamente.');
-      }
-    }
-
-    // ---- a barreira: este papel pode executar esta acao? ----
-    if (!perms.permite(papel, action)) {
-      return u.fail(res, 403, perms.recado(papel, action));
-    }
+    // A porta confere crachá, sessão encerrada, acesso desativado e
+    // permissão do papel. Mora em _lib/porta.js e é a mesma do financeiro.
+    const entrada = await porta.abrir(req, res, action);
+    if (!entrada) return;
+    const session = entrada.session;
+    const papel = entrada.papel;
 
     // quem sou eu (a tela usa para montar o menu e mostrar o nome)
     if (action === 'usuarios_eu') {

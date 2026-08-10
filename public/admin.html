@@ -353,6 +353,71 @@
   .cp-item em { display: block; font-style: normal; font-size: 12px; color: var(--label-3); margin-top: 2px; line-height: 1.45; }
   /* a chave sozinha, fora da lista de campos: precisa de um respiro */
   .cp-chave { margin: 0 0 4px; padding: 13px 15px; }
+
+  /* ==================== FINANCEIRO ====================
+     A planilha do time, do jeito que eles ja conhecem: faixa roxa
+     em cima, cabecalho roxo claro, linhas escuras. Cor de status
+     nunca sozinha — sempre com a palavra do lado. */
+  .fin-quadro { border-radius: 14px; overflow: hidden; box-shadow: 0 2px 18px rgba(0,0,0,.14); }
+  .fin-topo { display: flex; align-items: stretch; background: #35187a; }
+  .fin-marca { display: flex; align-items: center; gap: 10px; padding: 16px 22px;
+               background: #2b1266; border-right: 3px solid #6f8bf0; min-width: 220px; }
+  .fin-marca img { width: 26px; height: 26px; }
+  .fin-marca b { color: #fff; font-size: 15px; letter-spacing: .2px; display: block; line-height: 1.15; }
+  .fin-marca small { color: #b9a8ee; font-size: 8.5px; letter-spacing: 1.6px; text-transform: uppercase; }
+  .fin-titulo { flex: 1; display: flex; align-items: center; justify-content: center;
+                color: #fff; font-size: 24px; font-weight: 800; letter-spacing: .6px; padding: 12px; }
+
+  .fin-tab { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .fin-tab th { background: #5b4bb0; color: #fff; font-weight: 600; font-size: 12px;
+                letter-spacing: .5px; text-transform: uppercase; padding: 12px 10px;
+                border-right: 1px solid rgba(255,255,255,.16); white-space: nowrap; }
+  .fin-tab td { background: #3d3d3d; color: #ececec; padding: 11px 10px; text-align: center;
+                border-right: 1px solid #4d4d4d; border-top: 1px solid #4d4d4d; }
+  .fin-tab tr:hover td { background: #494949; }
+  .fin-tab td.fin-nome { font-weight: 600; letter-spacing: .3px; }
+  .fin-tab td.fin-nome.on { background: #e08b28; color: #fff; }
+  .fin-tab tr:hover td.fin-nome.on { background: #ea9a3c; }
+  .fin-tab td.fin-obs { text-align: left; color: #cfcfcf; font-size: 12px; }
+  .fin-tab td.fin-resp { text-align: left; }
+  .fin-tab td.fin-val { font-variant-numeric: tabular-nums; }
+
+  .fin-st { display: block; padding: 8px 6px; border-radius: 6px; font-weight: 600; font-size: 12.5px; }
+  .fin-st.pago { background: #1d6f45; color: #eafff2; }
+  .fin-st.aguardando { background: #d2e3e8; color: #24404a; }
+  .fin-st.inadimplente { background: #a92b21; color: #ffecea; }
+
+  .fin-editar { background: none; border: 0; color: #b9c6ff; cursor: pointer; font-size: 12px;
+                padding: 4px 8px; border-radius: 6px; }
+  .fin-editar:hover { background: rgba(255,255,255,.1); color: #fff; }
+
+  /* ---- dashboard ---- */
+  .fd-grade { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  .fd-tile { background: var(--card); border: 1px solid var(--fio); border-radius: var(--r-card);
+             padding: 17px 18px; }
+  .fd-tile .rot { font-size: 11.5px; text-transform: uppercase; letter-spacing: .7px;
+                  color: var(--label-3); font-weight: 600; }
+  .fd-tile .num { font-size: 28px; font-weight: 700; margin-top: 7px; letter-spacing: -.5px;
+                  font-variant-numeric: tabular-nums; }
+  .fd-tile .pe { font-size: 12px; color: var(--label-3); margin-top: 5px; }
+  .fd-tile.ruim { border-color: #f0bfba; background: #fdf4f3; }
+  .fd-tile.ruim .num { color: #a92b21; }
+  .fd-tile.ruim .rot { color: #a92b21; }
+  .fd-tile.espera .num { color: #1c5f79; }
+  .fd-tile.ok .num { color: #1d6f45; }
+
+  .fd-sem { border: 1px solid var(--fio); border-radius: var(--r-card); background: var(--card);
+            overflow: hidden; }
+  .fd-sem-linha { display: flex; align-items: center; gap: 12px; padding: 11px 16px;
+                  border-top: 1px solid var(--fio); font-size: 13.5px; }
+  .fd-sem-linha:first-child { border-top: 0; }
+  .fd-sem-dia { font-weight: 700; font-size: 12.5px; min-width: 48px; color: var(--label-3);
+                font-variant-numeric: tabular-nums; }
+  .fd-sem-nome { flex: 1; font-weight: 600; }
+  .fd-sem-val { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .fd-pino { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; }
+  .fd-pino.aguardando { background: #d2e3e8; color: #24404a; }
+  .fd-pino.inadimplente { background: #fbe3e0; color: #a92b21; }
 </style>
 </head>
 <body>
@@ -405,6 +470,9 @@
       <button data-aba="conteudo"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M10.3 9.1v5.8l4.8-2.9z"/></svg><span>Aulas</span></button>
       <button data-aba="quiz"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="5.5" y="4.2" width="13" height="16.6" rx="2"/><path d="M9.3 4.2V3.2h5.4v1"/><path d="m9.3 13.6 2 2 3.8-4.4"/></svg><span>Quiz</span></button>
       <button data-aba="mensagens"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3.6" y="5.4" width="16.8" height="13.2" rx="2"/><path d="m4.6 7 7.4 5.8L19.4 7"/></svg><span>Mensagens</span></button>
+      <div class="nav-sec">Financeiro</div>
+      <button data-aba="financeiro"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6.6 12h.1M17.3 12h.1"/></svg><span>Clientes</span></button>
+      <button data-aba="findash"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M4 19.6h16"/><path d="M7.2 19.6v-6M12 19.6V8.4M16.8 19.6v-9"/><path d="M6.4 6.6 11 4.2l4.4 2 3.4-2.6"/></svg><span>Dashboard</span></button>
       <div class="nav-sec">Administração</div>
       <button data-aba="usuarios"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><circle cx="9.2" cy="8" r="3.4"/><path d="M3.4 19.6c.6-3.3 3-5 5.8-5s5.2 1.7 5.8 5"/><path d="M17 9.4h4M19 7.4v4"/></svg><span>Usuários</span></button>
       <button data-aba="ajustes"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M4.5 8.2h7.7M16.8 8.2h2.7M4.5 15.8h2.7M12 15.8h7.5"/><circle cx="14.6" cy="8.2" r="2.1"/><circle cx="9.3" cy="15.8" r="2.1"/></svg><span>Ajustes</span></button>
@@ -543,6 +611,16 @@
       </div>
     </section>
 
+    <!-- ---------- FINANCEIRO: a planilha ---------- -->
+    <section data-painel="financeiro" style="display:none">
+      <div style="padding:22px 0 40px" id="painel-financeiro"></div>
+    </section>
+
+    <!-- ---------- FINANCEIRO: o dashboard ---------- -->
+    <section data-painel="findash" style="display:none">
+      <div style="padding:22px 0 40px" id="painel-findash"></div>
+    </section>
+
     <!-- ---------- AJUSTES ---------- -->
     <section data-painel="ajustes" style="display:none">
       <div style="padding:22px 0 40px" id="painel-ajustes"></div>
@@ -577,6 +655,7 @@
 <script src="/js/admin-vagas.js"></script>
 <script src="/js/admin-aurea.js"></script>
 <script src="/js/admin-whatsapp.js"></script>
+<script src="/js/admin-financeiro.js"></script>
 <script src="/js/admin-inicio.js"></script>
 </body>
 </html>
