@@ -905,6 +905,117 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   check('limpou os usuarios de teste', ds.usuarios.length === 0, ds.usuarios && ds.usuarios.length);
   check('senha mestra volta a valer sem nenhum dono', ds.senha_mestra_vale === true);
 
+  // ============================================================
+  console.log('\n5b-fin) FINANCEIRO — carteira, dashboard e relatorio');
+  // ============================================================
+  async function fin(action, body) {
+    return (await fetch(BASE + '/api/financeiro?action=' + action, {
+      method: body ? 'POST' : 'GET',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + T },
+      body: body ? JSON.stringify(body) : undefined
+    })).json();
+  }
+
+  const lista0 = await fin('fin_lista');
+  check('financeiro lista a carteira', lista0.ok && lista0.clientes.length >= 10, lista0.error);
+  const vitraux = (lista0.clientes || []).filter(function (c) { return c.cliente === 'VITRAUX'; })[0];
+  check('cada linha ja vem com o total somado',
+    vitraux && vitraux.total === 2500 + 1500 + 120, vitraux && vitraux.total);
+  check('e com o nome do status escrito', vitraux && vitraux.status_nome === 'Pago', vitraux && vitraux.status_nome);
+
+  const res0 = (await fin('fin_resumo')).resumo || {};
+  // Conferencia na mao: as tres somas do dashboard tem que bater com
+  // a soma das linhas. Se um dia alguem mexer na conta, cai aqui.
+  const somaDe = function (campo) {
+    return lista0.clientes.filter(function (c) { return c.ativo; })
+      .reduce(function (a, c) { return a + c[campo]; }, 0);
+  };
+  check('total de setup bate com as linhas', res0.total_setup === somaDe('setup'),
+    { dash: res0.total_setup, linhas: somaDe('setup') });
+  check('total de mensalidade bate com as linhas', res0.total_mensalidade === somaDe('valor'),
+    { dash: res0.total_mensalidade, linhas: somaDe('valor') });
+  check('total de hospedagem bate com as linhas', res0.total_hospedagem === somaDe('hospedagem'),
+    { dash: res0.total_hospedagem, linhas: somaDe('hospedagem') });
+  // pago + aguardando + inadimplente tem que fechar a carteira inteira
+  check('as tres situacoes somam a carteira toda',
+    Math.round((res0.recebido + res0.aguardando + res0.inadimplente) * 100) ===
+    Math.round(res0.total_carteira * 100),
+    { partes: res0.recebido + res0.aguardando + res0.inadimplente, total: res0.total_carteira });
+  check('inadimplente sai separado e contado',
+    res0.inadimplente > 0 && res0.inadimplente_qtd === 2, res0);
+  check('previsao da semana traz a data limite', /^\d\d\/\d\d$/.test(res0.proxima_semana_ate || ''),
+    res0.proxima_semana_ate);
+
+  // A conta da previsao, sem depender de que dia e hoje quando o teste roda.
+  {
+    const finmod = require('../api/financeiro.js');
+    const base = new Date(2026, 0, 10);                       // 10 de janeiro
+    check('vencimento dia 12 cai neste mes',
+      finmod.proximaData(12, base).getTime() === new Date(2026, 0, 12).getTime());
+    check('vencimento dia 5 (ja passou) pula para o mes que vem',
+      finmod.proximaData(5, base).getTime() === new Date(2026, 1, 5).getTime());
+    // fevereiro nao tem dia 31: a cobranca cai no ultimo dia do mes
+    check('dia 31 em fevereiro vira o ultimo dia',
+      finmod.proximaData(31, new Date(2026, 1, 1)).getTime() === new Date(2026, 1, 28).getTime(),
+      finmod.proximaData(31, new Date(2026, 1, 1)).toDateString());
+    // valores digitados do jeito que o time digita
+    check('aceita 2.500,00', finmod.limpaValor('2.500,00') === 2500);
+    check('aceita R$ 1.890', finmod.limpaValor('R$ 1.890') === 1890);
+    check('aceita 997.50', finmod.limpaValor('997.50') === 997.5);
+    check('valor negativo vira zero', finmod.limpaValor('-30') === 0);
+  }
+
+  // gravar, alterar e apagar
+  const novo = await fin('fin_salvar', {
+    cliente: 'CLIENTE TESTE ' + SUF, valor: '1.234,56', setup: '500', hospedagem: '90',
+    vencimento_dia: 15, status: 'aguardando', responsavel: 'Fulano', telefone: '13 90000-0000'
+  });
+  check('cria cliente novo', novo.ok && novo.cliente.valor === 1234.56, novo.error || novo.cliente);
+  check('o total do novo ja vem somado', novo.cliente.total === 1234.56 + 500 + 90, novo.cliente.total);
+  const editado = await fin('fin_salvar', { id: novo.cliente.id, cliente: novo.cliente.cliente, status: 'pago', valor: 1000 });
+  check('altera o cliente', editado.ok && editado.cliente.status === 'pago', editado.error);
+  check('sem nome nao grava', !(await fin('fin_salvar', { cliente: '   ' })).ok);
+  const inventado = await fin('fin_salvar', { cliente: 'X ' + SUF, status: 'sei-la' });
+  check('status inventado vira aguardando', inventado.cliente.status === 'aguardando');
+  await fin('fin_excluir', { id: inventado.cliente.id });
+
+  const relatorio = await fetch(BASE + '/api/financeiro?action=fin_relatorio', {
+    headers: { Authorization: 'Bearer ' + T }
+  });
+  // Os bytes crus, nao o texto: .text() come o BOM na decodificacao e
+  // o teste passaria mesmo se o servidor tivesse parado de mandar.
+  const bytes = Buffer.from(await relatorio.arrayBuffer());
+  const csv = bytes.toString('utf8');
+  check('relatorio sai como arquivo para baixar',
+    /attachment; filename=/.test(relatorio.headers.get('content-disposition') || ''),
+    relatorio.headers.get('content-disposition'));
+  check('relatorio comeca com BOM (senao o Excel come os acentos)',
+    bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF,
+    [bytes[0], bytes[1], bytes[2]]);
+  check('relatorio traz todas as colunas',
+    /Cliente;Mensalidade;Setup;Hospedagem;Total;Vencimento;Status;Responsavel;Telefone;Observacao/.test(csv));
+  check('relatorio fecha com a linha de total', /\r\nTOTAL;/.test(csv));
+  check('relatorio traz os clientes', csv.indexOf('VITRAUX') > 0 && csv.indexOf('BRAZ') > 0);
+
+  // limpeza dos que o teste criou
+  await fin('fin_excluir', { id: novo.cliente.id });
+  const depoisDeApagar = await fin('fin_lista');
+  check('exclui cliente',
+    (depoisDeApagar.clientes || []).filter(function (c) { return c.id === novo.cliente.id; }).length === 0);
+
+  // ---- a tranca: financeiro nao e para todo mundo ----
+  {
+    const perms = require('../api/_lib/perms.js');
+    check('dono ve o financeiro', perms.permite('dono', 'fin_lista') === true);
+    check('rh ve o financeiro', perms.permite('rh', 'fin_lista') === true);
+    check('avaliador NAO ve o financeiro', perms.permite('avaliador', 'fin_lista') === false);
+    check('leitura NAO ve o financeiro', perms.permite('leitura', 'fin_lista') === false);
+    check('leitura tambem nao baixa o relatorio', perms.permite('leitura', 'fin_relatorio') === false);
+    check('leitura nao altera cliente', perms.permite('leitura', 'fin_salvar') === false);
+    check('o menu do dono tem o financeiro', perms.menuDoPapel('dono').indexOf('financeiro') >= 0);
+    check('o menu de leitura nao tem', perms.menuDoPapel('leitura').indexOf('financeiro') < 0);
+  }
+
   console.log('\n5c) SEGURANCA — trava de senha e fim de sessao');
   // a dica da senha na tela de login
   const dica = await (await fetch(BASE + '/api/admin?action=dica_senha')).json();

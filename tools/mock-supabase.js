@@ -204,6 +204,20 @@ const DB = {
     }
   ],
 
+  // ---- financeiro: os mesmos 10 clientes ficticios do banco de verdade ----
+  finance_clients: [
+    { id: 'ffff0001-0001-4001-8001-000000000001', cliente: 'VITRAUX', valor: 2500, setup: 1500, hospedagem: 120, vencimento_dia: 9, status: 'pago', responsavel: 'Ketery', telefone: '13 3496-5502', observacao: '', destaque: false, ativo: true, position: 1, created_at: agora(), updated_at: agora() },
+    { id: 'ffff0002-0002-4002-8002-000000000002', cliente: 'LABELE', valor: 2000, setup: 0, hospedagem: 90, vencimento_dia: 10, status: 'pago', responsavel: 'Bruno', telefone: '11 93209-7227', observacao: '', destaque: false, ativo: true, position: 2, created_at: agora(), updated_at: agora() },
+    { id: 'ffff0003-0003-4003-8003-000000000003', cliente: 'TR BRAND', valor: 2700, setup: 2000, hospedagem: 150, vencimento_dia: 20, status: 'pago', responsavel: 'Tiago', telefone: '11 95313-4378', observacao: '', destaque: false, ativo: true, position: 3, created_at: agora(), updated_at: agora() },
+    { id: 'ffff0004-0004-4004-8004-000000000004', cliente: 'ANDERSON COSTA', valor: 1390, setup: 0, hospedagem: 90, vencimento_dia: 10, status: 'pago', responsavel: 'Gil', telefone: '83 8831-3182', observacao: '', destaque: false, ativo: true, position: 4, created_at: agora(), updated_at: agora() },
+    { id: 'ffff0005-0005-4005-8005-000000000005', cliente: 'ESDRAS EDUCACIONAL', valor: 1390, setup: 800, hospedagem: 120, vencimento_dia: 30, status: 'aguardando', responsavel: 'Eduardo', telefone: '11 96603-3037', observacao: '', destaque: false, ativo: true, position: 5, created_at: agora(), updated_at: agora() },
+    { id: 'ffff0006-0006-4006-8006-000000000006', cliente: 'ESCOLA DOM MANOEL', valor: 997, setup: 0, hospedagem: 90, vencimento_dia: 30, status: 'pago', responsavel: 'Sandra', telefone: '11 95902-2651', observacao: '', destaque: true, ativo: true, position: 6, created_at: agora(), updated_at: agora() },
+    { id: 'ffff0007-0007-4007-8007-000000000007', cliente: 'CEB', valor: 1000, setup: 1200, hospedagem: 180, vencimento_dia: 30, status: 'aguardando', responsavel: 'Alessandra', telefone: '34 634 386339', observacao: 'Primeiro pgto 30/01', destaque: true, ativo: true, position: 7, created_at: agora(), updated_at: agora() },
+    { id: 'ffff0008-0008-4008-8008-000000000008', cliente: 'EDUCARE', valor: 1000, setup: 900, hospedagem: 90, vencimento_dia: 30, status: 'inadimplente', responsavel: 'Marcelo', telefone: '13 97401-8786', observacao: 'Atrasado desde 30/06', destaque: false, ativo: true, position: 8, created_at: agora(), updated_at: agora() },
+    { id: 'ffff0009-0009-4009-8009-000000000009', cliente: 'BENE VIEIRA', valor: 2800, setup: 1500, hospedagem: 220, vencimento_dia: 20, status: 'pago', responsavel: 'Wellington', telefone: '13 99603-7333', observacao: 'Imobiliaria', destaque: false, ativo: true, position: 9, created_at: agora(), updated_at: agora() },
+    { id: 'ffff0010-0010-4010-8010-000000000010', cliente: 'BRAZ', valor: 1200, setup: 0, hospedagem: 90, vencimento_dia: 30, status: 'inadimplente', responsavel: 'Tania Izelli', telefone: '44 9979-0712', observacao: 'Cobranca enviada', destaque: false, ativo: true, position: 10, created_at: agora(), updated_at: agora() }
+  ],
+
   prequal_sessions: [],
   prequal_messages: [],
   candidates: [],
@@ -222,6 +236,7 @@ const DB = {
 const DEFAULTS = {
   candidates: function () { return { id: uuid(), extra: {}, wa_sequencia_em: null, cadastro_em: null, job_id: null, indicacao: null, curriculo_url: null, curriculo_nome: null, source: 'formulario', source_detail: null, stage_key: 'triagem', password_hash: null, password_salt: null, rating: null, notes: null, member_access: false, archived: false, created_at: agora(), updated_at: agora() }; },
   stage_history: function () { return { id: seq('stage_history'), created_at: agora(), note: null, from_stage: null, to_stage: null }; },
+  finance_clients: function () { return { id: uuid(), valor: 0, setup: 0, hospedagem: 0, vencimento_dia: 10, status: 'aguardando', responsavel: null, telefone: null, observacao: null, destaque: false, ativo: true, position: 1, created_at: agora(), updated_at: agora() }; },
   disc_results: function () { return { id: uuid(), answers: {}, created_at: agora() }; },
   quiz_attempts: function () { return { id: uuid(), answers: {}, score: null, max_score: null, percent: null, passed: null, focus_lost: 0, paste_blocked: 0, integrity_flags: [], started_at: agora(), finished_at: null }; },
   lesson_progress: function () { return { completed: true, completed_at: agora() }; },
