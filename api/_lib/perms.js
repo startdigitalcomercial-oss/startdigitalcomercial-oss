@@ -88,7 +88,8 @@ const ACOES = {
   // --- Space Colaborador: libera dinheiro de verdade, mesma tranca ---
   sp_painel: 'financeiro',
   sp_voucher_salvar: 'financeiro_mexer', sp_liberar: 'financeiro_mexer',
-  sp_cancelar: 'financeiro_mexer', sp_conferir: 'financeiro_mexer'
+  sp_cancelar: 'financeiro_mexer', sp_conferir: 'financeiro_mexer',
+  sp_config_save: 'financeiro_mexer'
 };
 
 function papelValido(p) { return PAPEIS.indexOf(p) >= 0; }
