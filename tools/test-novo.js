@@ -2,6 +2,7 @@
 // Uso: node tools/test-novo.js
 'use strict';
 const BASE = 'http://localhost:3000';
+const SERV = 'http://127.0.0.1:54322';   // espelho dos servicos de fora
 const SUF = Date.now().toString(36);
 let T = '';
 let falhas = 0, ok = 0;
@@ -1014,6 +1015,210 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
     check('leitura nao altera cliente', perms.permite('leitura', 'fin_salvar') === false);
     check('o menu do dono tem o financeiro', perms.menuDoPapel('dono').indexOf('financeiro') >= 0);
     check('o menu de leitura nao tem', perms.menuDoPapel('leitura').indexOf('financeiro') < 0);
+  }
+
+  // ============================================================
+  console.log('\n5b-space) SPACE COLABORADOR — beneficio por Pix (Asaas)');
+  // ============================================================
+  const MARINA = 'cccc0001-0001-4001-8001-000000000001';
+  const TOKEN_MARINA = 'colabtoken000000000001';
+  const DIEGO = 'cccc0002-0002-4002-8002-000000000002';
+  const TOKEN_DIEGO = 'colabtoken000000000002';
+  const CPF_OK = '111.444.777-35';   // CPF valido de teste
+
+  async function sp(action, body, query) {
+    const qs = new URLSearchParams(Object.assign({ action: action }, query || {}));
+    return (await fetch(BASE + '/api/space?' + qs, {
+      method: body ? 'POST' : 'GET',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + T },
+      body: body ? JSON.stringify(body) : undefined
+    })).json();
+  }
+  async function spPublico(action, body, query) {
+    const qs = new URLSearchParams(Object.assign({ action: action }, query || {}));
+    return (await fetch(BASE + '/api/space?' + qs, {
+      method: body ? 'POST' : 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined
+    })).json();
+  }
+  async function asaasModo(m) { await fetch(SERV + '/__asaas-modo?m=' + m); }
+  async function asaasLimpa() { await fetch(SERV + '/__asaas-limpar'); }
+  async function asaasUltimo() { return (await fetch(SERV + '/__asaas')).json(); }
+
+  await asaasLimpa();
+  // Comeca do zero: se ficou liberacao de uma rodada anterior (ou de
+  // alguem mexendo no espelho a mao), o teste testaria outra coisa.
+  await fetch('http://127.0.0.1:54321/rest/v1/benefit_releases', { method: 'DELETE' })
+    .catch(function () { return null; });
+
+  const pn = await sp('sp_painel');
+  check('space abre no painel', pn.ok, pn.error);
+  check('o voucher Amazon Prime esta la',
+    (pn.vouchers || []).filter(function (v) { return v.nome === 'Amazon Prime'; }).length === 1, pn.vouchers);
+  check('o Asaas aparece ligado no teste', pn.asaas.ligado === true && pn.asaas.ambiente === 'sandbox', pn.asaas);
+  check('o painel nunca imprime a chave inteira',
+    pn.asaas.chave.length <= 8 && pn.asaas.chave.indexOf('…') === 0, pn.asaas.chave);
+  check('cada pessoa vem com o link pessoal dela',
+    (pn.colaboradores || []).every(function (p) { return /\/space\?t=/.test(p.link); }), pn.colaboradores);
+
+  const VOUCHER = pn.vouchers.filter(function (v) { return v.nome === 'Amazon Prime'; })[0].id;
+
+  // ---- sem liberacao, ninguem saca ----
+  const semLib = await spPublico('sacar', { t: TOKEN_DIEGO, chave: CPF_OK });
+  check('sem liberacao o saque e recusado', !semLib.ok, semLib);
+  check('e nada foi mandado para o banco',
+    Object.keys(await asaasUltimo()).length === 0, await asaasUltimo());
+
+  // ---- token errado nao abre nada ----
+  check('token inventado nao abre o space', !(await spPublico('meu_space', null, { t: 'naoexisteesse123456' })).ok);
+
+  // ---- liberar ----
+  const lib1 = await sp('sp_liberar', { voucher_id: VOUCHER, colaboradores: [MARINA] });
+  check('libera para uma pessoa', lib1.ok && lib1.liberados.length === 1, lib1);
+  const lib2 = await sp('sp_liberar', { voucher_id: VOUCHER, colaboradores: [MARINA] });
+  check('nao empilha duas liberacoes na mesma pessoa',
+    lib2.liberados.length === 0 && lib2.pulados.length === 1, lib2);
+
+  const vejo = await spPublico('meu_space', null, { t: TOKEN_MARINA });
+  check('a pessoa ve o beneficio disponivel',
+    vejo.ok && vejo.disponivel && vejo.disponivel.valor === 50, vejo.disponivel);
+  check('e ve o proprio nome', vejo.colaborador.primeiro_nome === 'Marina', vejo.colaborador);
+
+  // ---- chave Pix que nao existe ----
+  const chaveRuim = await spPublico('sacar', { t: TOKEN_MARINA, chave: 'isso aqui nao e chave' });
+  check('chave Pix sem cara de chave e barrada antes do banco', !chaveRuim.ok, chaveRuim);
+  check('e o banco nao foi chamado', Object.keys(await asaasUltimo()).length === 0);
+
+  // ---- O TESTE QUE IMPORTA: dois cliques ao mesmo tempo ----
+  // Se a trava falhar, saem dois Pix e a empresa paga duas vezes.
+  const [saque1, saque2] = await Promise.all([
+    spPublico('sacar', { t: TOKEN_MARINA, chave: CPF_OK }),
+    spPublico('sacar', { t: TOKEN_MARINA, chave: CPF_OK })
+  ]);
+  const passaram = [saque1, saque2].filter(function (x) { return x.ok; }).length;
+  check('dois cliques juntos: SO UM saque passa', passaram === 1,
+    { um: saque1.ok, dois: saque2.ok, e1: saque1.error, e2: saque2.error });
+  const transf = await (await fetch(SERV + '/asaas/transfers', { headers: { access_token: 'chave-asaas-de-mentira' } })).json();
+  check('e o banco recebeu UMA transferencia so', (transf.data || []).length === 1, (transf.data || []).length);
+  check('com o valor certo', transf.data[0].value === 50, transf.data[0]);
+  check('e com a nossa referencia junto (para reconhecer o webhook depois)',
+    !!transf.data[0].externalReference, transf.data[0]);
+
+  const posSaque = await spPublico('meu_space', null, { t: TOKEN_MARINA });
+  check('depois de sacar nao sobra nada disponivel', posSaque.disponivel === null, posSaque.disponivel);
+  check('e o saque aparece como em processamento',
+    posSaque.em_curso && posSaque.em_curso.status === 'processando', posSaque.em_curso);
+
+  // ---- o webhook do Asaas fecha a conta ----
+  const LIB_ID = transf.data[0].externalReference;
+  async function webhookAsaas(evento, extras, token) {
+    return (await fetch(BASE + '/api/space?action=webhook', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'asaas-access-token': token === undefined ? 'token-webhook-de-teste' : token
+      },
+      body: JSON.stringify({
+        event: evento,
+        transfer: Object.assign({
+          id: transf.data[0].id, externalReference: LIB_ID, status: 'DONE', value: 50
+        }, extras || {})
+      })
+    }));
+  }
+
+  const whRuim = await webhookAsaas('TRANSFER_DONE', null, 'token-errado');
+  check('webhook com token errado leva 401', whRuim.status === 401, whRuim.status);
+
+  const okWh = await webhookAsaas('TRANSFER_DONE', { transactionReceiptUrl: 'https://asaas.com/recibo/1' });
+  check('webhook certo responde 200', okWh.status === 200, okWh.status);
+  const pago = await spPublico('meu_space', null, { t: TOKEN_MARINA });
+  const ultima = (pago.historico || [])[0];
+  check('o webhook marcou como pago', ultima && ultima.status === 'pago', ultima);
+  check('e guardou o comprovante', ultima.comprovante_url === 'https://asaas.com/recibo/1', ultima.comprovante_url);
+
+  // Evento atrasado nao pode desfazer um pagamento.
+  await webhookAsaas('TRANSFER_FAILED', { status: 'FAILED' });
+  const aindaPago = await spPublico('meu_space', null, { t: TOKEN_MARINA });
+  check('evento atrasado nao desfaz pagamento',
+    aindaPago.historico[0].status === 'pago', aindaPago.historico[0]);
+
+  // ---- quando o banco recusa, o beneficio volta para a pessoa ----
+  await asaasLimpa();
+  await sp('sp_liberar', { voucher_id: VOUCHER, colaboradores: [DIEGO] });
+  await asaasModo('recusa');
+  const recusado = await spPublico('sacar', { t: TOKEN_DIEGO, chave: CPF_OK });
+  check('recusa do banco vira mensagem para a pessoa', !recusado.ok && /Pix/i.test(recusado.error || ''), recusado);
+  const depoisRecusa = await spPublico('meu_space', null, { t: TOKEN_DIEGO });
+  check('e o beneficio volta a ficar disponivel',
+    depoisRecusa.disponivel && depoisRecusa.disponivel.status === 'liberado', depoisRecusa.disponivel);
+  await asaasModo('ok');
+
+  // ---- cancelar ----
+  const cancel = await sp('sp_cancelar', { id: depoisRecusa.disponivel.id });
+  check('da para cancelar o que ninguem sacou', cancel.ok, cancel.error);
+  check('e nao da para cancelar duas vezes', !(await sp('sp_cancelar', { id: depoisRecusa.disponivel.id })).ok);
+
+  // ---- teto de seguranca no voucher ----
+  const caro = await sp('sp_voucher_salvar', { nome: 'Zero a mais ' + SUF, valor: '999999' });
+  check('voucher acima do teto e recusado', !caro.ok && /limite/i.test(caro.error || ''), caro);
+  const bom = await sp('sp_voucher_salvar', { nome: 'Vale Teste ' + SUF, valor: '37,50' });
+  check('valor com virgula e aceito', bom.ok && bom.voucher.valor === 37.5, bom.error || bom.voucher);
+
+  // ---- adivinhacao do tipo da chave ----
+  {
+    const as = require('../api/_lib/asaas.js');
+    check('reconhece CPF', as.tipoDaChave('111.444.777-35') === 'CPF');
+    check('reconhece e-mail', as.tipoDaChave('gente@startdigital.com.br') === 'EMAIL');
+    // Onze digitos que tambem passam como CPF sao AMBIGUOS de verdade.
+    // O certo aqui e nao escolher sozinho: quem escolhe e o dono da chave.
+    check('numero que serve como CPF e como telefone nao e adivinhado',
+      as.tipoDaChave('(13) 99600-3897') === null, as.tipoDaChave('(13) 99600-3897'));
+    check('e as duas leituras sao oferecidas',
+      as.tiposPossiveis('(13) 99600-3897').sort().join(',') === 'CPF,PHONE',
+      as.tiposPossiveis('(13) 99600-3897'));
+    // telefone de 10 digitos nao pode ser CPF: esse sai sem perguntar
+    check('telefone fixo com DDD e reconhecido direto', as.tipoDaChave('(13) 3496-5502') === 'PHONE');
+    check('reconhece chave aleatoria',
+      as.tipoDaChave('123e4567-e89b-12d3-a456-426614174000') === 'EVP');
+    check('nao inventa tipo para lixo', as.tipoDaChave('abc 123') === null);
+    check('telefone sai com o +55 na frente',
+      as.formataChave('(13) 99600-3897', 'PHONE') === '+5513996003897', as.formataChave('(13) 99600-3897', 'PHONE'));
+    check('CPF sai so com numeros', as.formataChave('111.444.777-35', 'CPF') === '11144477735');
+    check('CPF invalido nao vira CPF', as.tipoDaChave('111.111.111-11') !== 'CPF');
+  }
+
+  // ---- chave ambigua: o servidor pergunta em vez de chutar ----
+  await asaasLimpa();
+  await sp('sp_liberar', { voucher_id: VOUCHER, colaboradores: [DIEGO] });
+  const ambigua = await spPublico('sacar', { t: TOKEN_DIEGO, chave: '13996003897' });
+  check('chave ambigua nao e enviada', !ambigua.ok, ambigua);
+  check('e o servidor devolve as opcoes para a pessoa escolher',
+    (ambigua.escolher || []).map(function (o) { return o.tipo; }).sort().join(',') === 'CPF,PHONE', ambigua.escolher);
+  check('nada foi para o banco enquanto a duvida nao foi resolvida',
+    Object.keys(await asaasUltimo()).length === 0);
+
+  const escolhida = await spPublico('sacar', { t: TOKEN_DIEGO, chave: '13996003897', tipo: 'PHONE' });
+  check('com a escolha da pessoa, o saque sai', escolhida.ok, escolhida.error);
+  const mandado = await asaasUltimo();
+  check('e vai como telefone, com o +55 na frente',
+    mandado.pixAddressKeyType === 'PHONE' && mandado.pixAddressKey === '+5513996003897', mandado);
+
+  // tipo que nao bate com a chave nao passa: ninguem burla pelo corpo do pedido
+  await sp('sp_liberar', { voucher_id: VOUCHER, colaboradores: [MARINA] });
+  const tipoMentira = await spPublico('sacar', { t: TOKEN_MARINA, chave: 'gente@startdigital.com.br', tipo: 'CPF' });
+  check('tipo que nao combina com a chave e ignorado (vale o que a chave e)',
+    tipoMentira.ok && (await asaasUltimo()).pixAddressKeyType === 'EMAIL', await asaasUltimo());
+
+  // ---- a tranca de permissao ----
+  {
+    const perms = require('../api/_lib/perms.js');
+    check('dono mexe no space', perms.permite('dono', 'sp_liberar') === true);
+    check('rh mexe no space', perms.permite('rh', 'sp_liberar') === true);
+    check('leitura nem ve o space', perms.permite('leitura', 'sp_painel') === false);
+    check('avaliador nao libera dinheiro', perms.permite('avaliador', 'sp_liberar') === false);
+    check('o menu do dono tem o space', perms.menuDoPapel('dono').indexOf('space') >= 0);
   }
 
   console.log('\n5c) SEGURANCA — trava de senha e fim de sessao');
