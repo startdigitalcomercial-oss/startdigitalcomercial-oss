@@ -27,6 +27,41 @@ function spDinheiro(v) {
   });
 }
 
+/* Janela de confirmação DENTRO da tela — nada de confirm() do navegador.
+   Usa o mesmo véu/gaveta de fundo do painel. */
+function spJanela(html) {
+  let veu = document.getElementById('sp-veu');
+  if (!veu) {
+    veu = document.createElement('div');
+    veu.id = 'sp-veu';
+    veu.style.cssText = 'position:fixed;inset:0;background:rgba(9,12,24,.55);backdrop-filter:blur(3px);' +
+      'z-index:120;display:flex;align-items:center;justify-content:center;padding:22px';
+    veu.innerHTML = '<div id="sp-janela" style="background:var(--surface);border-radius:18px;' +
+      'padding:24px;width:min(430px,100%);box-shadow:0 24px 70px rgba(0,0,0,.4)"></div>';
+    document.body.appendChild(veu);
+    veu.addEventListener('click', function (ev) { if (ev.target === veu) spFechaJanela(); });
+  }
+  veu.style.display = 'flex';
+  document.getElementById('sp-janela').innerHTML = html;
+}
+function spFechaJanela() {
+  const v = document.getElementById('sp-veu');
+  if (v) v.style.display = 'none';
+}
+function spConfirma(titulo, corpo, aoConfirmar, rotulo) {
+  spJanela('<h3 style="margin:0 0 8px;font-size:16.5px">' + titulo + '</h3>' +
+    '<div class="small" style="color:var(--label-2);line-height:1.55">' + corpo + '</div>' +
+    '<div class="row" style="gap:10px;margin-top:20px">' +
+      '<button class="btn btn-ghost" id="spj-nao" style="flex:1">Voltar</button>' +
+      '<button class="btn" id="spj-sim" style="flex:1">' + (rotulo || 'Confirmar') + '</button>' +
+    '</div>');
+  document.getElementById('spj-nao').addEventListener('click', spFechaJanela);
+  document.getElementById('spj-sim').addEventListener('click', function () {
+    spFechaJanela();
+    aoConfirmar();
+  });
+}
+
 async function carregaSpace() {
   const alvo = document.getElementById('painel-space');
   alvo.innerHTML = '<div class="spinner"></div>';
@@ -89,7 +124,7 @@ function desenhaSpace() {
       '<p class="small muted" style="margin:0 0 14px">Marque quem vai receber e clique em liberar. ' +
       'Cada liberação vale <strong>um saque</strong>: depois que a pessoa sacar, ela só saca de novo ' +
       'quando você liberar outra vez.</p>' +
-      '<div class="row row-wrap" style="gap:12px;align-items:flex-end;margin-bottom:14px">' +
+      '<div class="row row-wrap" style="gap:12px;align-items:flex-end;margin-bottom:12px">' +
         '<div class="field" style="flex:1;min-width:220px;margin:0"><label for="sp-voucher">Voucher</label>' +
           '<select id="sp-voucher">' +
             v.filter(function (x) { return x.ativo; }).map(function (x) {
@@ -97,6 +132,16 @@ function desenhaSpace() {
             }).join('') +
           '</select></div>' +
         '<button class="btn" id="sp-liberar">Liberar para os marcados</button>' +
+      '</div>' +
+      '<div class="row row-wrap small" style="gap:16px;align-items:center;margin-bottom:14px;color:var(--label-2)">' +
+        '<span style="font-weight:600">Avisar a pessoa por:</span>' +
+        '<label class="row" style="gap:6px;align-items:center"><input type="checkbox" id="sp-av-zap" checked ' +
+          'style="width:15px;height:15px"> WhatsApp</label>' +
+        '<label class="row" style="gap:6px;align-items:center"><input type="checkbox" id="sp-av-sms" checked ' +
+          'style="width:15px;height:15px"> SMS</label>' +
+        '<label class="row" style="gap:6px;align-items:center"><input type="checkbox" id="sp-av-mail" checked ' +
+          'style="width:15px;height:15px"> E-mail</label>' +
+        '<span class="muted">— com o link de resgate já dentro</span>' +
       '</div>' +
       '<div class="row" style="gap:10px;margin-bottom:10px">' +
         '<button class="btn btn-sm btn-ghost" id="sp-todos">Marcar todos</button>' +
@@ -128,6 +173,21 @@ function desenhaSpace() {
             esc(l.falha_motivo) + '</div>' : '');
         }).join('') +
       '</div>' : '') +
+
+    /* ---- aviso de saque para o chefe ---- */
+    '<div class="card" style="padding:18px;margin-bottom:18px">' +
+      '<h3 style="font-size:15px;margin:0 0 6px">Aviso de saque no seu celular</h3>' +
+      '<p class="small muted" style="margin:0 0 12px">Toda vez que alguém sacar, chega um SMS neste número ' +
+      'com o nome da pessoa e o benefício. Deixe vazio para desligar.</p>' +
+      '<div class="row row-wrap" style="gap:10px;align-items:flex-end">' +
+        '<div class="field" style="flex:1;min-width:220px;margin:0">' +
+          '<label for="sp-aviso-fone">Celular com DDD</label>' +
+          '<input id="sp-aviso-fone" placeholder="(13) 99999-9999" value="' +
+            esc((SP.config || {}).aviso_sms_para || '') + '">' +
+        '</div>' +
+        '<button class="btn btn-sm" id="sp-aviso-salvar">Salvar</button>' +
+      '</div>' +
+    '</div>' +
 
     /* ---- historico ---- */
     '<div class="card" style="padding:18px">' +
@@ -193,45 +253,78 @@ function ligaSpace() {
     SP_MARCADOS = {}; desenhaSpace();
   });
 
+  document.getElementById('sp-aviso-salvar').addEventListener('click', async function () {
+    this.disabled = true;
+    try {
+      await apiSpace('sp_config_save', {
+        body: { aviso_sms_para: (document.getElementById('sp-aviso-fone') || {}).value || '' }
+      });
+      toast('Aviso de saque salvo');
+    } catch (e) { toast(e.message, true); }
+    this.disabled = false;
+  });
+
   document.getElementById('sp-novo-voucher').addEventListener('click', function () { abreVoucher(null); });
   document.querySelectorAll('.sp-edit-v').forEach(function (b) {
     b.addEventListener('click', function () { abreVoucher(b.dataset.id); });
   });
 
-  document.getElementById('sp-liberar').addEventListener('click', async function () {
+  document.getElementById('sp-liberar').addEventListener('click', function () {
+    const botao = this;
     const escolhidos = Object.keys(SP_MARCADOS).filter(function (k) { return SP_MARCADOS[k]; });
     if (!escolhidos.length) return toast('Marque pelo menos uma pessoa', true);
     const vid = (document.getElementById('sp-voucher') || {}).value;
     if (!vid) return toast('Escolha o voucher', true);
 
     const vch = (SP.vouchers || []).filter(function (x) { return x.id === vid; })[0] || {};
-    if (!confirm('Liberar ' + spDinheiro(vch.valor) + ' (' + vch.nome + ') para ' +
-      escolhidos.length + ' pessoa(s)?\n\nCada uma vai poder sacar esse valor uma vez.')) return;
+    const avisar = {
+      whatsapp: (document.getElementById('sp-av-zap') || {}).checked === true,
+      sms: (document.getElementById('sp-av-sms') || {}).checked === true,
+      email: (document.getElementById('sp-av-mail') || {}).checked === true
+    };
+    const canais = ['whatsapp', 'sms', 'email'].filter(function (c) { return avisar[c]; });
 
-    this.disabled = true;
-    this.innerHTML = '<span class="spinner"></span> Liberando…';
-    try {
-      const r = await apiSpace('sp_liberar', { body: { voucher_id: vid, colaboradores: escolhidos } });
-      const n = (r.liberados || []).length;
-      toast(n + ' liberação(ões) feita(s)' + ((r.pulados || []).length ? ' · ' + r.pulados.length + ' pulada(s)' : ''));
-      if ((r.pulados || []).length) {
-        alert('Pulei estes:\n\n' + r.pulados.map(function (p) {
-          return '• ' + (p.nome || p.id) + ' — ' + p.motivo;
-        }).join('\n'));
-      }
-      carregaSpace();
-    } catch (e) {
-      toast(e.message, true);
-      this.disabled = false;
-      this.textContent = 'Liberar para os marcados';
-    }
+    spConfirma('Liberar o benefício?',
+      '<strong>' + esc(vch.nome) + '</strong> de <strong>' + spDinheiro(vch.valor) + '</strong> para ' +
+      '<strong>' + escolhidos.length + ' pessoa(s)</strong>. Cada uma vai poder sacar esse valor uma vez.' +
+      (canais.length ? '<br><br>Elas serão avisadas por: <strong>' +
+        canais.join(', ').replace('whatsapp', 'WhatsApp').replace('sms', 'SMS').replace('email', 'e-mail') +
+        '</strong>, com o link de resgate.' : '<br><br>Ninguém será avisado — você mesmo manda os links.'),
+      async function () {
+        botao.disabled = true;
+        botao.innerHTML = '<span class="spinner"></span> Liberando…';
+        try {
+          const r = await apiSpace('sp_liberar', {
+            body: { voucher_id: vid, colaboradores: escolhidos, avisar: avisar }
+          });
+          const n = (r.liberados || []).length;
+          toast(n + ' liberação(ões)' +
+            (r.avisos_enviados ? ' · ' + r.avisos_enviados + ' aviso(s) enviado(s)' : '') +
+            ((r.pulados || []).length ? ' · ' + r.pulados.length + ' pulada(s)' : ''));
+          if ((r.pulados || []).length) {
+            spJanela('<h3 style="margin:0 0 10px;font-size:16.5px">Estas ficaram de fora</h3>' +
+              '<div class="small" style="line-height:1.8;color:var(--label-2)">' +
+              r.pulados.map(function (p) {
+                return '• <strong>' + esc(p.nome || p.id) + '</strong> — ' + esc(p.motivo);
+              }).join('<br>') + '</div>' +
+              '<div class="row" style="margin-top:18px"><button class="btn" id="spj-ok" style="flex:1">Entendi</button></div>');
+            document.getElementById('spj-ok').addEventListener('click', spFechaJanela);
+          }
+          carregaSpace();
+        } catch (e) {
+          toast(e.message, true);
+          botao.disabled = false;
+          botao.textContent = 'Liberar para os marcados';
+        }
+      }, 'Liberar');
   });
 
   document.querySelectorAll('.sp-cancelar').forEach(function (b) {
-    b.addEventListener('click', async function () {
-      if (!confirm('Cancelar esta liberação? A pessoa deixa de poder sacar.')) return;
-      try { await apiSpace('sp_cancelar', { body: { id: b.dataset.id } }); toast('Cancelado'); carregaSpace(); }
-      catch (e) { toast(e.message, true); }
+    b.addEventListener('click', function () {
+      spConfirma('Cancelar esta liberação?', 'A pessoa deixa de poder sacar este benefício.', async function () {
+        try { await apiSpace('sp_cancelar', { body: { id: b.dataset.id } }); toast('Cancelado'); carregaSpace(); }
+        catch (e) { toast(e.message, true); }
+      }, 'Cancelar liberação');
     });
   });
 
