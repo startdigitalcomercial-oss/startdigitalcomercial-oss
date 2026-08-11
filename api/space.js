@@ -96,6 +96,13 @@ async function receberWebhook(req, res) {
   let corpo;
   try { corpo = await u.readBody(req); } catch (e) { return u.json(res, 200, { ok: true }); }
 
+  // ---- VALIDAÇÃO DE SAQUE ----
+  // Com o mecanismo de segurança ligado, o Asaas pergunta ANTES de
+  // soltar cada Pix: "foi você que pediu isso?". O pedido de validação
+  // vem com "type" e sem "event" — é assim que a gente o distingue do
+  // aviso normal de transferência.
+  if (!corpo.event && corpo.type) return await validarSaida(res, corpo);
+
   const evento = String(corpo.event || '');
   const t = corpo.transfer || {};
   const novo = ESTADO_POR_EVENTO[evento];
@@ -131,6 +138,46 @@ async function receberWebhook(req, res) {
 
   await db.update('benefit_releases', patch, { id: 'eq.' + lib.id });
   return u.json(res, 200, { ok: true, atualizado: novo });
+}
+
+// ------------------------------------------------------------
+// "FOI VOCÊ QUE PEDIU ESTE SAQUE?"
+//
+// A regra é uma só: a gente APROVA apenas o que a gente mesmo pediu —
+// uma transferência que está no nosso banco, em andamento, com o valor
+// exato. TODO o resto é recusado. Pagamento de conta, recarga, QR Code,
+// estorno: o portal nunca pede nada disso, então nunca aprova.
+//
+// É esta função que torna a chave da API quase inútil para um ladrão:
+// mesmo com a chave na mão, o saque dele morre aqui, porque não existe
+// no nosso banco.
+// ------------------------------------------------------------
+async function validarSaida(res, corpo) {
+  function recusa(motivo) {
+    console.error('[space] saque RECUSADO na validacao:', motivo, JSON.stringify(corpo).slice(0, 300));
+    return u.json(res, 200, { status: 'REFUSED', refuseReason: motivo });
+  }
+
+  if (String(corpo.type) !== 'TRANSFER') {
+    return recusa('O Portal do Colaborador não realiza este tipo de operação.');
+  }
+
+  const t = corpo.transfer || {};
+  if (!t.id) return recusa('Transferência sem identificador.');
+
+  const lib = await db.selectOne('benefit_releases', { asaas_id: 'eq.' + t.id, select: '*' });
+  if (!lib) return recusa('Transferência não encontrada no nosso banco.');
+
+  if (lib.status !== 'processando' && lib.status !== 'pago') {
+    return recusa('Este saque não está em andamento no nosso sistema.');
+  }
+
+  // centavo por centavo — valor mexido no caminho é recusa na hora
+  if (Math.round(Number(t.value) * 100) !== Math.round(Number(lib.valor) * 100)) {
+    return recusa('O valor não confere com o que foi liberado.');
+  }
+
+  return u.json(res, 200, { status: 'APPROVED' });
 }
 
 // ------------------------------------------------------------
