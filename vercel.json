@@ -111,6 +111,9 @@
   "functions": {
     "api/webhook.js": {
       "maxDuration": 60
+    },
+    "api/space.js": {
+      "maxDuration": 60
     }
   }
 }
