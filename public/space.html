@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Space Colaborador — StartDigital</title>
+<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest">
+<link rel="stylesheet" href="/ui.css">
+<style>
+  body { background: var(--canvas); }
+  .topo { background: #101828; padding: 16px 0; }
+  .topo .dentro { max-width: 620px; margin: 0 auto; padding: 0 22px; display: flex; align-items: center; gap: 10px; }
+  .topo img { width: 24px; height: 24px; }
+  .topo b { color: #fff; font-size: 15px; font-weight: 600; letter-spacing: -.014em; }
+  .topo small { color: #8a94a6; font-size: 11px; display: block; font-weight: 400; letter-spacing: 0; }
+
+  .folha { max-width: 620px; margin: 0 auto; padding: 26px 22px 60px; }
+  .ola { font-size: 22px; font-weight: 600; letter-spacing: -.02em; margin: 0 0 4px; }
+  .ola + p { margin: 0 0 22px; color: var(--label-3); font-size: 14.5px; }
+
+  /* O cartão do benefício. Só um por vez, então ele pode ser grande. */
+  .vale { border-radius: 20px; padding: 26px 24px; color: #fff; margin-bottom: 20px;
+          background: linear-gradient(135deg, #4c1d95 0%, #6d28d9 55%, #db2777 100%);
+          box-shadow: 0 10px 30px rgba(76,29,149,.28); }
+  .vale .rot { font-size: 11.5px; text-transform: uppercase; letter-spacing: 1.2px; opacity: .85; font-weight: 600; }
+  .vale h2 { margin: 8px 0 2px; font-size: 25px; font-weight: 700; letter-spacing: -.02em; }
+  .vale .grana { font-size: 40px; font-weight: 800; letter-spacing: -.03em; margin: 10px 0 2px;
+                 font-variant-numeric: tabular-nums; }
+  .vale .obs { font-size: 13.5px; opacity: .9; line-height: 1.5; }
+
+  .vale.vazio { background: var(--fill-1); color: var(--label); box-shadow: none;
+                border: 1px solid var(--fio); }
+  .vale.vazio .rot { color: var(--label-3); opacity: 1; }
+  .vale.vazio .obs { color: var(--label-2); opacity: 1; }
+
+  .cx { background: var(--surface); border-radius: var(--r-card); padding: 20px 22px;
+        box-shadow: var(--shadow-1); margin-bottom: 16px; }
+  .cx h3 { margin: 0 0 4px; font-size: 15.5px; font-weight: 600; letter-spacing: -.014em; }
+  .cx p.sub { margin: 0 0 16px; font-size: 13.5px; color: var(--label-3); line-height: 1.5; }
+
+  .btn-grande { width: 100%; height: 52px; font-size: 16px; font-weight: 600; border-radius: 14px; }
+
+  .linha-h { display: flex; align-items: center; gap: 12px; padding: 13px 0;
+             border-top: 1px solid var(--hairline); font-size: 14px; }
+  .linha-h:first-child { border-top: 0; }
+  .linha-h .qual { flex: 1; font-weight: 500; }
+  .linha-h .quando { font-size: 12px; color: var(--label-3); }
+  .pino { font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; }
+  .pino.pago { background: #dff5e8; color: #146c43; }
+  .pino.liberado { background: #e6ecfd; color: #26418f; }
+  .pino.processando { background: #fdf0d5; color: #8a5a00; }
+  .pino.falhou, .pino.cancelado { background: #fbe3e0; color: #a92b21; }
+
+  .conferir { display: flex; gap: 12px; align-items: flex-start; background: var(--fill-1);
+              border-radius: 12px; padding: 14px 16px; margin: 14px 0 4px; font-size: 13.5px; line-height: 1.5; }
+  .conferir b { display: block; font-size: 15px; margin-top: 2px; word-break: break-all; }
+</style>
+</head>
+<body>
+
+<div class="topo"><div class="dentro">
+  <img src="/favicon-32.png" alt="">
+  <span><b>StartDigital</b><small>Space Colaborador</small></span>
+</div></div>
+
+<div class="folha" id="folha"><div class="spinner"></div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function toast(msg, erro) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast on' + (erro ? ' erro' : '');
+  setTimeout(function () { t.className = 'toast' + (erro ? ' erro' : ''); }, 4000);
+}
+function el(id) { return document.getElementById(id); }
+function dataBr(iso) {
+  if (!iso) return '';
+  var d = new Date(iso);
+  return d.toLocaleDateString('pt-BR');
+}
+
+var T = new URLSearchParams(location.search).get('t') || '';
+var DADOS = null;
+
+async function carregar() {
+  if (!T) {
+    el('folha').innerHTML = '<div class="alert alert-erro">Link incompleto. Peça o seu link para a Start.</div>';
+    return;
+  }
+  try {
+    var r = await (await fetch('/api/space?action=meu_space&t=' + encodeURIComponent(T))).json();
+    if (!r.ok) throw new Error(r.error);
+    DADOS = r;
+    desenhar();
+  } catch (e) {
+    el('folha').innerHTML = '<div class="alert alert-erro">' + esc(e.message) + '</div>';
+  }
+}
+
+function desenhar() {
+  var d = DADOS;
+  var disp = d.disponivel;
+  var curso = d.em_curso;
+
+  var cartao;
+  if (disp) {
+    cartao = '<div class="vale">' +
+      '<div class="rot">Disponível para você</div>' +
+      '<h2>' + esc(disp.voucher) + '</h2>' +
+      '<div class="grana">' + esc(disp.valor_br) + '</div>' +
+      '<div class="obs">Liberado em ' + dataBr(disp.liberado_em) +
+      '. É só informar a sua chave Pix e o dinheiro cai na sua conta.</div>' +
+    '</div>';
+  } else if (curso) {
+    cartao = '<div class="vale">' +
+      '<div class="rot">Saque em andamento</div>' +
+      '<h2>' + esc(curso.voucher) + '</h2>' +
+      '<div class="grana">' + esc(curso.valor_br) + '</div>' +
+      '<div class="obs">Já pedimos ao banco. Costuma cair em segundos — atualize a página daqui a pouco.</div>' +
+    '</div>';
+  } else {
+    cartao = '<div class="vale vazio">' +
+      '<div class="rot">Nada disponível agora</div>' +
+      '<h2 style="font-size:20px">Sem benefício liberado</h2>' +
+      '<div class="obs">A Start libera o benefício de tempos em tempos. Quando liberar, ' +
+      'ele aparece aqui e você saca por Pix.</div>' +
+    '</div>';
+  }
+
+  var forma = '';
+  if (disp) {
+    forma = '<div class="cx">' +
+      '<h3>Para onde mando o Pix?</h3>' +
+      '<p class="sub">Informe a <strong>sua</strong> chave Pix. Pode ser CPF, e-mail, ' +
+      'telefone com DDD ou chave aleatória. Confira com calma: o dinheiro vai para quem for dono da chave.</p>' +
+      '<div class="field"><label for="chave">Sua chave Pix</label>' +
+        '<input id="chave" placeholder="CPF, e-mail, telefone ou chave aleatória" autocomplete="off"></div>' +
+      '<div id="revisao"></div>' +
+      '<button class="btn btn-grande" id="btn-sacar" style="margin-top:6px">Receber ' +
+        esc(disp.valor_br) + ' por Pix</button>' +
+      '<div id="saida"></div>' +
+    '</div>';
+  }
+
+  var hist = (d.historico || []).length
+    ? '<div class="cx"><h3>Seus benefícios</h3><p class="sub">Tudo que já foi liberado para você.</p>' +
+      d.historico.map(function (h) {
+        return '<div class="linha-h">' +
+          '<span class="qual">' + esc(h.voucher) +
+            '<span class="quando" style="display:block">' +
+            dataBr(h.pago_em || h.solicitado_em || h.liberado_em) + '</span></span>' +
+          '<span class="pino ' + esc(h.status) + '">' + esc(h.situacao) + '</span>' +
+          '<span style="font-variant-numeric:tabular-nums;font-weight:600">' + esc(h.valor_br) + '</span>' +
+          (h.comprovante_url ? '<a href="' + esc(h.comprovante_url) + '" target="_blank" rel="noopener" ' +
+            'style="font-size:12.5px">recibo</a>' : '') +
+        '</div>';
+      }).join('') + '</div>'
+    : '';
+
+  el('folha').innerHTML =
+    '<h1 class="ola">Oi, ' + esc(d.colaborador.primeiro_nome) + '</h1>' +
+    '<p>' + (d.colaborador.cargo ? esc(d.colaborador.cargo) + ' · ' : '') + 'StartDigital</p>' +
+    cartao + forma + hist;
+
+  if (disp) ligarSaque(disp);
+}
+
+var TIPO_ESCOLHIDO = null;
+
+function ligarSaque(disp) {
+  var campo = el('chave');
+  var btn = el('btn-sacar');
+  TIPO_ESCOLHIDO = null;
+
+  // Confirma antes de mandar: quem digitou errado ainda dá tempo de ver.
+  campo.addEventListener('input', function () {
+    var v = campo.value.trim();
+    el('revisao').innerHTML = v
+      ? '<div class="conferir"><span>📤</span><span>Vou mandar ' + esc(disp.valor_br) +
+        ' para esta chave:<b>' + esc(v) + '</b></span></div>'
+      : '';
+  });
+
+  btn.addEventListener('click', async function () {
+    var chave = campo.value.trim();
+    if (!chave) { campo.focus(); return toast('Escreva a sua chave Pix', true); }
+    if (!confirm('Confirmar o envio de ' + disp.valor_br + ' para:\n\n' + chave +
+      '\n\nConfira bem — depois de enviado não dá para voltar atrás.')) return;
+
+    await enviar(chave, TIPO_ESCOLHIDO);
+  });
+
+  async function enviar(chave, tipo) {
+    btn.disabled = true;
+    campo.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Enviando…';
+    function solta() {
+      btn.disabled = false;
+      campo.disabled = false;
+      btn.textContent = 'Receber ' + disp.valor_br + ' por Pix';
+    }
+    try {
+      var r = await (await fetch('/api/space?action=sacar', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ t: T, chave: chave, tipo: tipo || undefined })
+      })).json();
+
+      // O mesmo número pode ser CPF e telefone. Quando o servidor não
+      // tem como saber, ele devolve as opções e quem responde é a pessoa.
+      if (!r.ok && r.escolher) {
+        el('saida').innerHTML =
+          '<div class="conferir" style="margin-top:14px;display:block">' +
+            '<div>' + esc(r.error) + '</div>' +
+            '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">' +
+              r.escolher.map(function (o) {
+                return '<button class="btn btn-sm escolha" data-tipo="' + esc(o.tipo) + '">É o meu ' +
+                  esc(o.nome.toLowerCase()) + '</button>';
+              }).join('') +
+            '</div>' +
+          '</div>';
+        solta();
+        el('saida').querySelectorAll('.escolha').forEach(function (b) {
+          b.addEventListener('click', function () {
+            TIPO_ESCOLHIDO = b.dataset.tipo;
+            el('saida').innerHTML = '';
+            enviar(chave, TIPO_ESCOLHIDO);
+          });
+        });
+        return;
+      }
+
+      if (!r.ok) throw new Error(r.error);
+      toast(r.aviso || 'Pix enviado!');
+      carregar();
+    } catch (e) {
+      el('saida').innerHTML = '<div class="alert alert-erro" style="margin-top:14px">' + esc(e.message) + '</div>';
+      solta();
+    }
+  }
+}
+
+carregar();
+</script>
+</body>
+</html>
