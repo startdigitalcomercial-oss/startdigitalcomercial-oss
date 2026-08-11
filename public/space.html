@@ -8,63 +8,109 @@
 <link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest">
 <link rel="stylesheet" href="/ui.css">
 <style>
-  body { background: var(--canvas); }
-  .topo { background: #101828; padding: 16px 0; }
-  .topo .dentro { max-width: 620px; margin: 0 auto; padding: 0 22px; display: flex; align-items: center; gap: 10px; }
-  .topo img { width: 24px; height: 24px; }
+  body { background: #0d1024; min-height: 100vh; }
+  .topo { padding: 18px 0; }
+  .topo .dentro { max-width: 560px; margin: 0 auto; padding: 0 22px; display: flex; align-items: center; gap: 10px; }
+  .topo img { width: 26px; height: 26px; }
   .topo b { color: #fff; font-size: 15px; font-weight: 600; letter-spacing: -.014em; }
-  .topo small { color: #8a94a6; font-size: 11px; display: block; font-weight: 400; letter-spacing: 0; }
+  .topo small { color: #7c85a3; font-size: 11px; display: block; font-weight: 400; letter-spacing: 0; }
 
-  .folha { max-width: 620px; margin: 0 auto; padding: 26px 22px 60px; }
-  .ola { font-size: 22px; font-weight: 600; letter-spacing: -.02em; margin: 0 0 4px; }
-  .ola + p { margin: 0 0 22px; color: var(--label-3); font-size: 14.5px; }
+  .folha { max-width: 560px; margin: 0 auto; padding: 8px 22px 60px; }
+  .ola { font-size: 23px; font-weight: 700; letter-spacing: -.02em; margin: 14px 0 2px; color: #fff; }
+  .ola + p { margin: 0 0 22px; color: #7c85a3; font-size: 14px; }
 
-  /* O cartão do benefício. Só um por vez, então ele pode ser grande. */
-  .vale { border-radius: 20px; padding: 26px 24px; color: #fff; margin-bottom: 20px;
-          background: linear-gradient(135deg, #4c1d95 0%, #6d28d9 55%, #db2777 100%);
-          box-shadow: 0 10px 30px rgba(76,29,149,.28); }
-  .vale .rot { font-size: 11.5px; text-transform: uppercase; letter-spacing: 1.2px; opacity: .85; font-weight: 600; }
-  .vale h2 { margin: 8px 0 2px; font-size: 25px; font-weight: 700; letter-spacing: -.02em; }
-  .vale .grana { font-size: 40px; font-weight: 800; letter-spacing: -.03em; margin: 10px 0 2px;
-                 font-variant-numeric: tabular-nums; }
-  .vale .obs { font-size: 13.5px; opacity: .9; line-height: 1.5; }
+  /* ---------------- o cartão do benefício ---------------- */
+  .vale { position: relative; border-radius: 22px; padding: 30px 26px 28px; color: #fff;
+          background: radial-gradient(120% 160% at 10% 0%, #7c3aed 0%, #4c1d95 45%, #1b1145 100%);
+          box-shadow: 0 18px 50px rgba(76,29,149,.45), inset 0 1px 0 rgba(255,255,255,.14);
+          overflow: hidden; margin-bottom: 18px; }
+  .vale::after { content: ''; position: absolute; top: -60px; right: -40px; width: 220px; height: 220px;
+                 background: radial-gradient(circle, rgba(219,39,119,.45), transparent 65%); }
+  .vale .rot { font-size: 11px; text-transform: uppercase; letter-spacing: 1.6px; opacity: .8;
+               font-weight: 700; }
+  .vale h2 { margin: 10px 0 0; font-size: 30px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
+  /* o sorriso da amazon: uma seta curva de a a z */
+  .sorriso { display: block; width: 96px; height: 22px; margin-top: 4px; }
+  .sorriso path { fill: none; stroke: #ff9900; stroke-width: 3.4; stroke-linecap: round; }
+  .vale .desc { position: relative; font-size: 13.5px; opacity: .85; margin-top: 12px; line-height: 1.5; }
 
-  .vale.vazio { background: var(--fill-1); color: var(--label); box-shadow: none;
-                border: 1px solid var(--fio); }
-  .vale.vazio .rot { color: var(--label-3); opacity: 1; }
-  .vale.vazio .obs { color: var(--label-2); opacity: 1; }
+  .vale .grana { font-size: 44px; font-weight: 800; letter-spacing: -.03em; margin: 16px 0 2px;
+                 font-variant-numeric: tabular-nums; position: relative; }
+  .vale .grana small { font-size: 20px; font-weight: 700; vertical-align: 14px; margin-right: 4px; }
 
-  .cx { background: var(--surface); border-radius: var(--r-card); padding: 20px 22px;
-        box-shadow: var(--shadow-1); margin-bottom: 16px; }
-  .cx h3 { margin: 0 0 4px; font-size: 15.5px; font-weight: 600; letter-spacing: -.014em; }
-  .cx p.sub { margin: 0 0 16px; font-size: 13.5px; color: var(--label-3); line-height: 1.5; }
+  /* ---------------- o botão da festa ---------------- */
+  .btn-liberar { position: relative; display: flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%; height: 58px; margin-top: 20px; border: 0; border-radius: 16px; cursor: pointer;
+    font-family: inherit; font-size: 17px; font-weight: 700; letter-spacing: -.01em; color: #fff;
+    background: linear-gradient(120deg, #059652, #10b981 45%, #34d399 70%, #059652);
+    background-size: 220% 100%;
+    box-shadow: 0 10px 28px rgba(16,185,129,.42), inset 0 1px 0 rgba(255,255,255,.25);
+    transition: transform .15s, box-shadow .15s;
+    animation: correnteza 4s linear infinite; }
+  .btn-liberar:hover { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(16,185,129,.5), inset 0 1px 0 rgba(255,255,255,.25); }
+  .btn-liberar:active { transform: translateY(0) scale(.99); }
+  .btn-liberar:disabled { opacity: .7; cursor: default; transform: none; }
+  @keyframes correnteza { to { background-position: 220% 0; } }
+  @media (prefers-reduced-motion: reduce) { .btn-liberar { animation: none; } }
 
-  .btn-grande { width: 100%; height: 52px; font-size: 16px; font-weight: 600; border-radius: 14px; }
+  /* ---------------- caixas claras ---------------- */
+  .cx { background: #fff; border-radius: 18px; padding: 22px; box-shadow: 0 8px 30px rgba(0,0,0,.25);
+        margin-bottom: 16px; }
+  .cx h3 { margin: 0 0 4px; font-size: 16px; font-weight: 700; letter-spacing: -.014em; }
+  .cx p.sub { margin: 0 0 16px; font-size: 13.5px; color: var(--label-3); line-height: 1.55; }
+  .aparece { animation: sobe .5s cubic-bezier(.2,.9,.3,1); }
+  @keyframes sobe { from { opacity: 0; transform: translateY(18px); } }
+
+  .btn-pix { width: 100%; height: 52px; font-size: 16px; font-weight: 700; border-radius: 14px; }
+
+  .conferir { display: flex; gap: 12px; align-items: flex-start; background: var(--fill-1);
+              border-radius: 12px; padding: 14px 16px; margin: 0 0 14px; font-size: 13.5px; line-height: 1.5; }
+  .conferir b { display: block; font-size: 15px; margin-top: 2px; word-break: break-all; }
 
   .linha-h { display: flex; align-items: center; gap: 12px; padding: 13px 0;
              border-top: 1px solid var(--hairline); font-size: 14px; }
   .linha-h:first-child { border-top: 0; }
   .linha-h .qual { flex: 1; font-weight: 500; }
   .linha-h .quando { font-size: 12px; color: var(--label-3); }
-  .pino { font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; }
+  .pino { font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
   .pino.pago { background: #dff5e8; color: #146c43; }
   .pino.liberado { background: #e6ecfd; color: #26418f; }
   .pino.processando { background: #fdf0d5; color: #8a5a00; }
   .pino.falhou, .pino.cancelado { background: #fbe3e0; color: #a92b21; }
 
-  .conferir { display: flex; gap: 12px; align-items: flex-start; background: var(--fill-1);
-              border-radius: 12px; padding: 14px 16px; margin: 14px 0 4px; font-size: 13.5px; line-height: 1.5; }
-  .conferir b { display: block; font-size: 15px; margin-top: 2px; word-break: break-all; }
+  .vale.vazio { background: #171b36; box-shadow: none; border: 1px solid #262c4e; }
+  .vale.vazio h2 { font-size: 21px; }
+
+  /* ---------------- confetes ---------------- */
+  #ceu { position: fixed; inset: 0; pointer-events: none; z-index: 90; }
+
+  /* ---------------- janela DENTRO da tela ---------------- */
+  .veu { position: fixed; inset: 0; background: rgba(6,8,20,.6); -webkit-backdrop-filter: blur(4px);
+         backdrop-filter: blur(4px); z-index: 100; display: none; align-items: center;
+         justify-content: center; padding: 22px; }
+  .veu.on { display: flex; }
+  .janela { background: #fff; border-radius: 20px; padding: 26px 24px; width: min(420px, 100%);
+            box-shadow: 0 24px 70px rgba(0,0,0,.45); animation: sobe .28s cubic-bezier(.2,.9,.3,1); }
+  .janela h3 { margin: 0 0 8px; font-size: 17px; font-weight: 700; letter-spacing: -.014em; }
+  .janela p { margin: 0 0 6px; font-size: 14.5px; line-height: 1.55; color: var(--label-2); }
+  .janela .chavezona { background: var(--fill-1); border-radius: 10px; padding: 12px 14px;
+                       font-weight: 700; font-size: 15px; word-break: break-all; margin: 12px 0 4px; }
+  .janela .pes { display: flex; gap: 10px; margin-top: 20px; }
+  .janela .pes .btn { flex: 1; height: 46px; font-size: 15px; border-radius: 12px; }
 </style>
 </head>
 <body>
 
 <div class="topo"><div class="dentro">
-  <img src="/favicon-32.png" alt="">
+  <img src="/apple-touch-icon.png" alt="">
   <span><b>StartDigital</b><small>Space Colaborador</small></span>
 </div></div>
 
 <div class="folha" id="folha"><div class="spinner"></div></div>
+
+<canvas id="ceu"></canvas>
+
+<div class="veu" id="veu"><div class="janela" id="janela"></div></div>
 
 <div class="toast" id="toast"></div>
 
@@ -82,12 +128,61 @@ function toast(msg, erro) {
 function el(id) { return document.getElementById(id); }
 function dataBr(iso) {
   if (!iso) return '';
-  var d = new Date(iso);
-  return d.toLocaleDateString('pt-BR');
+  return new Date(iso).toLocaleDateString('pt-BR');
 }
 
+/* ============ janela de confirmação DENTRO da tela ============ */
+function janela(html) {
+  el('janela').innerHTML = html;
+  el('veu').classList.add('on');
+}
+function fechaJanela() { el('veu').classList.remove('on'); }
+el('veu').addEventListener('click', function (ev) { if (ev.target === el('veu')) fechaJanela(); });
+
+/* ============ confetes (desenhados na mão, sem biblioteca) ============ */
+function festa() {
+  var c = el('ceu');
+  var ctx = c.getContext('2d');
+  c.width = innerWidth; c.height = innerHeight;
+  var cores = ['#10b981', '#34d399', '#7c3aed', '#db2777', '#ff9900', '#60a5fa', '#fbbf24'];
+  var flocos = [];
+  for (var i = 0; i < 160; i++) {
+    flocos.push({
+      x: Math.random() * c.width,
+      y: -20 - Math.random() * c.height * 0.5,
+      w: 6 + Math.random() * 7,
+      h: 8 + Math.random() * 8,
+      cor: cores[i % cores.length],
+      vy: 2.2 + Math.random() * 3.4,
+      vx: -1.4 + Math.random() * 2.8,
+      giro: Math.random() * Math.PI,
+      vgiro: -0.12 + Math.random() * 0.24
+    });
+  }
+  var inicio = Date.now();
+  (function anda() {
+    ctx.clearRect(0, 0, c.width, c.height);
+    var vivos = 0;
+    flocos.forEach(function (f) {
+      f.y += f.vy; f.x += f.vx; f.giro += f.vgiro;
+      if (f.y < c.height + 30) vivos++;
+      ctx.save();
+      ctx.translate(f.x, f.y);
+      ctx.rotate(f.giro);
+      ctx.fillStyle = f.cor;
+      ctx.fillRect(-f.w / 2, -f.h / 2, f.w, f.h * (0.4 + Math.abs(Math.sin(f.giro))));
+      ctx.restore();
+    });
+    if (vivos > 0 && Date.now() - inicio < 5000) requestAnimationFrame(anda);
+    else ctx.clearRect(0, 0, c.width, c.height);
+  })();
+}
+
+/* ============ a página ============ */
 var T = new URLSearchParams(location.search).get('t') || '';
 var DADOS = null;
+var REVELADO = false;
+var TIPO_ESCOLHIDO = null;
 
 async function carregar() {
   if (!T) {
@@ -104,53 +199,71 @@ async function carregar() {
   }
 }
 
+// O sorriso laranja quando o voucher é da Amazon. Nos outros, nada:
+// melhor limpo do que enfeite errado.
+function marcaDoVoucher(nome) {
+  if (!/amazon/i.test(String(nome || ''))) return '';
+  return '<svg class="sorriso" viewBox="0 0 96 22"><path d="M4 6 C 30 22, 66 22, 88 8 M88 8 l-7 -1.5 M88 8 l-2.5 6.5"/></svg>';
+}
+
 function desenhar() {
   var d = DADOS;
   var disp = d.disponivel;
   var curso = d.em_curso;
+  var partes = [];
 
-  var cartao;
-  if (disp) {
-    cartao = '<div class="vale">' +
-      '<div class="rot">Disponível para você</div>' +
+  partes.push('<h1 class="ola">Oi, ' + esc(d.colaborador.primeiro_nome) + ' 👋</h1>' +
+    '<p>' + (d.colaborador.cargo ? esc(d.colaborador.cargo) + ' · ' : '') + 'StartDigital</p>');
+
+  if (disp && !REVELADO) {
+    // fase 1: o presente fechado
+    partes.push('<div class="vale">' +
+      '<div class="rot">Um benefício chegou para você</div>' +
       '<h2>' + esc(disp.voucher) + '</h2>' +
-      '<div class="grana">' + esc(disp.valor_br) + '</div>' +
-      '<div class="obs">Liberado em ' + dataBr(disp.liberado_em) +
-      '. É só informar a sua chave Pix e o dinheiro cai na sua conta.</div>' +
-    '</div>';
-  } else if (curso) {
-    cartao = '<div class="vale">' +
-      '<div class="rot">Saque em andamento</div>' +
-      '<h2>' + esc(curso.voucher) + '</h2>' +
-      '<div class="grana">' + esc(curso.valor_br) + '</div>' +
-      '<div class="obs">Já pedimos ao banco. Costuma cair em segundos — atualize a página daqui a pouco.</div>' +
-    '</div>';
-  } else {
-    cartao = '<div class="vale vazio">' +
-      '<div class="rot">Nada disponível agora</div>' +
-      '<h2 style="font-size:20px">Sem benefício liberado</h2>' +
-      '<div class="obs">A Start libera o benefício de tempos em tempos. Quando liberar, ' +
-      'ele aparece aqui e você saca por Pix.</div>' +
-    '</div>';
-  }
+      marcaDoVoucher(disp.voucher) +
+      '<div class="desc">A StartDigital liberou este benefício em ' + dataBr(disp.liberado_em) +
+      '. Clique abaixo para ver o valor e resgatar.</div>' +
+      '<button class="btn-liberar" id="btn-revelar">🎁 Liberar benefício</button>' +
+    '</div>');
+  } else if (disp) {
+    // fase 2: aberto — valor na cara e o pix
+    partes.push('<div class="vale aparece">' +
+      '<div class="rot">Disponível agora</div>' +
+      '<h2>' + esc(disp.voucher) + '</h2>' +
+      marcaDoVoucher(disp.voucher) +
+      '<div class="grana"><small>R$</small>' +
+        esc(Number(disp.valor).toFixed(2).replace('.', ',')) + '</div>' +
+      '<div class="desc">É seu. Informe a sua chave Pix abaixo e o valor cai na sua conta.</div>' +
+    '</div>');
 
-  var forma = '';
-  if (disp) {
-    forma = '<div class="cx">' +
+    partes.push('<div class="cx aparece">' +
       '<h3>Para onde mando o Pix?</h3>' +
-      '<p class="sub">Informe a <strong>sua</strong> chave Pix. Pode ser CPF, e-mail, ' +
-      'telefone com DDD ou chave aleatória. Confira com calma: o dinheiro vai para quem for dono da chave.</p>' +
+      '<p class="sub">Informe a <strong>sua</strong> chave Pix: CPF, e-mail, telefone com DDD ou ' +
+      'chave aleatória. O dinheiro vai para quem for dono da chave — confira com calma.</p>' +
       '<div class="field"><label for="chave">Sua chave Pix</label>' +
         '<input id="chave" placeholder="CPF, e-mail, telefone ou chave aleatória" autocomplete="off"></div>' +
       '<div id="revisao"></div>' +
-      '<button class="btn btn-grande" id="btn-sacar" style="margin-top:6px">Receber ' +
-        esc(disp.valor_br) + ' por Pix</button>' +
+      '<button class="btn btn-pix" id="btn-sacar">Receber ' + esc(disp.valor_br) + ' por Pix</button>' +
       '<div id="saida"></div>' +
-    '</div>';
+    '</div>');
+  } else if (curso) {
+    partes.push('<div class="vale">' +
+      '<div class="rot">Saque em andamento</div>' +
+      '<h2>' + esc(curso.voucher) + '</h2>' +
+      '<div class="grana"><small>R$</small>' + esc(Number(curso.valor).toFixed(2).replace('.', ',')) + '</div>' +
+      '<div class="desc">Já pedimos ao banco. Costuma cair em segundos — atualize a página daqui a pouco.</div>' +
+    '</div>');
+  } else {
+    partes.push('<div class="vale vazio">' +
+      '<div class="rot">Nada disponível agora</div>' +
+      '<h2>Sem benefício liberado</h2>' +
+      '<div class="desc">A Start libera o benefício de tempos em tempos. Quando liberar, ' +
+      'ele aparece aqui e você resgata por Pix.</div>' +
+    '</div>');
   }
 
-  var hist = (d.historico || []).length
-    ? '<div class="cx"><h3>Seus benefícios</h3><p class="sub">Tudo que já foi liberado para você.</p>' +
+  if ((d.historico || []).length) {
+    partes.push('<div class="cx"><h3>Seus benefícios</h3><p class="sub">Tudo que já foi liberado para você.</p>' +
       d.historico.map(function (h) {
         return '<div class="linha-h">' +
           '<span class="qual">' + esc(h.voucher) +
@@ -161,40 +274,57 @@ function desenhar() {
           (h.comprovante_url ? '<a href="' + esc(h.comprovante_url) + '" target="_blank" rel="noopener" ' +
             'style="font-size:12.5px">recibo</a>' : '') +
         '</div>';
-      }).join('') + '</div>'
-    : '';
+      }).join('') + '</div>');
+  }
 
-  el('folha').innerHTML =
-    '<h1 class="ola">Oi, ' + esc(d.colaborador.primeiro_nome) + '</h1>' +
-    '<p>' + (d.colaborador.cargo ? esc(d.colaborador.cargo) + ' · ' : '') + 'StartDigital</p>' +
-    cartao + forma + hist;
+  el('folha').innerHTML = partes.join('');
 
-  if (disp) ligarSaque(disp);
+  var rev = el('btn-revelar');
+  if (rev) {
+    rev.addEventListener('click', function () {
+      REVELADO = true;
+      festa();
+      desenhar();
+      var campo = el('chave');
+      if (campo) setTimeout(function () { campo.focus(); }, 350);
+    });
+  }
+  if (disp && REVELADO) ligarSaque(disp);
 }
-
-var TIPO_ESCOLHIDO = null;
 
 function ligarSaque(disp) {
   var campo = el('chave');
   var btn = el('btn-sacar');
   TIPO_ESCOLHIDO = null;
 
-  // Confirma antes de mandar: quem digitou errado ainda dá tempo de ver.
   campo.addEventListener('input', function () {
     var v = campo.value.trim();
+    TIPO_ESCOLHIDO = null;
     el('revisao').innerHTML = v
       ? '<div class="conferir"><span>📤</span><span>Vou mandar ' + esc(disp.valor_br) +
         ' para esta chave:<b>' + esc(v) + '</b></span></div>'
       : '';
   });
 
-  btn.addEventListener('click', async function () {
+  btn.addEventListener('click', function () {
     var chave = campo.value.trim();
     if (!chave) { campo.focus(); return toast('Escreva a sua chave Pix', true); }
-    if (!confirm('Confirmar o envio de ' + disp.valor_br + ' para:\n\n' + chave +
-      '\n\nConfira bem — depois de enviado não dá para voltar atrás.')) return;
 
-    await enviar(chave, TIPO_ESCOLHIDO);
+    // confirmação DENTRO da tela, não a janelinha feia do navegador
+    janela('<h3>Confirmar o resgate</h3>' +
+      '<p>Vou enviar <strong>' + esc(disp.valor_br) + '</strong> por Pix para a chave:</p>' +
+      '<div class="chavezona">' + esc(chave) + '</div>' +
+      '<p style="font-size:13px;color:var(--label-3)">Depois de enviado não dá para voltar atrás. ' +
+      'Confira se a chave é mesmo a sua.</p>' +
+      '<div class="pes">' +
+        '<button class="btn btn-ghost" id="j-nao">Voltar</button>' +
+        '<button class="btn" id="j-sim">Confirmar e receber</button>' +
+      '</div>');
+    el('j-nao').addEventListener('click', fechaJanela);
+    el('j-sim').addEventListener('click', function () {
+      fechaJanela();
+      enviar(chave, TIPO_ESCOLHIDO);
+    });
   });
 
   async function enviar(chave, tipo) {
@@ -212,24 +342,21 @@ function ligarSaque(disp) {
         body: JSON.stringify({ t: T, chave: chave, tipo: tipo || undefined })
       })).json();
 
-      // O mesmo número pode ser CPF e telefone. Quando o servidor não
-      // tem como saber, ele devolve as opções e quem responde é a pessoa.
+      // o mesmo número pode ser CPF e telefone: quem decide é a pessoa
       if (!r.ok && r.escolher) {
-        el('saida').innerHTML =
-          '<div class="conferir" style="margin-top:14px;display:block">' +
-            '<div>' + esc(r.error) + '</div>' +
-            '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">' +
-              r.escolher.map(function (o) {
-                return '<button class="btn btn-sm escolha" data-tipo="' + esc(o.tipo) + '">É o meu ' +
-                  esc(o.nome.toLowerCase()) + '</button>';
-              }).join('') +
-            '</div>' +
-          '</div>';
         solta();
-        el('saida').querySelectorAll('.escolha').forEach(function (b) {
+        janela('<h3>Só uma dúvida</h3>' +
+          '<p>' + esc(r.error) + '</p>' +
+          '<div class="pes">' +
+            r.escolher.map(function (o) {
+              return '<button class="btn escolha" data-tipo="' + esc(o.tipo) + '">É o meu ' +
+                esc(o.nome.toLowerCase()) + '</button>';
+            }).join('') +
+          '</div>');
+        el('janela').querySelectorAll('.escolha').forEach(function (b) {
           b.addEventListener('click', function () {
             TIPO_ESCOLHIDO = b.dataset.tipo;
-            el('saida').innerHTML = '';
+            fechaJanela();
             enviar(chave, TIPO_ESCOLHIDO);
           });
         });
@@ -237,7 +364,9 @@ function ligarSaque(disp) {
       }
 
       if (!r.ok) throw new Error(r.error);
+      festa();
       toast(r.aviso || 'Pix enviado!');
+      REVELADO = false;
       carregar();
     } catch (e) {
       el('saida').innerHTML = '<div class="alert alert-erro" style="margin-top:14px">' + esc(e.message) + '</div>';
