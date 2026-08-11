@@ -32,6 +32,8 @@ const MIME = {
 };
 
 const ROTAS = {
+  '/space': '/space.html',
+  '/beneficio': '/space.html',
   '/vagas': '/vagas.html',
   '/carreiras': '/vagas.html',
   '/trabalhe-conosco': '/vagas.html',
