@@ -29,6 +29,14 @@
       "destination": "/vagas.html"
     },
     {
+      "source": "/space",
+      "destination": "/space.html"
+    },
+    {
+      "source": "/beneficio",
+      "destination": "/space.html"
+    },
+    {
       "source": "/vagas",
       "destination": "/vagas.html"
     },
