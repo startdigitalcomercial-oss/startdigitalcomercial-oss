@@ -67,6 +67,23 @@ async function colaboradorPorToken(token) {
 }
 
 // ------------------------------------------------------------
+// DIÁRIO DO WEBHOOK DO ASAAS
+// Grava as últimas batidas — inclusive as recusadas. Sem isto,
+// quando um saque volta, não dá para saber se o Asaas não chamou,
+// se chamou com o token errado, ou se chamou e a gente recusou.
+// ------------------------------------------------------------
+async function anotaAsaas(dados) {
+  try {
+    const reg = await db.selectOne('settings', { key: 'eq.asaas_webhook_log', select: 'value' });
+    const itens = (reg && reg.value && Array.isArray(reg.value.itens)) ? reg.value.itens : [];
+    itens.unshift(Object.assign({ em: new Date().toISOString() }, dados));
+    await db.upsert('settings', {
+      key: 'asaas_webhook_log', value: { itens: itens.slice(0, 25) }
+    }, 'key');
+  } catch (e) { /* o diario nunca pode derrubar o webhook */ }
+}
+
+// ------------------------------------------------------------
 // 1) WEBHOOK DO ASAAS
 // O Asaas manda o header asaas-access-token com o valor que a
 // gente cadastrou lá. Se não bater, não é o Asaas falando.
@@ -86,10 +103,14 @@ async function receberWebhook(req, res) {
   const veio = String(req.headers['asaas-access-token'] || '').trim();
 
   if (!esperado) {
-    console.error('[space] webhook chegou mas ASAAS_WEBHOOK_TOKEN nao esta configurada');
+    await anotaAsaas({ decisao: 'ASAAS_WEBHOOK_TOKEN nao configurada na Vercel (faltou variavel ou Redeploy)' });
     return u.json(res, 200, { ok: true, ignorado: 'webhook sem token configurado' });
   }
   if (!veio || !u.safeEqual(veio, esperado)) {
+    await anotaAsaas({
+      decisao: 'token invalido',
+      veio_token: veio ? (veio.slice(0, 6) + '…') : '(vazio — o campo token nao foi preenchido no Asaas)'
+    });
     return u.json(res, 401, { ok: false, error: 'token invalido' });
   }
 
@@ -137,6 +158,7 @@ async function receberWebhook(req, res) {
   if (novo === 'falhou') patch.falha_motivo = t.failReason || ('Asaas: ' + evento);
 
   await db.update('benefit_releases', patch, { id: 'eq.' + lib.id });
+  await anotaAsaas({ decisao: 'evento aplicado', evento: evento, novo_status: novo, transfer_id: t.id });
   return u.json(res, 200, { ok: true, atualizado: novo });
 }
 
@@ -153,8 +175,11 @@ async function receberWebhook(req, res) {
 // no nosso banco.
 // ------------------------------------------------------------
 async function validarSaida(res, corpo) {
-  function recusa(motivo) {
-    console.error('[space] saque RECUSADO na validacao:', motivo, JSON.stringify(corpo).slice(0, 300));
+  async function recusa(motivo) {
+    await anotaAsaas({
+      decisao: 'validacao RECUSADA', motivo: motivo,
+      tipo: corpo.type, transfer_id: (corpo.transfer || {}).id, valor: (corpo.transfer || {}).value
+    });
     return u.json(res, 200, { status: 'REFUSED', refuseReason: motivo });
   }
 
@@ -177,6 +202,7 @@ async function validarSaida(res, corpo) {
     return recusa('O valor não confere com o que foi liberado.');
   }
 
+  await anotaAsaas({ decisao: 'validacao APROVADA', transfer_id: t.id, valor: t.value });
   return u.json(res, 200, { status: 'APPROVED' });
 }
 
