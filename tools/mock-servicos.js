@@ -16,8 +16,11 @@ function ler(req) {
 const server = http.createServer(async function (req, res) {
   const url = new URL(req.url, 'http://x');
   const body = await ler(req);
-  const json = function (o) {
-    res.statusCode = 200;
+  // Segundo argumento e o codigo HTTP. Sem ele o padrao continua 200 —
+  // mas quem passa 400 tem que ver 400 chegar do outro lado, senao o
+  // espelho mente sobre como o servico de verdade se comporta.
+  const json = function (o, codigo) {
+    res.statusCode = codigo || 200;
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify(o));
   };
@@ -233,6 +236,63 @@ const server = http.createServer(async function (req, res) {
       { instance: { instanceName: 'start-comercial', connectionStatus: 'open', ownerJid: '5511999999999@s.whatsapp.net' } },
       { instance: { instanceName: 'start-rh', connectionStatus: 'open', ownerJid: '5513988887777@s.whatsapp.net' } }
     ]);
+  }
+
+  // ---------------- Asaas ----------------
+  // Espelho do banco. Guarda o que recebeu em __asaas para o teste
+  // conferir, e obedece a __asaas_modo para simular recusa e timeout.
+  if (url.pathname.indexOf('/asaas/') === 0) {
+    const caminho = url.pathname.replace('/asaas', '');
+    if (req.headers['access_token'] !== 'chave-asaas-de-mentira') {
+      return json({ errors: [{ code: 'invalid_access_token', description: 'A chave de API fornecida é inválida' }] }, 401);
+    }
+
+    if (caminho === '/finance/balance') return json({ balance: 12345.67 });
+
+    if (caminho === '/transfers' && req.method === 'POST') {
+      const modo = global.__asaas_modo || 'ok';
+      if (modo === 'recusa') {
+        return json({ errors: [{ code: 'invalid_pixAddressKey', description: 'Chave Pix inválida ou não encontrada' }] }, 400);
+      }
+      if (modo === 'demora') {
+        // nunca responde: o cliente tem que desistir sozinho
+        return;
+      }
+      const t = {
+        object: 'transfer',
+        id: 'tr_' + Math.random().toString(36).slice(2, 10),
+        status: modo === 'japago' ? 'DONE' : 'PENDING',
+        type: 'PIX', operationType: 'PIX',
+        value: body.value,
+        externalReference: body.externalReference,
+        transactionReceiptUrl: modo === 'japago' ? 'https://asaas.com/comprovante/x' : null,
+        bankAccount: { pixAddressKey: body.pixAddressKey }
+      };
+      global.__asaas = Object.assign({}, body);
+      const lista = global.__asaas_transfers || (global.__asaas_transfers = []);
+      lista.push(t);
+      return json(t);
+    }
+
+    if (caminho === '/transfers' && req.method === 'GET') {
+      const ref = url.searchParams.get('externalReference');
+      const todas = global.__asaas_transfers || [];
+      const achadas = ref ? todas.filter(function (x) { return x.externalReference === ref; }) : todas;
+      return json({ data: achadas, totalCount: achadas.length });
+    }
+
+    return json({ errors: [{ code: 'not_found', description: 'nao existe' }] }, 404);
+  }
+
+  // espiadas do teste
+  if (url.pathname === '/__asaas') return json(global.__asaas || {});
+  if (url.pathname === '/__asaas-modo') {
+    global.__asaas_modo = url.searchParams.get('m') || 'ok';
+    return json({ modo: global.__asaas_modo });
+  }
+  if (url.pathname === '/__asaas-limpar') {
+    global.__asaas = null; global.__asaas_transfers = []; global.__asaas_modo = 'ok';
+    return json({ limpo: true });
   }
 
   res.statusCode = 404;
