@@ -83,7 +83,12 @@ const ACOES = {
 
   // --- financeiro: so quem cuida do dinheiro ---
   fin_lista: 'financeiro', fin_resumo: 'financeiro', fin_relatorio: 'financeiro',
-  fin_salvar: 'financeiro_mexer', fin_excluir: 'financeiro_mexer'
+  fin_salvar: 'financeiro_mexer', fin_excluir: 'financeiro_mexer',
+
+  // --- Space Colaborador: libera dinheiro de verdade, mesma tranca ---
+  sp_painel: 'financeiro',
+  sp_voucher_salvar: 'financeiro_mexer', sp_liberar: 'financeiro_mexer',
+  sp_cancelar: 'financeiro_mexer', sp_conferir: 'financeiro_mexer'
 };
 
 function papelValido(p) { return PAPEIS.indexOf(p) >= 0; }
@@ -130,12 +135,12 @@ function recado(papel, acao) {
 function menuDoPapel(papel) {
   if (papel === 'dono') {
     return ['dashboard', 'vagas', 'triagem', 'candidatos', 'prequalificacao', 'aurea', 'preonboarding',
-      'colaboradores', 'avisos', 'conteudo', 'quiz', 'mensagens',
+      'colaboradores', 'avisos', 'space', 'conteudo', 'quiz', 'mensagens',
       'financeiro', 'findash', 'ajustes', 'usuarios'];
   }
   if (papel === 'rh') {
     return ['dashboard', 'vagas', 'triagem', 'candidatos', 'prequalificacao', 'aurea', 'preonboarding',
-      'colaboradores', 'avisos', 'conteudo', 'quiz', 'mensagens',
+      'colaboradores', 'avisos', 'space', 'conteudo', 'quiz', 'mensagens',
       'financeiro', 'findash', 'ajustes'];
   }
   if (papel === 'avaliador') {
