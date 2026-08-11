@@ -226,7 +226,16 @@ const DB = {
   quiz_attempts: [],
   lesson_progress: [],
   message_logs: [],
-  collaborators: [],
+  collaborators: [
+    { id: 'cccc0001-0001-4001-8001-000000000001', token: 'colabtoken000000000001', name: 'Marina Ribeiro', nickname: 'Marina', email: 'marina@startdigital.com.br', phone: '13 99111-2233', phone_digits: '5513991112233', role_title: 'Social Media', area: 'Criacao', active: true, source: 'painel', created_at: agora(), updated_at: agora() },
+    { id: 'cccc0002-0002-4002-8002-000000000002', token: 'colabtoken000000000002', name: 'Diego Ramos', nickname: 'Diego', email: 'diego@startdigital.com.br', phone: '13 99444-5566', phone_digits: '5513994445566', role_title: 'Gestor de Trafego', area: 'Trafego', active: true, source: 'painel', created_at: agora(), updated_at: agora() }
+  ],
+
+  benefit_vouchers: [
+    { id: 'bbbb0001-0001-4001-8001-000000000001', nome: 'Amazon Prime', valor: 50, descricao: 'Assinatura Amazon Prime - liberado a cada 3 meses.', ativo: true, position: 1, created_at: agora(), updated_at: agora() }
+  ],
+  benefit_releases: [],
+
   broadcasts: [],
   panel_users: [],
   audit_log: []
@@ -236,7 +245,9 @@ const DB = {
 const DEFAULTS = {
   candidates: function () { return { id: uuid(), extra: {}, wa_sequencia_em: null, cadastro_em: null, job_id: null, indicacao: null, curriculo_url: null, curriculo_nome: null, source: 'formulario', source_detail: null, stage_key: 'triagem', password_hash: null, password_salt: null, rating: null, notes: null, member_access: false, archived: false, created_at: agora(), updated_at: agora() }; },
   stage_history: function () { return { id: seq('stage_history'), created_at: agora(), note: null, from_stage: null, to_stage: null }; },
-  finance_clients: function () { return { id: uuid(), valor: 0, setup: 0, hospedagem: 0, vencimento_dia: 10, status: 'aguardando', responsavel: null, telefone: null, observacao: null, destaque: false, ativo: true, position: 1, created_at: agora(), updated_at: agora() }; },
+  benefit_vouchers: function () { return { id: uuid(), valor: 0, descricao: null, ativo: true, position: 1, created_at: agora(), updated_at: agora() }; },
+  benefit_releases: function () { return { id: uuid(), status: 'liberado', voucher_id: null, liberado_por: null, liberado_em: agora(), pix_chave: null, pix_tipo: null, asaas_id: null, asaas_status: null, comprovante_url: null, falha_motivo: null, solicitado_em: null, pago_em: null, created_at: agora(), updated_at: agora() }; },
+    finance_clients: function () { return { id: uuid(), valor: 0, setup: 0, hospedagem: 0, vencimento_dia: 10, status: 'aguardando', responsavel: null, telefone: null, observacao: null, destaque: false, ativo: true, position: 1, created_at: agora(), updated_at: agora() }; },
   disc_results: function () { return { id: uuid(), answers: {}, created_at: agora() }; },
   quiz_attempts: function () { return { id: uuid(), answers: {}, score: null, max_score: null, percent: null, passed: null, focus_lost: 0, paste_blocked: 0, integrity_flags: [], started_at: agora(), finished_at: null }; },
   lesson_progress: function () { return { completed: true, completed_at: agora() }; },
