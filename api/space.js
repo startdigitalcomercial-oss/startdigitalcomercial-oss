@@ -20,6 +20,36 @@ const db = require('./_lib/db');
 const u = require('./_lib/util');
 const porta = require('./_lib/porta');
 const asaas = require('./_lib/asaas');
+const send = require('./_lib/send');
+
+// Ajustes do Space guardados no banco (settings.space):
+//   aviso_sms_para — o telefone que recebe um SMS a cada saque feito.
+async function configSpace() {
+  const row = await db.selectOne('settings', { key: 'eq.space', select: 'value' });
+  return Object.assign({ aviso_sms_para: '' }, (row && row.value) || {});
+}
+
+// A instância do WhatsApp é a mesma que a Aurea usa.
+async function instanciaZap() {
+  const a = await db.selectOne('settings', { key: 'eq.aurea', select: 'value' });
+  if (a && a.value && a.value.instancia_whatsapp) return a.value.instancia_whatsapp;
+  const w = await db.selectOne('settings', { key: 'eq.whatsapp', select: 'value' });
+  return (w && w.value && w.value.instance) || process.env.EVOLUTION_INSTANCE || '';
+}
+
+// SMS para o dono a cada saque. Nunca pode atrapalhar o saque em si:
+// se o SMS falhar, o Pix já saiu e está tudo bem — só registra.
+async function avisaChefeDoSaque(colaborador, lib) {
+  try {
+    const cfg = await configSpace();
+    if (!cfg.aviso_sms_para) return;
+    await send.sendSms({
+      to: cfg.aviso_sms_para,
+      text: 'StartDigital Space: ' + u.firstName(colaborador.name) + ' (' + colaborador.name + ') sacou ' +
+        lib.nome_voucher + ' de R$ ' + Number(lib.valor).toFixed(2).replace('.', ',') + '.'
+    });
+  } catch (e) { console.error('[space] aviso de saque falhou:', e.message); }
+}
 
 // Teto de segurança. Não é regra de negócio, é cinto: se alguém
 // digitar um zero a mais no valor do voucher, o saque para aqui
@@ -290,6 +320,10 @@ async function sacar(res, colaborador, chaveBruta, tipoEscolhido) {
       updated_at: new Date().toISOString()
     }, { id: 'eq.' + travada.id });
 
+    // o SMS para o dono sai antes de responder: em serverless, depois
+    // do res.end a função pode ser congelada e o aviso nunca sairia
+    await avisaChefeDoSaque(colaborador, travada);
+
     return u.ok(res, {
       enviado: true,
       liberacao: paraTela(atualizada || travada),
@@ -416,6 +450,7 @@ module.exports = async function handler(req, res) {
           const p = pessoas.filter(function (x) { return x.id === l.collaborator_id; })[0];
           return Object.assign(paraTela(l), { colaborador: p ? p.name : '—' });
         }),
+        config: await configSpace(),
         asaas: {
           ligado: asaas.configurado(),
           ambiente: asaas.ambiente(),
@@ -471,9 +506,15 @@ module.exports = async function handler(req, res) {
       const feitos = [];
       const pulados = [];
 
+      // por quais canais avisar cada pessoa que o benefício chegou
+      const avisar = Object.assign({ whatsapp: false, sms: false, email: false }, body.avisar || {});
+      const vaiAvisar = avisar.whatsapp || avisar.sms || avisar.email;
+      const inst = vaiAvisar ? await instanciaZap() : '';
+      let avisos = 0;
+
       for (const cid of ids) {
         if (!cid) continue;
-        const p = await db.selectOne('collaborators', { id: 'eq.' + cid, select: 'id,name,active' });
+        const p = await db.selectOne('collaborators', { id: 'eq.' + cid, select: 'id,name,active,phone,email,token' });
         if (!p || p.active === false) { pulados.push({ id: cid, motivo: 'colaborador inativo' }); continue; }
 
         // Já tem uma em aberto? Não empilha. O banco também barra
@@ -494,12 +535,53 @@ module.exports = async function handler(req, res) {
             liberado_em: new Date().toISOString()
           });
           feitos.push({ nome: p.name, id: nova.id });
+
+          // ---- avisa a pessoa pelos canais escolhidos ----
+          // Aviso que falha não desfaz a liberação: o benefício está lá,
+          // o link continua valendo, e o painel mostra quem foi avisado.
+          if (vaiAvisar) {
+            const link = u.appUrl() + '/space?t=' + p.token;
+            const valorBr = 'R$ ' + Number(voucher.valor).toFixed(2).replace('.', ',');
+            const texto = 'Oi ' + u.firstName(p.name) + '! Você recebeu um benefício da StartDigital: ' +
+              voucher.nome + ' de ' + valorBr + '. Resgate por Pix aqui: ' + link;
+
+            if (avisar.whatsapp && p.phone) {
+              const r1 = await send.sendWhatsApp({ to: p.phone, text: texto, instance: inst })
+                .catch(function () { return { status: 'erro' }; });
+              if (r1.status === 'enviado') avisos++;
+            }
+            if (avisar.sms && p.phone) {
+              const r2 = await send.sendSms({ to: p.phone, text: texto })
+                .catch(function () { return { status: 'erro' }; });
+              if (r2.status === 'enviado') avisos++;
+            }
+            if (avisar.email && p.email) {
+              const r3 = await send.sendEmail({
+                to: p.email,
+                subject: 'Você recebeu um benefício da StartDigital 🎁',
+                text: texto + '\n\nQualquer dúvida, fale com o time da Start.\n\nEquipe StartDigital'
+              }).catch(function () { return { status: 'erro' }; });
+              if (r3.status === 'enviado') avisos++;
+            }
+          }
         } catch (e) {
           pulados.push({ nome: p.name, motivo: 'já tem um benefício em aberto' });
         }
       }
 
-      return u.ok(res, { liberados: feitos, pulados: pulados });
+      return u.ok(res, { liberados: feitos, pulados: pulados, avisos_enviados: avisos });
+    }
+
+    // ---- ajustes do Space (por enquanto: o telefone do aviso de saque) ----
+    if (action === 'sp_config_save') {
+      if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
+      const body = await u.readBody(req);
+      const atual = await configSpace();
+      const novo = Object.assign({}, atual, {
+        aviso_sms_para: String(body.aviso_sms_para || '').trim().slice(0, 30)
+      });
+      await db.upsert('settings', { key: 'space', value: novo }, 'key');
+      return u.ok(res, { config: novo });
     }
 
     // ---- cancelar uma liberação que ninguém sacou ----
