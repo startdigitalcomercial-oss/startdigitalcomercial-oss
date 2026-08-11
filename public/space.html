@@ -272,27 +272,31 @@ function desenhar() {
       '<div class="desc">Já pedimos ao banco. Costuma cair em segundos — atualize a página daqui a pouco.</div>' +
     '</div>');
   } else {
-    partes.push('<div class="vale vazio">' +
-      '<div class="rot">Nada disponível agora</div>' +
-      '<h2>Sem benefício liberado</h2>' +
-      '<div class="desc">A Start libera o benefício de tempos em tempos. Quando liberar, ' +
-      'ele aparece aqui e você resgata por Pix.</div>' +
-    '</div>');
-  }
-
-  if ((d.historico || []).length) {
-    partes.push('<div class="cx"><h3>Seus benefícios</h3><p class="sub">Tudo que já foi liberado para você.</p>' +
-      d.historico.map(function (h) {
-        return '<div class="linha-h">' +
-          '<span class="qual">' + esc(h.voucher) +
-            '<span class="quando" style="display:block">' +
-            dataBr(h.pago_em || h.solicitado_em || h.liberado_em) + '</span></span>' +
-          '<span class="pino ' + esc(h.status) + '">' + esc(h.situacao) + '</span>' +
-          '<span style="font-variant-numeric:tabular-nums;font-weight:600">' + esc(h.valor_br) + '</span>' +
-          (h.comprovante_url ? '<a href="' + esc(h.comprovante_url) + '" target="_blank" rel="noopener" ' +
-            'style="font-size:12.5px">recibo</a>' : '') +
-        '</div>';
-      }).join('') + '</div>');
+    // Sem nada em aberto. Se o último capítulo foi um pagamento, a tela
+    // celebra em vez de dizer "nada para você" — a pessoa acabou de
+    // receber, e é aqui que ela pega o recibo.
+    var ultimo = (d.historico || [])[0];
+    if (ultimo && ultimo.status === 'pago') {
+      partes.push('<div class="vale">' +
+        '<div class="rot">Resgatado com sucesso ✓</div>' +
+        '<h2>' + esc(ultimo.voucher) + '</h2>' +
+        marcaDoVoucher(ultimo.voucher) +
+        '<div class="grana"><small>R$</small>' + esc(Number(ultimo.valor).toFixed(2).replace('.', ',')) + '</div>' +
+        '<div class="desc">Caiu na sua conta em ' + dataBr(ultimo.pago_em) + '. ' +
+        (ultimo.comprovante_url
+          ? '<a href="' + esc(ultimo.comprovante_url) + '" target="_blank" rel="noopener" ' +
+            'style="color:#7ef0c0;font-weight:600">Ver o comprovante</a>. '
+          : '') +
+        'Quando a Start liberar o próximo benefício, ele aparece aqui.</div>' +
+      '</div>');
+    } else {
+      partes.push('<div class="vale vazio">' +
+        '<div class="rot">Nada disponível agora</div>' +
+        '<h2>Sem benefício liberado</h2>' +
+        '<div class="desc">A Start libera o benefício de tempos em tempos. Quando liberar, ' +
+        'ele aparece aqui e você resgata por Pix.</div>' +
+      '</div>');
+    }
   }
 
   el('folha').innerHTML = partes.join('');
