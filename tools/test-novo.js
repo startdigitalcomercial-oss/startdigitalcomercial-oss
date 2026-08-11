@@ -1189,6 +1189,39 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
     check('CPF invalido nao vira CPF', as.tipoDaChave('111.111.111-11') !== 'CPF');
   }
 
+  // ---- "foi voce que pediu?": a validacao de saque do Asaas ----
+  // O Asaas manda o pedido de validacao com "type" e sem "event".
+  async function validaAsaas(payload, token) {
+    const r = await fetch(BASE + '/api/space?action=webhook', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'asaas-access-token': token === undefined ? 'token-webhook-de-teste' : token
+      },
+      body: JSON.stringify(payload)
+    });
+    return { http: r.status, corpo: await r.json() };
+  }
+
+  // o saque de verdade que esta em andamento (o da Marina, la de cima)
+  const vSaque = await validaAsaas({ type: 'TRANSFER', transfer: { id: transf.data[0].id, value: 50 } });
+  check('valida e APROVA o saque que o sistema pediu',
+    vSaque.corpo.status === 'APPROVED', vSaque.corpo);
+  const vDesconhecido = await validaAsaas({ type: 'TRANSFER', transfer: { id: 'tr_de_ladrao', value: 50 } });
+  check('RECUSA transferencia que o sistema nao pediu',
+    vDesconhecido.corpo.status === 'REFUSED', vDesconhecido.corpo);
+  const vValor = await validaAsaas({ type: 'TRANSFER', transfer: { id: transf.data[0].id, value: 5000 } });
+  check('RECUSA quando o valor foi mexido no caminho',
+    vValor.corpo.status === 'REFUSED', vValor.corpo);
+  const vConta = await validaAsaas({ type: 'BILL', bill: { id: 1, value: 20 } });
+  check('RECUSA pagamento de conta (o portal nunca paga conta)',
+    vConta.corpo.status === 'REFUSED', vConta.corpo);
+  const vRecarga = await validaAsaas({ type: 'MOBILE_PHONE_RECHARGE', mobilePhoneRecharge: { value: 20 } });
+  check('RECUSA recarga de celular', vRecarga.corpo.status === 'REFUSED', vRecarga.corpo);
+  const vTokenErrado = await validaAsaas({ type: 'TRANSFER', transfer: { id: transf.data[0].id, value: 50 } }, 'token-errado');
+  check('validacao com token errado leva 401 (nem responde APPROVED/REFUSED)',
+    vTokenErrado.http === 401, vTokenErrado);
+
   // ---- chave ambigua: o servidor pergunta em vez de chutar ----
   await asaasLimpa();
   await sp('sp_liberar', { voucher_id: VOUCHER, colaboradores: [DIEGO] });
