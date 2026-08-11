@@ -1244,6 +1244,55 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   check('tipo que nao combina com a chave e ignorado (vale o que a chave e)',
     tipoMentira.ok && (await asaasUltimo()).pixAddressKeyType === 'EMAIL', await asaasUltimo());
 
+  // ---- aviso de saque por SMS para o chefe ----
+  // Palco limpo: as cenas anteriores deixaram saques em andamento, e
+  // aqui a gente precisa liberar e sacar do zero.
+  await fetch('http://127.0.0.1:54321/rest/v1/benefit_releases', { method: 'DELETE' })
+    .catch(function () { return null; });
+  const cfgSalva = await sp('sp_config_save', { aviso_sms_para: '13 98888-0001' });
+  check('salva o telefone do aviso de saque', cfgSalva.ok, cfgSalva.error);
+  check('o painel devolve o telefone salvo',
+    ((await sp('sp_painel')).config || {}).aviso_sms_para === '13 98888-0001');
+
+  // um saque novo tem que disparar o SMS com nome e beneficio
+  await asaasLimpa();
+  await fetch(SERV + '/__asaas-modo?m=ok');
+  await sp('sp_liberar', { voucher_id: VOUCHER, colaboradores: [DIEGO] });
+  const saqueAviso = await spPublico('sacar', { t: TOKEN_DIEGO, chave: CPF_OK });
+  check('saque com aviso ligado sai normal', saqueAviso.ok, saqueAviso.error);
+  const smsChefe = await (await fetch(SERV + '/__ultimo-sms')).json();
+  check('o chefe recebe SMS do saque', String(smsChefe.receivers && smsChefe.receivers[0] || '').indexOf('5513988880001') >= 0, smsChefe.receivers);
+  check('o SMS diz quem sacou e o que',
+    /Diego/.test(smsChefe.message || '') && /Amazon Prime/.test(smsChefe.message || ''), smsChefe.message);
+
+  // ---- liberar avisando a pessoa pelos tres canais ----
+  const libAviso = await sp('sp_liberar', {
+    voucher_id: VOUCHER, colaboradores: [MARINA],
+    avisar: { whatsapp: true, sms: true, email: true }
+  });
+  check('libera avisando a pessoa', libAviso.ok && libAviso.liberados.length === 1, libAviso);
+  check('contou os avisos enviados', libAviso.avisos_enviados >= 2, libAviso.avisos_enviados);
+  const zapAviso = await (await fetch(SERV + '/__ultimo-zap')).json();
+  check('o WhatsApp da pessoa recebeu o link de resgate',
+    /space\?t=colabtoken000000000001/.test(zapAviso.text || '') && /Amazon Prime/.test(zapAviso.text || ''),
+    zapAviso.text);
+  const mailAviso = await (await fetch(SERV + '/__ultimo-email')).json();
+  check('o e-mail da pessoa tambem foi',
+    /space\?t=colabtoken000000000001/.test(mailAviso.text || '') &&
+    (mailAviso.to || [])[0] === 'marina@startdigital.com.br', mailAviso.to);
+  const smsPessoa = await (await fetch(SERV + '/__ultimo-sms')).json();
+  check('o SMS da pessoa idem',
+    /space/.test(smsPessoa.message || '') && String(smsPessoa.receivers && smsPessoa.receivers[0] || '').indexOf('5513991112233') >= 0,
+    { msg: smsPessoa.message, para: smsPessoa.receivers });
+  // limpa a liberacao da Marina para nao interferir no resto
+  {
+    const painelAgora = await sp('sp_painel');
+    const marinaAgora = (painelAgora.colaboradores || []).filter(function (c) { return c.id === MARINA; })[0];
+    if (marinaAgora && marinaAgora.aberta) await sp('sp_cancelar', { id: marinaAgora.aberta.id });
+  }
+  // desliga o aviso para as proximas rodadas nao dependerem dele
+  await sp('sp_config_save', { aviso_sms_para: '' });
+
   // ---- a tranca de permissao ----
   {
     const perms = require('../api/_lib/perms.js');
