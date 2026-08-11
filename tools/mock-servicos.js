@@ -216,7 +216,9 @@ const server = http.createServer(async function (req, res) {
   }
 
   // ---------------- Evolution ----------------
+  if (url.pathname === '/__ultimo-zap') return json(global.__zap || {});
   if (url.pathname.indexOf('/message/sendText/') === 0) {
+    global.__zap = { instancia: decodeURIComponent(url.pathname.split('/message/sendText/')[1] || ''), number: body.number, text: body.text };
     return json({ key: { id: 'mock-' + Math.random().toString(36).slice(2, 9) } });
   }
   if (url.pathname.indexOf('/chat/whatsappNumbers/') === 0) {
