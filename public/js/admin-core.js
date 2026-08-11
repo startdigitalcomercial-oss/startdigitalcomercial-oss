@@ -151,7 +151,8 @@ const TITULOS = {
   conteudo: 'Aulas da integração', quiz: 'Quiz de seleção',
   colaboradores: 'Colaboradores', avisos: 'Avisos para o time', usuarios: 'Usuários do painel',
   mensagens: 'Modelos de mensagem', ajustes: 'Ajustes',
-  financeiro: 'Financeiro', findash: 'Dashboard financeiro'
+  financeiro: 'Financeiro', findash: 'Dashboard financeiro',
+  space: 'Space Colaborador'
 };
 /* ---------------------------------------------- sanfona do menu
    Um grupo aberto por vez. O grupo da página em que você está abre
@@ -211,7 +212,8 @@ document.getElementById('abas').addEventListener('click', function (ev) {
     prequalificacao: carregaPrequal, aurea: carregaAurea, preonboarding: carregaBoasVindas,
     colaboradores: carregaColaboradores, avisos: carregaAvisos, usuarios: carregaUsuarios,
     conteudo: carregaConteudo, quiz: carregaQuiz, mensagens: carregaTemplates, ajustes: carregaAjustes,
-    financeiro: carregaFinanceiro, findash: carregaFinDash
+    financeiro: carregaFinanceiro, findash: carregaFinDash,
+    space: carregaSpace
   };
   marcaGrupoAtivo();
   if (carregar[b.dataset.aba]) carregar[b.dataset.aba]();
