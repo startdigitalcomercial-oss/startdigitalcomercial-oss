@@ -50,7 +50,7 @@ async function carregaAvisos() {
       '<div class="field" style="margin-top:18px"><label>Imagem <span class="muted" style="font-weight:400">(opcional)</span></label>' +
       '<span class="hint">Vai como foto no WhatsApp (com o aviso de legenda) e dentro do e-mail. ' +
       'JPG, PNG, WebP ou GIF, até 8 MB. O SMS continua só texto.</span>' +
-      '<label class="anexo-aviso" id="av-anexo-area" style="display:flex;gap:12px;align-items:center;' +
+      '<div class="anexo-aviso" id="av-anexo-area" style="display:flex;gap:12px;align-items:center;' +
         'margin-top:10px;padding:13px 15px;border:1.5px dashed var(--fio);border-radius:12px;cursor:pointer">' +
         '<svg width="20" height="20" viewBox="0 0 24 24" style="fill:none;stroke:var(--label-3);stroke-width:1.8;' +
           'stroke-linecap:round;stroke-linejoin:round;flex:none"><rect x="3.5" y="4.5" width="17" height="15" rx="2.4"/>' +
@@ -61,7 +61,7 @@ async function carregaAvisos() {
           'border-radius:10px;flex:none">' +
         '<button type="button" class="btn btn-sm btn-ghost" id="av-img-tirar" style="display:none">Tirar</button>' +
         '<input type="file" id="av-img" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none">' +
-      '</label></div>' +
+      '</div></div>' +
 
       '<div class="field" style="margin-top:22px"><label>Quem vai receber</label>' +
       '<span class="hint">Filtre pelo jeito de trabalhar e desmarque quem não deve receber.</span>' +
@@ -226,6 +226,15 @@ function ligaAvisos(d) {
   // Fica guardada aqui na tela; só sobe para o servidor na hora de
   // disparar. Trocou de ideia antes de enviar = nada foi pra lugar nenhum.
   let AVISO_IMAGEM = null;
+
+  // O clique abre o seletor de arquivo NA MÃO. Não dá para confiar na
+  // etiqueta (label) aqui: o botão "Tirar" mora dentro da área, e uma
+  // etiqueta com botão dentro entrega o clique pro botão, não pro campo
+  // de arquivo — foi exatamente o defeito da primeira versão.
+  b('av-anexo-area').addEventListener('click', function (ev) {
+    if (ev.target.closest('#av-img-tirar')) return;   // "Tirar" cuida de si
+    b('av-img').click();
+  });
 
   b('av-img').addEventListener('change', function () {
     const arq = (this.files || [])[0];
