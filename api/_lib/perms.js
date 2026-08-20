@@ -67,7 +67,7 @@ const ACOES = {
   update_candidate: 'candidato_nota',
 
   // --- disparo de mensagem ---
-  send: 'enviar', broadcast_send: 'enviar', sms_teste: 'enviar',
+  send: 'enviar', broadcast_send: 'enviar', aviso_imagem: 'enviar', sms_teste: 'enviar',
   wa_teste: 'enviar', aurea_start: 'enviar', import_candidates: 'enviar',
 
   // --- configuracao pesada ---
