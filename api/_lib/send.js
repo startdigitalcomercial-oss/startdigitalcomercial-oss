@@ -163,6 +163,75 @@ async function sendWhatsApp(opts) {
 }
 
 // ------------------------------------------------------------
+// IMAGEM pelo WhatsApp (Evolution /message/sendMedia).
+// A imagem vai por URL publica — a Evolution baixa e entrega, com o
+// texto do aviso como legenda embaixo da foto, igual a gente faz a mao.
+// ------------------------------------------------------------
+async function sendWhatsAppImagem(opts) {
+  const base = (process.env.EVOLUTION_API_URL || '').replace(/\/+$/, '');
+  const apiKey = process.env.EVOLUTION_API_KEY;
+  const instance = opts.instance || process.env.EVOLUTION_INSTANCE;
+  if (!base || !apiKey) {
+    return { status: 'pendente_manual', provider: 'evolution', error: 'EVOLUTION_API_URL / EVOLUTION_API_KEY nao configuradas' };
+  }
+  if (!instance) {
+    return { status: 'pendente_manual', provider: 'evolution', error: 'Instancia do WhatsApp nao escolhida' };
+  }
+  let number = u.normalizePhone(opts.to);
+  if (!number) return { status: 'erro', provider: 'evolution', error: 'Telefone invalido' };
+  if (!opts.url) return { status: 'erro', provider: 'evolution', error: 'Sem imagem para enviar' };
+
+  // a mesma conferencia do nono digito do sendText
+  try {
+    const cheque = await waNumeroExiste(number, instance);
+    if (cheque.ok && cheque.existe && cheque.jid) {
+      const d = String(cheque.jid).split('@')[0].replace(/\D/g, '');
+      if (d) number = d;
+    }
+  } catch (e) { /* segue com o numero montado */ }
+
+  const url = base + '/message/sendMedia/' + encodeURIComponent(instance);
+  const headers = { apikey: apiKey, 'Content-Type': 'application/json' };
+
+  async function tentativa(body) {
+    const res = await fetch(url, { method: 'POST', headers: headers, body: JSON.stringify(body) });
+    const bruto = await res.text();
+    let data = null;
+    if (bruto) { try { data = JSON.parse(bruto); } catch (e) { data = bruto; } }
+    return { ok: res.ok, status: res.status, data: data };
+  }
+
+  try {
+    // Evolution v2: campos soltos no corpo
+    let r = await tentativa({
+      number: number, mediatype: 'image', media: opts.url,
+      caption: String(opts.caption || '').slice(0, 1024), fileName: 'aviso.jpg'
+    });
+    // Evolution v1: tudo dentro de mediaMessage
+    if (!r.ok && (r.status === 400 || r.status === 422)) {
+      const r2 = await tentativa({
+        number: number,
+        options: { delay: 400 },
+        mediaMessage: {
+          mediatype: 'image', media: opts.url,
+          caption: String(opts.caption || '').slice(0, 1024), fileName: 'aviso.jpg'
+        }
+      });
+      if (r2.ok) r = r2;
+      else if (erroEvolution(r2.data, r2.status).length > erroEvolution(r.data, r.status).length) r = r2;
+    }
+
+    if (!r.ok) {
+      return { status: 'erro', provider: 'evolution', error: erroEvolution(r.data, r.status) + ' [numero ' + number + ']' };
+    }
+    const d = r.data || {};
+    return { status: 'enviado', provider: 'evolution', id: (d.key && d.key.id) || null, numero: number };
+  } catch (e) {
+    return { status: 'erro', provider: 'evolution', error: e.message };
+  }
+}
+
+// ------------------------------------------------------------
 // "Digitando…" de verdade no WhatsApp da pessoa.
 // A Evolution tem duas formas: o endpoint de presenca (mostra o
 // aviso agora) e o campo delay do sendText (ela mesma segura a
@@ -506,7 +575,7 @@ function providerStatus() {
 }
 
 module.exports = {
-  sendEmail, sendWhatsApp, sendWhatsAppComPausa, waDigitando, sendSms,
+  sendEmail, sendWhatsApp, sendWhatsAppImagem, sendWhatsAppComPausa, waDigitando, sendSms,
   listWhatsAppInstances, providerStatus,
   waNumeroExiste, comteleRotas, comteleRotaEscolhida, comteleEntregas, comteleSaldo
 };
