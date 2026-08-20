@@ -217,6 +217,14 @@ const server = http.createServer(async function (req, res) {
 
   // ---------------- Evolution ----------------
   if (url.pathname === '/__ultimo-zap') return json(global.__zap || {});
+  if (url.pathname === '/__ultima-midia') return json(global.__zapMidia || {});
+  if (url.pathname.indexOf('/message/sendMedia/') === 0) {
+    global.__zapMidia = {
+      instancia: decodeURIComponent(url.pathname.split('/message/sendMedia/')[1] || ''),
+      number: body.number, mediatype: body.mediatype, media: body.media, caption: body.caption
+    };
+    return json({ key: { id: 'mock-midia-' + Math.random().toString(36).slice(2, 9) } });
+  }
   if (url.pathname.indexOf('/message/sendText/') === 0) {
     global.__zap = { instancia: decodeURIComponent(url.pathname.split('/message/sendText/')[1] || ''), number: body.number, text: body.text };
     return json({ key: { id: 'mock-' + Math.random().toString(36).slice(2, 9) } });
