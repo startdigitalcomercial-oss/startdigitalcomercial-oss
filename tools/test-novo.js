@@ -715,6 +715,37 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   const dda = depoisAv.data || depoisAv;
   check('guarda o aviso no historico', dda.historico.length >= 1, dda.historico && dda.historico.length);
 
+  // ---- aviso COM IMAGEM ----
+  // um PNG de verdade (1x1), em base64 — o suficiente para o caminho inteiro
+  const PNG_1x1 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const up = await adm('aviso_imagem', { tipo: 'image/png', arquivo: PNG_1x1 });
+  check('imagem do aviso sobe e devolve a URL publica',
+    up.ok && /\/storage\/v1\/object\/public\/avisos\/aviso-/.test(up.url || ''), up.error || up.url);
+  check('recusa arquivo que nao e imagem',
+    !(await adm('aviso_imagem', { tipo: 'application/pdf', arquivo: PNG_1x1 })).ok);
+  check('recusa imagem vazia', !(await adm('aviso_imagem', { tipo: 'image/png', arquivo: '' })).ok);
+
+  const comFoto = await adm('broadcast_send', {
+    title: 'Aviso com foto', message: 'Olha essa novidade, {{primeiro_nome}}!',
+    channels: ['whatsapp', 'email'], image_url: up.url
+  });
+  check('dispara o aviso com imagem', comFoto.ok && comFoto.enviados >= 2, comFoto.error || comFoto);
+  const midia = await (await fetch(SERV + '/__ultima-midia')).json();
+  check('o WhatsApp saiu como FOTO com o aviso de legenda',
+    midia.mediatype === 'image' && midia.media === up.url && /novidade/.test(midia.caption || ''),
+    midia);
+  const mailFoto = await (await fetch(SERV + '/__ultimo-email')).json();
+  check('o e-mail saiu com a foto dentro do corpo',
+    /<img src="/.test(mailFoto.html || '') && (mailFoto.html || '').indexOf(up.url) >= 0,
+    (mailFoto.html || '').slice(0, 120));
+
+  // seguranca: imagem de fora do nosso balde nao passa
+  check('recusa imagem que nao veio do painel',
+    !(await adm('broadcast_send', {
+      title: 'x', message: 'y', channels: ['whatsapp'],
+      image_url: 'https://site-estranho.com/foto.png'
+    })).ok);
+
   check('exclui colaborador', (await adm('team_delete', { id: eu.id })).ok);
 
   console.log('\n5b) SMS — Comtele (API v4 do painel novo)');
