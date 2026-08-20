@@ -132,6 +132,12 @@ async function subirArquivo(balde, caminho, bytes, tipo) {
   return balde + '/' + caminho;
 }
 
+// Endereco publico de um arquivo em balde PUBLICO (ex.: as imagens
+// dos avisos). Nao serve para balde privado — la e o linkTemporario.
+function urlPublica(balde, caminho) {
+  return baseUrl() + '/storage/v1/object/public/' + balde + '/' + caminho;
+}
+
 // Link que vale por alguns minutos, so para quem esta no painel.
 async function linkTemporario(balde, caminho, segundos) {
   const url = baseUrl() + '/storage/v1/object/sign/' + balde + '/' + caminho;
@@ -148,5 +154,5 @@ async function linkTemporario(balde, caminho, segundos) {
 
 module.exports = {
   rest, select, selectOne, insert, upsert, update, remove, count,
-  subirArquivo, linkTemporario
+  subirArquivo, linkTemporario, urlPublica
 };
