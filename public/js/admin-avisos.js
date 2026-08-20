@@ -47,6 +47,22 @@ async function carregaAvisos() {
       '<textarea id="av-msg" style="min-height:150px" placeholder="Oi {{primeiro_nome}}! Nossa confraternização vai ser dia 15/12, às 19h…"></textarea>' +
       '<span class="hint" id="av-conta"></span></div>' +
 
+      '<div class="field" style="margin-top:18px"><label>Imagem <span class="muted" style="font-weight:400">(opcional)</span></label>' +
+      '<span class="hint">Vai como foto no WhatsApp (com o aviso de legenda) e dentro do e-mail. ' +
+      'JPG, PNG, WebP ou GIF, até 8 MB. O SMS continua só texto.</span>' +
+      '<label class="anexo-aviso" id="av-anexo-area" style="display:flex;gap:12px;align-items:center;' +
+        'margin-top:10px;padding:13px 15px;border:1.5px dashed var(--fio);border-radius:12px;cursor:pointer">' +
+        '<svg width="20" height="20" viewBox="0 0 24 24" style="fill:none;stroke:var(--label-3);stroke-width:1.8;' +
+          'stroke-linecap:round;stroke-linejoin:round;flex:none"><rect x="3.5" y="4.5" width="17" height="15" rx="2.4"/>' +
+          '<circle cx="9" cy="10" r="1.8"/><path d="m4.5 17 4.6-4.4 3.2 3 3.4-3.4 3.8 3.6"/></svg>' +
+        '<span style="flex:1;min-width:0"><b id="av-img-nome" style="display:block;font-size:13.5px">Escolher imagem</b>' +
+        '<span class="small muted" id="av-img-info">Nenhuma imagem anexada</span></span>' +
+        '<img id="av-img-previa" alt="" style="display:none;width:52px;height:52px;object-fit:cover;' +
+          'border-radius:10px;flex:none">' +
+        '<button type="button" class="btn btn-sm btn-ghost" id="av-img-tirar" style="display:none">Tirar</button>' +
+        '<input type="file" id="av-img" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none">' +
+      '</label></div>' +
+
       '<div class="field" style="margin-top:22px"><label>Quem vai receber</label>' +
       '<span class="hint">Filtre pelo jeito de trabalhar e desmarque quem não deve receber.</span>' +
       '<div class="row row-wrap" style="gap:7px;margin:10px 0 12px" id="av-filtros"></div>' +
@@ -206,6 +222,58 @@ function ligaAvisos(d) {
     }
   });
 
+  // ---- a imagem do aviso ----
+  // Fica guardada aqui na tela; só sobe para o servidor na hora de
+  // disparar. Trocou de ideia antes de enviar = nada foi pra lugar nenhum.
+  let AVISO_IMAGEM = null;
+
+  b('av-img').addEventListener('change', function () {
+    const arq = (this.files || [])[0];
+    if (!arq) return;
+    if (['image/jpeg', 'image/png', 'image/webp', 'image/gif'].indexOf(arq.type) < 0) {
+      return toast('Use JPG, PNG, WebP ou GIF', true);
+    }
+    if (arq.size > 8 * 1024 * 1024) return toast('A imagem passou de 8 MB', true);
+    AVISO_IMAGEM = arq;
+    b('av-img-nome').textContent = arq.name;
+    b('av-img-info').textContent = (arq.size / 1024 / 1024).toFixed(1).replace('.', ',') + ' MB · vai junto com o aviso';
+    const previa = b('av-img-previa');
+    previa.src = URL.createObjectURL(arq);
+    previa.style.display = 'block';
+    b('av-img-tirar').style.display = 'inline-flex';
+  });
+
+  b('av-img-tirar').addEventListener('click', function (ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    AVISO_IMAGEM = null;
+    b('av-img').value = '';
+    b('av-img-nome').textContent = 'Escolher imagem';
+    b('av-img-info').textContent = 'Nenhuma imagem anexada';
+    b('av-img-previa').style.display = 'none';
+    b('av-img-tirar').style.display = 'none';
+  });
+
+  function sobeImagemDoAviso() {
+    return new Promise(function (ok, falhou) {
+      if (!AVISO_IMAGEM) return ok('');
+      const leitor = new FileReader();
+      leitor.onerror = function () { falhou(new Error('não consegui ler a imagem')); };
+      leitor.onload = async function () {
+        try {
+          const r = await api('aviso_imagem', {
+            body: {
+              tipo: AVISO_IMAGEM.type,
+              arquivo: String(leitor.result).split(',').pop()
+            }
+          });
+          ok(r.url);
+        } catch (e) { falhou(e); }
+      };
+      leitor.readAsDataURL(AVISO_IMAGEM);
+    });
+  }
+
   b('av-enviar').addEventListener('click', async function () {
     const canais = Object.keys(AVISO_CANAIS).filter(function (k) { return AVISO_CANAIS[k]; });
     const titulo = b('av-titulo').value.trim();
@@ -220,6 +288,7 @@ function ligaAvisos(d) {
       (escolhidas.length > 5 ? ' e mais ' + (escolhidas.length - 5) : '');
     const aviso = 'Enviar "' + titulo + '" por ' + canais.map(function (c) { return nomes[c]; }).join(' e ') +
       ' para ' + escolhidas.length + ' pessoa(s)?\n\n' + primeiros +
+      (AVISO_IMAGEM ? '\n\nCom a imagem "' + AVISO_IMAGEM.name + '" junto.' : '') +
       (AVISO_CANAIS.sms ? '\n\nO SMS gasta crédito — um por pessoa, no mínimo.' : '');
     if (!confirm(aviso)) return;
 
@@ -227,10 +296,17 @@ function ligaAvisos(d) {
     this.innerHTML = '<span class="spinner"></span> Enviando…';
     b('av-saida').innerHTML = '';
     try {
+      let urlImagem = '';
+      if (AVISO_IMAGEM) {
+        this.innerHTML = '<span class="spinner"></span> Subindo a imagem…';
+        urlImagem = await sobeImagemDoAviso();
+        this.innerHTML = '<span class="spinner"></span> Enviando…';
+      }
       const r = await api('broadcast_send', {
         body: {
           title: titulo, message: b('av-msg').value, channels: canais,
-          ids: escolhidas.map(function (p) { return p.id; })
+          ids: escolhidas.map(function (p) { return p.id; }),
+          image_url: urlImagem || undefined
         }
       });
       b('av-saida').innerHTML =
@@ -247,6 +323,7 @@ function ligaAvisos(d) {
           : '');
       b('av-titulo').value = '';
       b('av-msg').value = '';
+      b('av-img-tirar').click();
       setTimeout(carregaAvisos, 2500);
     } catch (e) {
       b('av-saida').innerHTML = '<div class="alert alert-erro" style="margin-top:16px">' + esc(e.message) + '</div>';
