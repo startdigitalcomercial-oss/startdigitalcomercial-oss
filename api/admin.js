@@ -1589,6 +1589,28 @@ module.exports = async function handler(req, res) {
       return u.ok(res, { itens: montaAviso(titulo, texto, body.channels || []) });
     }
 
+    // A imagem do aviso sobe ANTES do envio, uma vez só, para um balde
+    // público — e a mesma URL vai para todo mundo. Subir uma vez em vez
+    // de anexar pessoa a pessoa: 30 colaboradores, 1 upload.
+    if (action === 'aviso_imagem') {
+      if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
+      const body = await u.readBody(req);
+
+      const tipo = String(body.tipo || '');
+      const permitidos = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
+      if (!permitidos[tipo]) return u.fail(res, 400, 'Use uma imagem JPG, PNG, WebP ou GIF.');
+
+      let bytes;
+      try { bytes = Buffer.from(String(body.arquivo || ''), 'base64'); }
+      catch (e) { return u.fail(res, 400, 'Nao consegui ler a imagem.'); }
+      if (!bytes.length) return u.fail(res, 400, 'A imagem veio vazia.');
+      if (bytes.length > 8 * 1024 * 1024) return u.fail(res, 400, 'A imagem passou de 8 MB.');
+
+      const caminho = 'aviso-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + permitidos[tipo];
+      await db.subirArquivo('avisos', caminho, bytes, tipo);
+      return u.ok(res, { url: db.urlPublica('avisos', caminho) });
+    }
+
     if (action === 'broadcast_send') {
       const body = await u.readBody(req);
       const titulo = String(body.title || '').trim();
@@ -1599,6 +1621,14 @@ module.exports = async function handler(req, res) {
       if (!titulo) return u.fail(res, 400, 'Escreva um título para o aviso.');
       if (!texto) return u.fail(res, 400, 'Escreva a mensagem.');
       if (!canais.length) return u.fail(res, 400, 'Escolha pelo menos um canal.');
+
+      // A imagem (opcional) já subiu pela acao aviso_imagem. So aceitamos
+      // endereco do NOSSO balde de avisos — URL de fora poderia fazer o
+      // sistema espalhar qualquer coisa em nome da Start.
+      const imagem = String(body.image_url || '').trim();
+      if (imagem && imagem.indexOf(db.urlPublica('avisos', '')) !== 0) {
+        return u.fail(res, 400, 'Essa imagem nao veio do painel. Anexe de novo.');
+      }
 
       let time = await db.select('collaborators', { active: 'is.true', order: 'name.asc', select: '*' });
       if (Array.isArray(body.ids) && body.ids.length) {
@@ -1630,9 +1660,20 @@ module.exports = async function handler(req, res) {
           let r;
           if (canal === 'email') {
             if (!pessoa.email) { r = { status: 'erro', provider: 'nenhum', error: 'sem e-mail cadastrado' }; }
-            else r = await send.sendEmail({ to: pessoa.email, subject: assunto, text: corpo });
+            else {
+              // com imagem, o e-mail sai com a foto no corpo, acima do texto
+              const html = imagem
+                ? '<img src="' + imagem + '" alt="" style="max-width:100%;border-radius:12px;margin-bottom:16px">' +
+                  u.textToEmailHtml(corpo, assunto)
+                : undefined;
+              r = await send.sendEmail({ to: pessoa.email, subject: assunto, text: corpo, html: html });
+            }
           } else if (canal === 'whatsapp') {
             if (!pessoa.phone) { r = { status: 'erro', provider: 'nenhum', error: 'sem telefone cadastrado' }; }
+            else if (imagem) {
+              // a foto com o aviso inteiro de legenda — uma mensagem so
+              r = await send.sendWhatsAppImagem({ to: pessoa.phone, url: imagem, caption: corpo, instance: waInstance });
+            }
             else r = await send.sendWhatsApp({ to: pessoa.phone, text: corpo, instance: waInstance });
           } else {
             if (!pessoa.phone) { r = { status: 'erro', provider: 'nenhum', error: 'sem telefone cadastrado' }; }
@@ -1657,7 +1698,7 @@ module.exports = async function handler(req, res) {
       const registro = await db.insert('broadcasts', {
         title: titulo, body: texto, channels: canais,
         total: time.length, sent: enviados, failed: falhas,
-        detail: { itens: detalhe.slice(0, 400) }
+        detail: { itens: detalhe.slice(0, 400), imagem: imagem || null }
       });
 
       return u.ok(res, {
