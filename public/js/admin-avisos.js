@@ -49,7 +49,7 @@ async function carregaAvisos() {
 
       '<div class="field" style="margin-top:18px"><label>Imagem <span class="muted" style="font-weight:400">(opcional)</span></label>' +
       '<span class="hint">Vai como foto no WhatsApp (com o aviso de legenda) e dentro do e-mail. ' +
-      'JPG, PNG, WebP ou GIF, até 8 MB. O SMS continua só texto.</span>' +
+      'JPG, PNG, WebP ou GIF — foto grande a gente comprime sozinho. O SMS continua só texto.</span>' +
       '<div class="anexo-aviso" id="av-anexo-area" style="display:flex;gap:12px;align-items:center;' +
         'margin-top:10px;padding:13px 15px;border:1.5px dashed var(--fio);border-radius:12px;cursor:pointer">' +
         '<svg width="20" height="20" viewBox="0 0 24 24" style="fill:none;stroke:var(--label-3);stroke-width:1.8;' +
@@ -236,18 +236,61 @@ function ligaAvisos(d) {
     b('av-img').click();
   });
 
-  b('av-img').addEventListener('change', function () {
+  // Foto de celular vem enorme, e o caminho até o servidor tem um teto
+  // (~4,5 MB por pedido na Vercel — e o base64 ainda incha 1/3). Então a
+  // gente ENCOLHE aqui na tela antes de subir: no máximo 1600px de lado,
+  // JPG de boa qualidade. Pro WhatsApp e e-mail, ninguém vê diferença.
+  function encolheImagem(arq) {
+    return new Promise(function (pronto) {
+      // GIF não passa pelo encolhedor: redesenhar mata a animação
+      if (arq.type === 'image/gif') return pronto(arq);
+      const urlTmp = URL.createObjectURL(arq);
+      const img = new Image();
+      img.onerror = function () { URL.revokeObjectURL(urlTmp); pronto(arq); };
+      img.onload = function () {
+        URL.revokeObjectURL(urlTmp);
+        const MAIOR = 1600;
+        const escala = Math.min(1, MAIOR / Math.max(img.width, img.height));
+        // já é pequena e leve? não mexe
+        if (escala === 1 && arq.size <= 900 * 1024) return pronto(arq);
+        const cv = document.createElement('canvas');
+        cv.width = Math.round(img.width * escala);
+        cv.height = Math.round(img.height * escala);
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+        cv.toBlob(function (blob) {
+          if (!blob) return pronto(arq);
+          // se por algum motivo encolher piorou, fica com a original
+          if (blob.size >= arq.size) return pronto(arq);
+          pronto(new File([blob], arq.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' }));
+        }, 'image/jpeg', 0.85);
+      };
+      img.src = urlTmp;
+    });
+  }
+
+  b('av-img').addEventListener('change', async function () {
     const arq = (this.files || [])[0];
     if (!arq) return;
     if (['image/jpeg', 'image/png', 'image/webp', 'image/gif'].indexOf(arq.type) < 0) {
       return toast('Use JPG, PNG, WebP ou GIF', true);
     }
-    if (arq.size > 8 * 1024 * 1024) return toast('A imagem passou de 8 MB', true);
-    AVISO_IMAGEM = arq;
+    if (arq.size > 25 * 1024 * 1024) return toast('Essa imagem é grande demais (mais de 25 MB)', true);
+
     b('av-img-nome').textContent = arq.name;
-    b('av-img-info').textContent = (arq.size / 1024 / 1024).toFixed(1).replace('.', ',') + ' MB · vai junto com o aviso';
+    b('av-img-info').textContent = 'Preparando a imagem…';
+    const pronta = await encolheImagem(arq);
+
+    // depois de encolhida ainda está pesada? aí não passa no caminho
+    if (pronta.size > 3 * 1024 * 1024) {
+      b('av-img-nome').textContent = 'Escolher imagem';
+      b('av-img-info').textContent = 'Nenhuma imagem anexada';
+      return toast('Mesmo comprimida essa imagem ficou pesada demais. Tente outra.', true);
+    }
+
+    AVISO_IMAGEM = pronta;
+    b('av-img-info').textContent = (pronta.size / 1024 / 1024).toFixed(1).replace('.', ',') + ' MB · vai junto com o aviso';
     const previa = b('av-img-previa');
-    previa.src = URL.createObjectURL(arq);
+    previa.src = URL.createObjectURL(pronta);
     previa.style.display = 'block';
     b('av-img-tirar').style.display = 'inline-flex';
   });
