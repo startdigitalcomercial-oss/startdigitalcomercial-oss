@@ -152,7 +152,7 @@ const TITULOS = {
   colaboradores: 'Colaboradores', avisos: 'Avisos para o time', usuarios: 'Usuários do painel',
   mensagens: 'Modelos de mensagem', ajustes: 'Ajustes',
   financeiro: 'Financeiro', findash: 'Dashboard financeiro',
-  space: 'Space Colaborador'
+  space: 'Benefícios'
 };
 /* ---------------------------------------------- sanfona do menu
    Um grupo aberto por vez. O grupo da página em que você está abre
