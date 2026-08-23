@@ -48,6 +48,7 @@ function paraTela(r) {
     observacao: r.observacao || '',
     destaque: r.destaque === true,
     ativo: r.ativo !== false,
+    pago_em: r.pago_em || null,
     position: Number(r.position || 1)
   };
 }
@@ -81,6 +82,84 @@ function proximaData(dia, hoje) {
 
 function diaBr(d) {
   return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+// ------------------------------------------------------------
+// OS CARTÕES POR PERÍODO (Recebidas / Aguardando / Vencidas)
+//
+// Cada cartão olha para a data CERTA — não a mesma para os três:
+//   Recebidas   → a data em que o pagamento ACONTECEU (pago_em)
+//   Aguardando  → a data em que a cobrança VENCE dentro do período
+//   Vencidas    → a data em que ela VENCEU (já passou e ninguém pagou)
+// Misturar essas datas é o jeito clássico de dashboard mentir.
+// ------------------------------------------------------------
+function dentro(data, de, ate) {
+  if (!data) return false;
+  const t = new Date(data).getTime();
+  return t >= de.getTime() && t <= ate.getTime();
+}
+
+// O vencimento é um DIA do mês ("todo dia 30"). Aqui viram datas de
+// verdade: todas as ocorrências desse dia dentro do período.
+function vencimentosNoPeriodo(dia, de, ate) {
+  const datas = [];
+  const d = Math.min(Math.max(Number(dia) || 1, 1), 31);
+  let ano = de.getFullYear(), mes = de.getMonth();
+  while (ano < ate.getFullYear() || (ano === ate.getFullYear() && mes <= ate.getMonth())) {
+    const ultimo = new Date(ano, mes + 1, 0).getDate();
+    const cand = new Date(ano, mes, Math.min(d, ultimo), 12);
+    if (cand >= de && cand <= ate) datas.push(cand);
+    mes++;
+    if (mes > 11) { mes = 0; ano++; }
+  }
+  return datas;
+}
+
+function cartoesDoPeriodo(linhas, de, ate, hoje) {
+  const ativos = linhas.filter(function (r) { return r.ativo; });
+  const c = {
+    recebidas: { valor: 0, clientes: 0 },
+    aguardando: { valor: 0, clientes: 0 },
+    vencidas: { valor: 0, clientes: 0 }
+  };
+
+  ativos.forEach(function (r) {
+    const linha = centavos(r.valor) + centavos(r.setup) + centavos(r.hospedagem);
+
+    // Recebidas: pagou DENTRO do período.
+    if (r.status === 'pago' && dentro(r.pago_em, de, ate)) {
+      c.recebidas.valor += linha;
+      c.recebidas.clientes++;
+      return;
+    }
+
+    if (r.status === 'pago') return;   // pagou fora do período: não entra em nada
+
+    const vencs = vencimentosNoPeriodo(r.vencimento_dia, de, ate);
+    if (!vencs.length) return;         // esta cobrança não pertence a este período
+
+    // Vencida = o vencimento do período já ficou para trás e ninguém pagou.
+    // Vale para quem o time já marcou (inadimplente) E para quem está
+    // "aguardando" com a data estourada — na prática, também venceu.
+    const jaPassou = vencs.some(function (v) { return v.getTime() < hoje.getTime(); });
+    if (r.status === 'inadimplente' || jaPassou) {
+      c.vencidas.valor += linha;
+      c.vencidas.clientes++;
+      return;
+    }
+
+    // Aguardando: vence dentro do período, mas a data ainda vai chegar.
+    c.aguardando.valor += linha;
+    c.aguardando.clientes++;
+  });
+
+  return {
+    de: de.toISOString().slice(0, 10),
+    ate: ate.toISOString().slice(0, 10),
+    recebidas: { valor: reais(c.recebidas.valor), clientes: c.recebidas.clientes },
+    aguardando: { valor: reais(c.aguardando.valor), clientes: c.aguardando.clientes },
+    vencidas: { valor: reais(c.vencidas.valor), clientes: c.vencidas.clientes }
+  };
 }
 
 // ------------------------------------------------------------
@@ -238,7 +317,26 @@ module.exports = async function handler(req, res) {
     // ---------------------------------------------------- o dashboard
     if (action === 'fin_resumo') {
       const linhas = await carteira();
-      return u.ok(res, { resumo: resumo(linhas, new Date()) });
+      const hoje = new Date();
+
+      // O período vem da tela (YYYY-MM-DD). Sem período: este mês.
+      function dataOk(s, fim) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(s || ''))) return null;
+        const d = new Date(s + (fim ? 'T23:59:59' : 'T00:00:00'));
+        return isNaN(d.getTime()) ? null : d;
+      }
+      let de = dataOk(params.de);
+      let ate = dataOk(params.ate, true);
+      if (!de || !ate) {
+        de = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+        ate = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59);
+      }
+      if (de > ate) { const troca = de; de = ate; ate = troca; }
+
+      return u.ok(res, {
+        resumo: resumo(linhas, hoje),
+        cartoes: cartoesDoPeriodo(linhas, de, ate, hoje)
+      });
     }
 
     // ---------------------------------------------------- o relatório
@@ -276,9 +374,20 @@ module.exports = async function handler(req, res) {
 
       let row;
       if (body.id) {
+        // A DATA DO PAGAMENTO: virou "pago" agora? Carimba o momento.
+        // Saiu de "pago"? Apaga o carimbo. Já estava pago? Não mexe —
+        // senão toda edição empurraria o pagamento para hoje.
+        const antes = await db.selectOne('finance_clients', { id: 'eq.' + body.id, select: 'status,pago_em' });
+        if (!antes) return u.fail(res, 404, 'Cliente nao encontrado.');
+        if (status === 'pago') {
+          patch.pago_em = antes.status === 'pago' ? (antes.pago_em || new Date().toISOString()) : new Date().toISOString();
+        } else {
+          patch.pago_em = null;
+        }
         row = await db.update('finance_clients', patch, { id: 'eq.' + body.id });
         if (!row) return u.fail(res, 404, 'Cliente nao encontrado.');
       } else {
+        if (status === 'pago') patch.pago_em = new Date().toISOString();
         const todos = await db.select('finance_clients', { select: 'position' });
         patch.position = todos.reduce(function (a, r) {
           return Math.max(a, Number(r.position || 0));
@@ -286,6 +395,91 @@ module.exports = async function handler(req, res) {
         row = await db.insert('finance_clients', patch);
       }
       return u.ok(res, { cliente: paraTela(row) });
+    }
+
+    // ---------------------------------------------------- importação
+    // A tela lê o arquivo (CSV/XLS/XLSX), mostra a prévia e manda para
+    // cá linhas já em formato de gente. Aqui é a peneira final: nome
+    // obrigatório, valores limpos, dia válido — e NINGUÉM entra duas
+    // vezes. A identidade é o nome do cliente (sem acento, sem caixa),
+    // que é o único identificador que esta carteira tem hoje.
+    if (action === 'fin_importar') {
+      if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
+      const body = await u.readBody(req);
+      const linhas = Array.isArray(body.linhas) ? body.linhas : [];
+      if (!linhas.length) return u.fail(res, 400, 'O arquivo nao trouxe nenhuma linha.');
+      if (linhas.length > 500) return u.fail(res, 400, 'Maximo de 500 clientes por arquivo. Divida em partes.');
+
+      function identidade(nome) {
+        return String(nome || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+          .toLowerCase().replace(/\s+/g, ' ').trim();
+      }
+
+      const existentes = await db.select('finance_clients', { select: 'cliente,position' });
+      const vistos = {};
+      existentes.forEach(function (r) { vistos[identidade(r.cliente)] = true; });
+      let posicao = existentes.reduce(function (a, r) { return Math.max(a, Number(r.position || 0)); }, 0);
+
+      const MAPA_STATUS = function (s) {
+        const t = identidade(s);
+        if (/pag|receb|ok|quitad/.test(t)) return 'pago';
+        if (/venc|inadim|atras|devend/.test(t)) return 'inadimplente';
+        return 'aguardando';
+      };
+
+      let importados = 0;
+      const pulados = [];
+
+      for (let i = 0; i < linhas.length; i++) {
+        const l = linhas[i] || {};
+        const numLinha = Number(l.linha) || (i + 1);
+        const nome = limpaTexto(l.cliente, 120);
+
+        if (!nome || nome.length < 2) {
+          pulados.push({ linha: numLinha, nome: nome || '(vazio)', motivo: 'sem nome de cliente' });
+          continue;
+        }
+        const id = identidade(nome);
+        if (vistos[id]) {
+          pulados.push({ linha: numLinha, nome: nome, motivo: 'ja existe na carteira (ou repetido no arquivo)' });
+          continue;
+        }
+
+        let dia = Math.round(Number(String(l.vencimento_dia || '').replace(/\D/g, '')));
+        if (!isFinite(dia) || dia < 1 || dia > 31) dia = 10;
+
+        const status = MAPA_STATUS(l.status);
+        const novo = {
+          cliente: nome,
+          valor: limpaValor(l.valor),
+          setup: limpaValor(l.setup),
+          hospedagem: limpaValor(l.hospedagem),
+          vencimento_dia: dia,
+          status: status,
+          pago_em: status === 'pago' ? new Date().toISOString() : null,
+          responsavel: limpaTexto(l.responsavel, 120),
+          telefone: limpaTexto(l.telefone, 40),
+          observacao: limpaTexto(l.observacao, 400),
+          destaque: false, ativo: true,
+          position: ++posicao,
+          updated_at: new Date().toISOString()
+        };
+
+        try {
+          await db.insert('finance_clients', novo);
+          vistos[id] = true;
+          importados++;
+        } catch (e) {
+          pulados.push({ linha: numLinha, nome: nome, motivo: 'o banco recusou: ' + e.message });
+        }
+      }
+
+      return u.ok(res, {
+        importados: importados,
+        pulados: pulados.slice(0, 100),
+        total_pulados: pulados.length,
+        total_no_arquivo: linhas.length
+      });
     }
 
     if (action === 'fin_excluir') {
