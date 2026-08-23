@@ -940,8 +940,9 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   // ============================================================
   console.log('\n5b-fin) FINANCEIRO — carteira, dashboard e relatorio');
   // ============================================================
-  async function fin(action, body) {
-    return (await fetch(BASE + '/api/financeiro?action=' + action, {
+  async function fin(action, body, query) {
+    const qs = new URLSearchParams(Object.assign({ action: action }, query || {}));
+    return (await fetch(BASE + '/api/financeiro?' + qs, {
       method: body ? 'POST' : 'GET',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + T },
       body: body ? JSON.stringify(body) : undefined
@@ -1049,6 +1050,73 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   }
 
   // ============================================================
+  // ============================================================
+  console.log('\n5b-fin2) FINANCEIRO — periodo, pago_em e importacao');
+  // ============================================================
+  {
+    function iso(d) { return d.toISOString().slice(0, 10); }
+    const hojeD = new Date();
+
+    // marcar como pago carimba a data; o cartao "Recebidas" de hoje ve
+    const lst = await fin('fin_lista');
+    const alvoPg = lst.clientes.filter(function (c) { return c.status === 'aguardando'; })[0];
+    const virou = await fin('fin_salvar', { id: alvoPg.id, cliente: alvoPg.cliente, status: 'pago', valor: alvoPg.valor, setup: alvoPg.setup, hospedagem: alvoPg.hospedagem, vencimento_dia: alvoPg.vencimento_dia });
+    check('marcar pago carimba a data do pagamento', virou.ok && !!virou.cliente.pago_em, virou.cliente && virou.cliente.pago_em);
+
+    const rHoje = await fin('fin_resumo', null, { de: iso(hojeD), ate: iso(hojeD) });
+    check('resumo devolve os cartoes do periodo', rHoje.ok && !!rHoje.cartoes, rHoje.error);
+    check('Recebidas de HOJE inclui quem pagou agora', rHoje.cartoes.recebidas.clientes >= 1, rHoje.cartoes.recebidas);
+
+    // num periodo do passado remoto, nada foi recebido
+    const rPassado = await fin('fin_resumo', null, { de: '2020-01-01', ate: '2020-01-31' });
+    check('em janeiro de 2020 nao ha recebidas', rPassado.cartoes.recebidas.clientes === 0, rPassado.cartoes.recebidas);
+    check('nem aguardando fora do periodo delas', rPassado.cartoes.aguardando.clientes === 0, rPassado.cartoes.aguardando);
+
+    // este mes: inadimplentes viram "Vencidas"
+    const rMes = await fin('fin_resumo');
+    check('inadimplentes aparecem como Vencidas no mes', rMes.cartoes.vencidas.clientes >= 2, rMes.cartoes.vencidas);
+    check('datas do periodo padrao sao deste mes', String(rMes.cartoes.de).slice(0, 7) === iso(hojeD).slice(0, 7), rMes.cartoes.de);
+
+    // desfaz o pago para nao mexer nas contas dos outros testes
+    await fin('fin_salvar', { id: alvoPg.id, cliente: alvoPg.cliente, status: 'aguardando', valor: alvoPg.valor, setup: alvoPg.setup, hospedagem: alvoPg.hospedagem, vencimento_dia: alvoPg.vencimento_dia });
+    const desfez = await fin('fin_lista');
+    check('sair de pago apaga o carimbo', desfez.clientes.filter(function (c) { return c.id === alvoPg.id; })[0].pago_em === null);
+
+    // ---- importacao ----
+    const imp = await fin('fin_importar', { linhas: [
+      { linha: 2, cliente: 'Padaria Sol Nascente ' + SUF, valor: '1.250,00', setup: 'R$ 300', vencimento_dia: '15', status: 'Pago', telefone: '13 99999-0001' },
+      { linha: 3, cliente: 'Oficina Dois Irmaos ' + SUF, valor: '890', status: 'vencida' },
+      { linha: 4, cliente: 'VITRAUX', valor: '999' },                      // ja existe na carteira
+      { linha: 5, cliente: '', valor: '50' },                              // sem nome
+      { linha: 6, cliente: 'Padaria Sol Nascente ' + SUF, valor: '1' }     // repetida no proprio arquivo
+    ] });
+    check('importa os clientes validos', imp.ok && imp.importados === 2, imp.error || imp);
+    check('barra o que ja existe na carteira',
+      imp.pulados.some(function (p) { return p.nome === 'VITRAUX' && /ja existe/.test(p.motivo); }), imp.pulados);
+    check('barra linha sem nome', imp.pulados.some(function (p) { return /sem nome/.test(p.motivo); }));
+    check('barra repetido dentro do proprio arquivo', imp.total_pulados === 3, imp.total_pulados);
+
+    const depoisImp = await fin('fin_lista');
+    const padaria = depoisImp.clientes.filter(function (c) { return c.cliente === 'Padaria Sol Nascente ' + SUF; })[0];
+    check('valor com milhar entra certo (1.250,00)', padaria && padaria.valor === 1250, padaria && padaria.valor);
+    check('status "Pago" do arquivo vira pago com data', padaria.status === 'pago' && !!padaria.pago_em, padaria);
+    const oficina = depoisImp.clientes.filter(function (c) { return c.cliente === 'Oficina Dois Irmaos ' + SUF; })[0];
+    check('status "vencida" vira inadimplente', oficina && oficina.status === 'inadimplente', oficina && oficina.status);
+    check('arquivo vazio e recusado', !(await fin('fin_importar', { linhas: [] })).ok);
+
+    // limpa os importados do teste
+    await fin('fin_excluir', { id: padaria.id });
+    await fin('fin_excluir', { id: oficina.id });
+
+    // ---- a chave da Automacao no menu ----
+    const euAntes = await adm('usuarios_eu');
+    check('automacao vem escondida de fabrica', euAntes.mostrar_automacao === false, euAntes.mostrar_automacao);
+    await adm('settings_save', { key: 'painel', value: { mostrar_automacao: true } });
+    check('ligou nos ajustes, o menu passa a mostrar', (await adm('usuarios_eu')).mostrar_automacao === true);
+    await adm('settings_save', { key: 'painel', value: { mostrar_automacao: false } });
+    check('desligou, esconde de novo', (await adm('usuarios_eu')).mostrar_automacao === false);
+  }
+
   console.log('\n5b-space) SPACE COLABORADOR — beneficio por Pix (Asaas)');
   // ============================================================
   const MARINA = 'cccc0001-0001-4001-8001-000000000001';
