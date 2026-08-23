@@ -194,6 +194,18 @@ async function carregaAjustes() {
         'de ambiente da Vercel e faça <strong>Redeploy</strong>. Esta linha vira verde sozinha quando o sistema enxergar a chave.') +
     '</div>' +
 
+    '<div class="card"><h2>Menu do painel</h2>' +
+    '<p class="sub" style="margin:2px 0 14px">O grupo <strong>Automação</strong> (Pré Qualificação, Aurea e ' +
+    'Pré Onboarding) continua funcionando por baixo — esta chave só decide se ele aparece no menu lateral.</p>' +
+    '<label class="row" style="gap:10px;align-items:center;cursor:pointer">' +
+      '<input type="checkbox" id="pn-automacao" ' + ((d.painel || {}).mostrar_automacao === true ? 'checked' : '') +
+      ' style="width:17px;height:17px">' +
+      '<span style="font-size:14px;font-weight:500">Exibir Automação no menu</span>' +
+    '</label>' +
+    '<div class="row" style="margin-top:12px"><button class="btn btn-sm" id="btn-painel-salvar">Salvar</button>' +
+    '<span class="small muted">A mudança vale para todo mundo na próxima vez que abrirem o painel.</span></div>' +
+    '</div>' +
+
     '<div class="card"><h2>Segurança</h2>' +
     '<p class="sub" style="margin:2px 0 16px">A sessão de quem entra no painel vale 12 horas. ' +
     'Depois de 5 senhas erradas seguidas, o sistema trava aquela origem por 15 minutos.</p>' +
@@ -208,6 +220,21 @@ async function carregaAjustes() {
     '<div id="wa-area"><div class="loading-page" style="padding:30px">Verificando…</div></div></div>' +
 
     '<div class="card"><h2>Últimos envios</h2><div id="tab-logs" class="small muted">carregando…</div></div>';
+
+  document.getElementById('btn-painel-salvar').addEventListener('click', async function () {
+    this.disabled = true;
+    try {
+      const ligado = document.getElementById('pn-automacao').checked;
+      await api('settings_save', {
+        body: { key: 'painel', value: Object.assign({}, d.painel || {}, { mostrar_automacao: ligado }) }
+      });
+      // aplica na hora nesta tela tambem, sem esperar recarregar
+      const grupo = document.querySelector('#abas .nav-grupo[data-grupo="automacao"]');
+      if (grupo) grupo.style.display = ligado ? '' : 'none';
+      toast(ligado ? 'Automação visível no menu' : 'Automação escondida do menu');
+    } catch (e) { toast(e.message, true); }
+    this.disabled = false;
+  });
 
   document.getElementById('btn-form-salvar').addEventListener('click', async function () {
     try {
