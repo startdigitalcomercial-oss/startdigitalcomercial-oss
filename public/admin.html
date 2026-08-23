@@ -448,6 +448,35 @@
   .fd-tile.espera .num { color: #1c5f79; }
   .fd-tile.ok .num { color: #1d6f45; }
 
+  /* ---- os cartoes por periodo (Recebidas / Aguardando / Vencidas) ----
+     Seguem a referencia: cartao claro, canto bem arredondado, valor
+     grande colorido, barrinha de status e o rodape de clientes. */
+  .fd2-grade { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+               transition: opacity .15s; }
+  .fd2-carta { background: var(--card); border: 1px solid var(--fio); border-radius: 18px;
+               padding: 20px 20px 10px; }
+  .fd2-tit { font-size: 14.5px; font-weight: 600; color: var(--label); margin-bottom: 12px;
+             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fd2-val { font-size: 27px; font-weight: 800; letter-spacing: -.02em;
+             font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .fd2-sub { font-size: 12.5px; color: var(--label-3); margin-top: 5px; }
+  .fd2-barra { height: 9px; border-radius: 999px; margin: 14px 0 6px; }
+  .fd2-barra.listras { background: repeating-linear-gradient(45deg, #f5deb0 0 10px, #fbeed4 10px 20px); }
+  .fd2-linha { display: flex; align-items: center; justify-content: space-between; width: 100%;
+               background: none; border: 0; border-top: 1px solid var(--hairline);
+               padding: 11px 2px; margin-top: 6px; font-family: inherit; font-size: 13.5px;
+               font-weight: 600; color: var(--label-2); cursor: pointer; }
+  .fd2-linha:hover { color: var(--label); }
+  .fd2-linha:disabled { color: var(--label-3); cursor: default; opacity: .6; }
+
+  .fd2-filtro { display: flex; gap: 2px; background: var(--fill-1); padding: 3px;
+                border-radius: 10px; }
+  .fd2-filtro button { border: 0; background: transparent; font-family: inherit; font-size: 12.5px;
+                       font-weight: 600; color: var(--label-2); padding: 6px 12px; border-radius: 8px;
+                       cursor: pointer; white-space: nowrap; transition: background .14s, color .14s; }
+  .fd2-filtro button:hover { color: var(--label); }
+  .fd2-filtro button.on { background: var(--surface); color: var(--label); box-shadow: var(--shadow-1); }
+
   .fd-sem { border: 1px solid var(--fio); border-radius: var(--r-card); background: var(--card);
             overflow: hidden; }
   .fd-sem-linha { display: flex; align-items: center; gap: 12px; padding: 11px 16px;
@@ -497,7 +526,7 @@
     <div class="logo"><img src="/favicon-32.png" alt="" class="logo-img"><span class="logo-txt">StartDigital<small>Portal do Colaborador</small></span></div>
     <nav id="abas">
       <div class="nav-grupo on" data-grupo="principal">
-      <button type="button" class="nav-cab">Principal<svg class="seta" width="12" height="12" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
+      <button type="button" class="nav-cab">Vagas<svg class="seta" width="12" height="12" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
       <div class="nav-itens"><div>
       <button data-aba="dashboard" class="on"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3.6" y="3.6" width="7" height="6" rx="1.6"/><rect x="3.6" y="12.4" width="7" height="8" rx="1.6"/><rect x="13.4" y="3.6" width="7" height="10" rx="1.6"/><rect x="13.4" y="16.4" width="7" height="4" rx="1.6"/></svg><span>Dashboard</span></button>
       <button data-aba="vagas"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3.4" y="7.2" width="17.2" height="12.4" rx="2"/><path d="M8.8 7.2V5.6a1.8 1.8 0 0 1 1.8-1.8h2.8a1.8 1.8 0 0 1 1.8 1.8v1.6"/><path d="M3.4 12.4h17.2"/></svg><span>Vagas</span></button>
@@ -512,14 +541,14 @@
       <button data-aba="preonboarding"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M21 3 10.6 13.4"/><path d="M21 3l-6.6 18-3.8-8.6L2 8.6z"/></svg><span>Pré Onboarding</span></button>
 </div></div></div>
       <div class="nav-grupo" data-grupo="time">
-      <button type="button" class="nav-cab">Time<svg class="seta" width="12" height="12" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
+      <button type="button" class="nav-cab">Colaboradores<svg class="seta" width="12" height="12" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
       <div class="nav-itens"><div>
       <button data-aba="colaboradores"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><circle cx="12" cy="7.6" r="3.3"/><path d="M5.6 19.8c.6-3.4 3.3-5.2 6.4-5.2s5.8 1.8 6.4 5.2"/><path d="M18.4 4.4a2.4 2.4 0 0 1 0 4.5"/><path d="M5.6 4.4a2.4 2.4 0 0 0 0 4.5"/></svg><span>Colaboradores</span></button>
       <button data-aba="avisos"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M5.4 9.6a6.6 6.6 0 0 1 13.2 0c0 4.2 1.4 5.6 1.4 5.6H4s1.4-1.4 1.4-5.6z"/><path d="M10.3 18.6a2 2 0 0 0 3.4 0"/></svg><span>Avisos</span></button>
-      <button data-aba="space"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3.2" y="7.4" width="17.6" height="12.4" rx="2"/><path d="M3.2 11.6h17.6"/><path d="M12 7.4V4.6M12 4.6c-1.6-1.6-4.2-.4-3.4 1.5.5 1.2 2.2 1.3 3.4 1.3m0-2.8c1.6-1.6 4.2-.4 3.4 1.5-.5 1.2-2.2 1.3-3.4 1.3"/></svg><span>Space Colaborador</span></button>
+      <button data-aba="space"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3.2" y="7.4" width="17.6" height="12.4" rx="2"/><path d="M3.2 11.6h17.6"/><path d="M12 7.4V4.6M12 4.6c-1.6-1.6-4.2-.4-3.4 1.5.5 1.2 2.2 1.3 3.4 1.3m0-2.8c1.6-1.6 4.2-.4 3.4 1.5-.5 1.2-2.2 1.3-3.4 1.3"/></svg><span>Benefícios</span></button>
 </div></div></div>
       <div class="nav-grupo" data-grupo="conteudo">
-      <button type="button" class="nav-cab">Conteúdo<svg class="seta" width="12" height="12" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
+      <button type="button" class="nav-cab">Start Academy<svg class="seta" width="12" height="12" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
       <div class="nav-itens"><div>
       <button data-aba="conteudo"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M10.3 9.1v5.8l4.8-2.9z"/></svg><span>Aulas</span></button>
       <button data-aba="quiz"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="5.5" y="4.2" width="13" height="16.6" rx="2"/><path d="M9.3 4.2V3.2h5.4v1"/><path d="m9.3 13.6 2 2 3.8-4.4"/></svg><span>Quiz</span></button>
@@ -528,8 +557,8 @@
       <div class="nav-grupo" data-grupo="financeiro">
       <button type="button" class="nav-cab">Financeiro<svg class="seta" width="12" height="12" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
       <div class="nav-itens"><div>
-      <button data-aba="financeiro"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6.6 12h.1M17.3 12h.1"/></svg><span>Clientes</span></button>
       <button data-aba="findash"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M4 19.6h16"/><path d="M7.2 19.6v-6M12 19.6V8.4M16.8 19.6v-9"/><path d="M6.4 6.6 11 4.2l4.4 2 3.4-2.6"/></svg><span>Dashboard</span></button>
+      <button data-aba="financeiro"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6.6 12h.1M17.3 12h.1"/></svg><span>Clientes</span></button>
 </div></div></div>
       <div class="nav-grupo" data-grupo="admin">
       <button type="button" class="nav-cab">Administração<svg class="seta" width="12" height="12" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
