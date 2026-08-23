@@ -84,6 +84,7 @@ const ACOES = {
   // --- financeiro: so quem cuida do dinheiro ---
   fin_lista: 'financeiro', fin_resumo: 'financeiro', fin_relatorio: 'financeiro',
   fin_salvar: 'financeiro_mexer', fin_excluir: 'financeiro_mexer',
+  fin_importar: 'financeiro_mexer',
 
   // --- Space Colaborador: libera dinheiro de verdade, mesma tranca ---
   sp_painel: 'financeiro',
