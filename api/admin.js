@@ -438,6 +438,9 @@ module.exports = async function handler(req, res) {
 
     // quem sou eu (a tela usa para montar o menu e mostrar o nome)
     if (action === 'usuarios_eu') {
+      // A Automacao existe inteira por baixo — este ajuste so decide se
+      // ela aparece no menu. Vem DESLIGADA de fabrica, a pedido.
+      const painelCfg = await getSetting('painel', {});
       return u.ok(res, {
         usuario: {
           nome: session.nome || 'Senha mestra',
@@ -446,7 +449,8 @@ module.exports = async function handler(req, res) {
           papel_nome: perms.NOMES[papel] || papel,
           mestra: !!session.mestra
         },
-        menu: perms.menuDoPapel(papel)
+        menu: perms.menuDoPapel(papel),
+        mostrar_automacao: painelCfg.mostrar_automacao === true
       });
     }
 
@@ -853,10 +857,11 @@ module.exports = async function handler(req, res) {
       const whatsapp = await getSetting('whatsapp', {});
       const landing = await getSetting('landing', {});
       const conhecimento = await getSetting('conhecimento', {});
+      const painel = await getSetting('painel', {});
       const instances = await send.listWhatsAppInstances();
       return u.ok(res, {
         company: company, form: form, whatsapp: whatsapp, landing: landing,
-        conhecimento: conhecimento,
+        conhecimento: conhecimento, painel: painel,
         wa_instances: instances, providers: send.providerStatus(), app_url: u.appUrl()
       });
     }
