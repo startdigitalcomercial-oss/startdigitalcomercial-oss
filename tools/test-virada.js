@@ -130,6 +130,28 @@ async function fin(T, action, body, query) {
     (jan.competencias || []).length >= 6, (jan.competencias || []).length);
 
   // ---------- deixa o palco como encontrou ----------
+  // Este teste mexeu em AGOSTO de proposito (marcou um pago, desligou
+  // um contrato). Se nao desfizer, o proximo teste ve uma carteira
+  // diferente e falha sem culpa nenhuma.
+  const agoraAgosto = await fin(T, 'fin_lista', null, { mes: 8, ano: 2026 });
+  for (const linha of (agoraAgosto.clientes || [])) {
+    if (linha.cliente === encerrado.cliente && linha.ativo === false) {
+      await fin(T, 'fin_salvar', { id: linha.id, cliente: linha.cliente, valor: linha.valor,
+        setup: linha.setup, hospedagem: linha.hospedagem, vencimento_dia: linha.vencimento_dia,
+        status: linha.status, observacao: linha.observacao, ativo: true });
+    }
+    if (/PAGOU EM AGOSTO/.test(linha.observacao || '')) {
+      await fin(T, 'fin_salvar', { id: linha.id, cliente: linha.cliente, valor: linha.valor,
+        setup: linha.setup, hospedagem: linha.hospedagem, vencimento_dia: linha.vencimento_dia,
+        status: linha.status, observacao: '', ativo: linha.ativo });
+    }
+  }
+  const restaurado = await fin(T, 'fin_lista', null, { mes: 8, ano: 2026 });
+  diz('agosto foi restaurado ao estado original',
+    restaurado.clientes.every(function (c) { return c.ativo; }) &&
+    !restaurado.clientes.some(function (c) { return /PAGOU EM AGOSTO/.test(c.observacao || ''); }),
+    restaurado.clientes.filter(function (c) { return !c.ativo; }).map(function (c) { return c.cliente; }));
+
   // Este teste cria competencias no espelho compartilhado. Sem limpar,
   // o proximo teste veria setembro cheio e falharia sem culpa nenhuma.
   for (const c of (jan.competencias || [])) {
