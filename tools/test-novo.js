@@ -1063,19 +1063,20 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
     const virou = await fin('fin_salvar', { id: alvoPg.id, cliente: alvoPg.cliente, status: 'pago', valor: alvoPg.valor, setup: alvoPg.setup, hospedagem: alvoPg.hospedagem, vencimento_dia: alvoPg.vencimento_dia });
     check('marcar pago carimba a data do pagamento', virou.ok && !!virou.cliente.pago_em, virou.cliente && virou.cliente.pago_em);
 
-    const rHoje = await fin('fin_resumo', null, { de: iso(hojeD), ate: iso(hojeD) });
-    check('resumo devolve os cartoes do periodo', rHoje.ok && !!rHoje.cartoes, rHoje.error);
-    check('Recebidas de HOJE inclui quem pagou agora', rHoje.cartoes.recebidas.clientes >= 1, rHoje.cartoes.recebidas);
-
-    // num periodo do passado remoto, nada foi recebido
-    const rPassado = await fin('fin_resumo', null, { de: '2020-01-01', ate: '2020-01-31' });
-    check('em janeiro de 2020 nao ha recebidas', rPassado.cartoes.recebidas.clientes === 0, rPassado.cartoes.recebidas);
-    check('nem aguardando fora do periodo delas', rPassado.cartoes.aguardando.clientes === 0, rPassado.cartoes.aguardando);
-
-    // este mes: inadimplentes viram "Vencidas"
+    // o dashboard agora anda pela COMPETENCIA, nao por datas soltas
     const rMes = await fin('fin_resumo');
+    check('resumo devolve os cartoes da competencia', rMes.ok && !!rMes.cartoes, rMes.error);
+    check('Recebidas do mes inclui quem pagou agora', rMes.cartoes.recebidas.clientes >= 1, rMes.cartoes.recebidas);
     check('inadimplentes aparecem como Vencidas no mes', rMes.cartoes.vencidas.clientes >= 2, rMes.cartoes.vencidas);
-    check('datas do periodo padrao sao deste mes', String(rMes.cartoes.de).slice(0, 7) === iso(hojeD).slice(0, 7), rMes.cartoes.de);
+    check('o periodo do dashboard e o mes da competencia',
+      String(rMes.cartoes.de).slice(0, 7) === rMes.competencia.ano + '-' + String(rMes.competencia.mes).padStart(2, '0'),
+      { de: rMes.cartoes.de, comp: rMes.competencia });
+
+    // numa competencia vazia do passado, nao ha nada
+    const rVazio = await fin('fin_resumo', null, { mes: 1, ano: 2020 });
+    check('competencia sem cobrancas mostra tudo zerado',
+      rVazio.cartoes.recebidas.clientes === 0 && rVazio.cartoes.aguardando.clientes === 0 &&
+      rVazio.cartoes.vencidas.clientes === 0, rVazio.cartoes);
 
     // desfaz o pago para nao mexer nas contas dos outros testes
     await fin('fin_salvar', { id: alvoPg.id, cliente: alvoPg.cliente, status: 'aguardando', valor: alvoPg.valor, setup: alvoPg.setup, hospedagem: alvoPg.hospedagem, vencimento_dia: alvoPg.vencimento_dia });
@@ -1115,6 +1116,122 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
     check('ligou nos ajustes, o menu passa a mostrar', (await adm('usuarios_eu')).mostrar_automacao === true);
     await adm('settings_save', { key: 'painel', value: { mostrar_automacao: false } });
     check('desligou, esconde de novo', (await adm('usuarios_eu')).mostrar_automacao === false);
+  }
+
+  // ============================================================
+  console.log('\n5b-comp) COMPETENCIA MENSAL — historico e virada do mes');
+  // ============================================================
+  {
+    const fmod = require('../api/financeiro.js');
+
+    // ---- a matematica do calendario, sem tocar no banco ----
+    check('agosto/2026 -> setembro/2026',
+      JSON.stringify(fmod.deOrdinal(fmod.ordinal(8, 2026) + 1)) === JSON.stringify({ mes: 9, ano: 2026 }));
+    check('setembro/2026 -> outubro/2026',
+      JSON.stringify(fmod.deOrdinal(fmod.ordinal(9, 2026) + 1)) === JSON.stringify({ mes: 10, ano: 2026 }));
+    check('DEZEMBRO/2026 -> JANEIRO/2027 (vira o ano)',
+      JSON.stringify(fmod.deOrdinal(fmod.ordinal(12, 2026) + 1)) === JSON.stringify({ mes: 1, ano: 2027 }));
+    check('nunca gera janeiro do mesmo ano',
+      fmod.deOrdinal(fmod.ordinal(12, 2026) + 1).ano === 2027);
+    check('a ordem cresce mes a mes, sem buraco na virada',
+      fmod.ordinal(1, 2027) - fmod.ordinal(12, 2026) === 1);
+
+    // ---- a lista atual esta em 08/2026 ----
+    const l0 = await fin('fin_lista');
+    check('a lista abre na competencia atual', l0.ok && !!l0.competencia, l0.error);
+    check('e o servidor diz qual e o mes corrente', !!l0.competencia_atual, l0.competencia_atual);
+    check('os 12 meses vem para o seletor', (l0.meses || []).length === 12, (l0.meses || []).length);
+    check('as cobrancas de hoje estao em 08/2026',
+      l0.competencia.mes === 8 && l0.competencia.ano === 2026 && l0.clientes.length >= 10,
+      { comp: l0.competencia, qtd: l0.clientes.length });
+    const totalAgosto = l0.clientes.length;
+
+    // ---- criar a competencia de setembro a partir de agosto ----
+    // (o mock esta em agosto/2026, entao a virada automatica so roda
+    //  quando o mes vira de verdade; aqui exercitamos o mesmo caminho
+    //  pedindo setembro e criando nele.)
+    const novoSet = await fin('fin_salvar', {
+      cliente: 'Cliente So De Setembro ' + SUF, valor: '900', vencimento_dia: 12,
+      mes: 9, ano: 2026
+    });
+    check('cria cobranca direto em outra competencia', novoSet.ok, novoSet.error);
+    check('a cobranca nova nasce em 09/2026',
+      novoSet.cliente.ref_mes === 9 && novoSet.cliente.ref_ano === 2026, novoSet.cliente);
+
+    const lSet = await fin('fin_lista', null, { mes: 9, ano: 2026 });
+    check('setembro tem a sua propria lista', lSet.clientes.length === 1, lSet.clientes.length);
+    const lAgo = await fin('fin_lista', null, { mes: 8, ano: 2026 });
+    check('e agosto continua intacto', lAgo.clientes.length === totalAgosto, lAgo.clientes.length);
+    check('a lista de competencias mostra as duas',
+      (lSet.competencias || []).some(function (c) { return c.mes === 9 && c.ano === 2026; }) &&
+      (lSet.competencias || []).some(function (c) { return c.mes === 8 && c.ano === 2026; }),
+      lSet.competencias);
+
+    // ---- editar setembro NAO pode mexer em agosto ----
+    const alvoAgo = lAgo.clientes.filter(function (c) { return c.cliente === 'VITRAUX'; })[0];
+    const gemeoSet = await fin('fin_salvar', {
+      cliente: 'VITRAUX', valor: '9999', vencimento_dia: 5, status: 'inadimplente',
+      responsavel: 'Setembro', mes: 9, ano: 2026
+    });
+    check('o mesmo cliente pode existir em outro mes', gemeoSet.ok, gemeoSet.error);
+    const agoDepois = await fin('fin_lista', null, { mes: 8, ano: 2026 });
+    const vitrauxAgo = agoDepois.clientes.filter(function (c) { return c.cliente === 'VITRAUX'; })[0];
+    check('MEXER EM SETEMBRO NAO ALTERA AGOSTO',
+      vitrauxAgo.valor === alvoAgo.valor && vitrauxAgo.status === alvoAgo.status &&
+      vitrauxAgo.vencimento_dia === alvoAgo.vencimento_dia,
+      { antes: alvoAgo, depois: vitrauxAgo });
+
+    // ---- duplicidade dentro da MESMA competencia e barrada ----
+    const repetido = await fin('fin_salvar', { cliente: 'VITRAUX', valor: '10', mes: 9, ano: 2026 });
+    check('mesmo cliente duas vezes no mesmo mes e recusado', !repetido.ok, repetido);
+
+    // ---- excluir de um mes nao apaga os outros ----
+    await fin('fin_excluir', { id: gemeoSet.cliente.id });
+    const agoIntacto = await fin('fin_lista', null, { mes: 8, ano: 2026 });
+    check('EXCLUIR EM SETEMBRO NAO APAGA AGOSTO',
+      agoIntacto.clientes.filter(function (c) { return c.cliente === 'VITRAUX'; }).length === 1);
+    check('e agosto segue com o mesmo tamanho', agoIntacto.clientes.length === totalAgosto);
+
+    // ---- os cartoes respeitam a competencia escolhida ----
+    const dSet = await fin('fin_resumo', null, { mes: 9, ano: 2026 });
+    const dAgo = await fin('fin_resumo', null, { mes: 8, ano: 2026 });
+    check('o dashboard de setembro ve so setembro',
+      dSet.competencia.mes === 9 && dSet.resumo.clientes === 1, { c: dSet.competencia, n: dSet.resumo.clientes });
+    check('o dashboard de agosto ve so agosto',
+      dAgo.competencia.mes === 8 && dAgo.resumo.clientes === totalAgosto, dAgo.resumo.clientes);
+    check('tabela e dashboard falam da MESMA competencia',
+      JSON.stringify(dAgo.competencia) === JSON.stringify(lAgo.competencia), { d: dAgo.competencia, l: lAgo.competencia });
+    check('mes fechado nao promete previsao de semana', dAgo.resumo.competencia_corrente === true);
+    check('mes futuro e marcado como nao-corrente', dSet.resumo.competencia_corrente === false);
+
+    // ---- importar cai na competencia escolhida ----
+    const impSet = await fin('fin_importar', {
+      mes: 9, ano: 2026,
+      linhas: [{ linha: 2, cliente: 'Importado De Setembro ' + SUF, valor: '123' }]
+    });
+    check('a importacao entra na competencia aberta',
+      impSet.ok && impSet.importados === 1 && impSet.competencia.mes === 9, impSet);
+    check('e nao aparece em agosto',
+      (await fin('fin_lista', null, { mes: 8, ano: 2026 })).clientes
+        .filter(function (c) { return /Importado De Setembro/.test(c.cliente); }).length === 0);
+
+    // ---- a virada e idempotente ----
+    const v1 = await fin('fin_virada');
+    const v2 = await fin('fin_virada');
+    check('a virada roda sem erro', v1.ok && v2.ok, v1.error || v2.error);
+    check('chamar duas vezes nao duplica nada',
+      (v2.criadas || []).length === 0, v2.criadas);
+    const depoisVirada = await fin('fin_lista', null, { mes: 8, ano: 2026 });
+    check('e a competencia antiga continua do mesmo tamanho',
+      depoisVirada.clientes.length === totalAgosto, depoisVirada.clientes.length);
+
+    // limpeza do que este teste criou em setembro
+    const limparSet = await fin('fin_lista', null, { mes: 9, ano: 2026 });
+    for (const c of limparSet.clientes) await fin('fin_excluir', { id: c.id });
+
+    // permissao
+    const perms = require('../api/_lib/perms.js');
+    check('leitura nao dispara a virada', perms.permite('leitura', 'fin_virada') === false);
   }
 
   // ============================================================
