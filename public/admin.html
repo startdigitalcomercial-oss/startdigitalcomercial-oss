@@ -483,6 +483,26 @@
                      cursor: pointer; }
   .fin-chip button:hover { background: rgba(176,42,32,.2); }
 
+  /* o seletor de competencia (mes/ano), usado em Cobrancas e no Dashboard */
+  .fin-comp { display: inline-flex; align-items: center; gap: 8px; background: var(--fill-1);
+              border-radius: 10px; padding: 5px 12px 5px 11px; color: var(--label-2);
+              white-space: nowrap; }
+  /* os select do sistema nascem com largura total; aqui eles precisam
+     ocupar so o tamanho do texto, senao o seletor empilha */
+  .fin-comp select { width: auto !important; border: 0; background: transparent;
+                     font-family: inherit; font-size: 14px; font-weight: 600; color: var(--label);
+                     cursor: pointer; padding: 3px 22px 3px 2px; height: auto; min-width: 0;
+                     box-shadow: none; margin: 0; }
+  .fin-comp select:focus { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  .fin-comp .barra { color: var(--label-3); font-weight: 600; }
+  .fin-comp .agora { font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase;
+                     color: var(--accent); background: var(--accent-tint); padding: 3px 8px;
+                     border-radius: 999px; }
+  .fin-comp .voltar { border: 0; background: var(--fill-2); color: var(--label-2); font-family: inherit;
+                      font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px;
+                      cursor: pointer; white-space: nowrap; }
+  .fin-comp .voltar:hover { background: var(--fill-3, var(--fio)); color: var(--label); }
+
   .fd2-filtro { display: flex; gap: 2px; background: var(--fill-1); padding: 3px;
                 border-radius: 10px; }
   .fd2-filtro button { border: 0; background: transparent; font-family: inherit; font-size: 12.5px;
