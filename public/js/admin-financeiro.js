@@ -209,23 +209,51 @@ function finIndicadores(linhas, hoje) {
   };
 }
 
-/* O filtro da tabela. '' = todas; 'inadimplentes' = só quem venceu. */
-let FIN_FILTRO = '';
+/* Os filtros da tabela de Cobranças. Somam-se: competência (do
+   servidor) + busca + dia de vencimento + o botão de inadimplentes.
+   Um nunca anula o outro. */
+let FIN_FILTRO = '';        // '' = todas; 'inadimplentes' = só quem venceu
+let FIN_BUSCA = '';         // pedaço do nome do cliente
+let FIN_VENC = '';          // '' = todos os dias; '10' = só dia 10
+
+// Sem acento e sem caixa: quem digita "goncalves" acha "GONÇALVES".
+function finChave(t) {
+  return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+}
+
+function finTemFiltro() { return !!(FIN_BUSCA || FIN_VENC || FIN_FILTRO); }
+
+/* Aplica busca + vencimento. O botão de inadimplentes fica de fora
+   de propósito: os cartões precisam mostrar o que você VERIA ao
+   clicar nele, senão o número do cartão nunca bateria com a tabela. */
+function finFiltraBase(linhas) {
+  const busca = finChave(FIN_BUSCA);
+  return linhas.filter(function (c) {
+    if (busca && finChave(c.cliente).indexOf(busca) < 0) return false;
+    if (FIN_VENC && String(c.vencimento_dia) !== String(FIN_VENC)) return false;
+    return true;
+  });
+}
+
+/* Os dias que EXISTEM nesta competência — nada de lista fixa. */
+function finDiasComCobranca(linhas) {
+  const dias = {};
+  linhas.forEach(function (c) { dias[Number(c.vencimento_dia) || 0] = true; });
+  return Object.keys(dias).map(Number).filter(function (d) { return d > 0; })
+    .sort(function (a, b) { return a - b; });
+}
 
 function desenhaFinanceiro() {
   const linhas = FIN_CLIENTES;
-  const hoje = finHojeDaCompetencia();
-  const ind = finIndicadores(linhas, hoje);
   const compAtual = FIN_COMP_ATUAL &&
     FIN_COMP && FIN_COMP.mes === FIN_COMP_ATUAL.mes && FIN_COMP.ano === FIN_COMP_ATUAL.ano;
+  const dias = finDiasComCobranca(linhas);
 
-  // a MESMA regra do indicador decide quem fica na tabela filtrada
-  const visiveis = FIN_FILTRO === 'inadimplentes'
-    ? linhas.filter(function (c) { return finEhInadimplente(c, hoje); })
-    : linhas;
-
+  // A casca é desenhada UMA vez. Cartões e tabela vivem em caixas
+  // próprias e são repintados sozinhos — se a tela inteira fosse
+  // redesenhada a cada tecla, o cursor da busca pularia fora.
   document.getElementById('painel-financeiro').innerHTML =
-    '<div class="row row-wrap" style="justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px">' +
+    '<div class="row row-wrap" style="justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px">' +
       finSeletorComp('fc') +
       '<div class="row row-wrap" style="gap:10px">' +
         '<button class="btn btn-sm btn-ghost" id="fin-baixar">Baixar relatório</button>' +
@@ -233,10 +261,95 @@ function desenhaFinanceiro() {
         '<button class="btn btn-sm" id="fin-novo">Novo cliente</button>' +
       '</div>' +
     '</div>' +
-    '<div class="small muted" style="margin:-6px 0 14px">' + linhas.length + ' cobrança(s) nesta competência' +
-      (compAtual ? '' : ' · mês já fechado, o histórico fica como está') + '</div>' +
 
-    /* ---- os indicadores, nascidos das mesmas linhas da tabela ---- */
+    /* ---- busca + vencimento ---- */
+    '<div class="fin-filtros">' +
+      '<div class="fin-busca">' +
+        '<svg width="15" height="15" viewBox="0 0 24 24"><circle cx="10.6" cy="10.6" r="6.4"/>' +
+          '<path d="m15.4 15.4 4.2 4.2"/></svg>' +
+        '<input type="search" id="fin-q" placeholder="Buscar cliente…" autocomplete="off" ' +
+          'value="' + esc(FIN_BUSCA) + '">' +
+      '</div>' +
+      '<label class="fin-venc"><span>Vencimento</span>' +
+        '<select id="fin-dia">' +
+          '<option value="">Todos os vencimentos</option>' +
+          dias.map(function (d) {
+            return '<option value="' + d + '"' + (String(FIN_VENC) === String(d) ? ' selected' : '') + '>' +
+              'Dia ' + d + '</option>';
+          }).join('') +
+        '</select>' +
+      '</label>' +
+      '<button type="button" class="btn btn-sm btn-ghost" id="fin-limpar" ' +
+        (finTemFiltro() ? '' : 'style="display:none"') + '>Limpar filtros</button>' +
+      '<span class="small muted" id="fin-contador" style="margin-left:auto"></span>' +
+    '</div>' +
+
+    '<div id="fin-cards"></div>' +
+
+    '<div class="fin-quadro">' +
+      '<div class="fin-topo">' +
+        '<div class="fin-marca"><img src="/favicon-32.png" alt="">' +
+          '<span><b>StartDigital</b><small>Assessoria de Marketing</small></span></div>' +
+        '<div class="fin-titulo">FINANCEIRO START DIGITAL</div>' +
+      '</div>' +
+      '<div style="overflow-x:auto">' +
+      '<table class="fin-tab"><thead><tr>' +
+        '<th>Cliente</th><th>Valor</th><th>Vencimento</th><th>Status</th>' +
+        '<th>Responsável</th><th>Observação</th><th></th>' +
+      '</tr></thead><tbody id="fin-tbody"></tbody></table>' +
+      '</div>' +
+    '</div>';
+
+  finLigaSeletor('fc', carregaFinanceiro);
+  document.getElementById('fin-novo').addEventListener('click', function () { abreFinCliente(null); });
+  document.getElementById('fin-baixar').addEventListener('click', baixaRelatorioFin);
+  document.getElementById('fin-importar').addEventListener('click', abreImportacao);
+
+  // A busca filtra o que JÁ está na tela: nada de ida ao servidor a
+  // cada tecla. Com centenas de linhas isso é instantâneo, e o mês
+  // inteiro já veio numa chamada só.
+  const campoQ = document.getElementById('fin-q');
+  campoQ.addEventListener('input', function () {
+    FIN_BUSCA = campoQ.value;
+    finPinta();
+  });
+  campoQ.addEventListener('search', function () {      // o "x" do campo
+    FIN_BUSCA = campoQ.value;
+    finPinta();
+  });
+
+  document.getElementById('fin-dia').addEventListener('change', function () {
+    FIN_VENC = this.value;
+    finPinta();
+  });
+
+  document.getElementById('fin-limpar').addEventListener('click', function () {
+    FIN_BUSCA = ''; FIN_VENC = ''; FIN_FILTRO = '';
+    document.getElementById('fin-q').value = '';
+    document.getElementById('fin-dia').value = '';
+    finPinta();
+    document.getElementById('fin-q').focus();
+  });
+
+  finPinta();
+}
+
+/* Repinta só o que muda com os filtros: os cartões, a tabela e o
+   contador. A barra de filtros continua intacta na tela. */
+function finPinta() {
+  const hoje = finHojeDaCompetencia();
+  const compAtual = FIN_COMP_ATUAL &&
+    FIN_COMP && FIN_COMP.mes === FIN_COMP_ATUAL.mes && FIN_COMP.ano === FIN_COMP_ATUAL.ano;
+
+  // base = competência + busca + vencimento (o botão de inadimplentes
+  // fica de fora aqui, senão o cartão não mostraria o que ele filtra)
+  const base = finFiltraBase(FIN_CLIENTES);
+  const ind = finIndicadores(base, hoje);
+  const visiveis = FIN_FILTRO === 'inadimplentes'
+    ? base.filter(function (c) { return finEhInadimplente(c, hoje); })
+    : base;
+
+  document.getElementById('fin-cards').innerHTML =
     '<div class="fd2-grade" style="margin-bottom:16px">' +
       '<div class="fd2-carta">' +
         '<div class="fd2-tit">Valor total a receber</div>' +
@@ -263,49 +376,27 @@ function desenhaFinanceiro() {
           : 'clique para filtrar a tabela') + '</div>' +
         '<div class="fd2-barra" style="background:#d9453a"></div>' +
       '</button>' +
-    '</div>' +
-
-    (FIN_FILTRO === 'inadimplentes'
-      ? '<div class="row" style="margin-bottom:12px"><span class="fin-chip">Mostrando só os inadimplentes' +
-        '<button type="button" id="fin-limpa-filtro" title="ver todas">✕ ver todas</button></span></div>'
-      : '') +
-
-    '<div class="fin-quadro">' +
-      '<div class="fin-topo">' +
-        '<div class="fin-marca"><img src="/favicon-32.png" alt="">' +
-          '<span><b>StartDigital</b><small>Assessoria de Marketing</small></span></div>' +
-        '<div class="fin-titulo">FINANCEIRO START DIGITAL</div>' +
-      '</div>' +
-      '<div style="overflow-x:auto">' +
-      '<table class="fin-tab"><thead><tr>' +
-        '<th>Cliente</th><th>Valor</th><th>Vencimento</th><th>Status</th>' +
-        '<th>Responsável</th><th>Observação</th><th></th>' +
-      '</tr></thead><tbody>' +
-      (visiveis.length ? visiveis.map(finLinha).join('')
-        : '<tr><td colspan="7" style="padding:26px">' +
-          (FIN_FILTRO ? 'Nenhum inadimplente. 🎉' : 'Nenhuma cobrança cadastrada ainda.') + '</td></tr>') +
-      '</tbody></table>' +
-      '</div>' +
     '</div>';
 
-  finLigaSeletor('fc', carregaFinanceiro);
-  document.getElementById('fin-novo').addEventListener('click', function () { abreFinCliente(null); });
-  document.getElementById('fin-baixar').addEventListener('click', baixaRelatorioFin);
-  document.getElementById('fin-importar').addEventListener('click', abreImportacao);
-  document.querySelectorAll('.fin-editar').forEach(function (b) {
+  document.getElementById('fin-card-inad').addEventListener('click', function () {
+    FIN_FILTRO = FIN_FILTRO === 'inadimplentes' ? '' : 'inadimplentes';
+    finPinta();
+  });
+
+  const tbody = document.getElementById('fin-tbody');
+  tbody.innerHTML = visiveis.length ? visiveis.map(finLinha).join('')
+    : '<tr><td colspan="7" style="padding:26px">' +
+      (finTemFiltro() ? 'Nenhuma cobrança com esses filtros.' : 'Nenhuma cobrança nesta competência.') + '</td></tr>';
+  tbody.querySelectorAll('.fin-editar').forEach(function (b) {
     b.addEventListener('click', function () { abreFinCliente(b.dataset.id); });
   });
 
-  // o cartão liga e desliga o filtro — sem recarregar nada
-  document.getElementById('fin-card-inad').addEventListener('click', function () {
-    FIN_FILTRO = FIN_FILTRO === 'inadimplentes' ? '' : 'inadimplentes';
-    desenhaFinanceiro();
-  });
-  const limpa = document.getElementById('fin-limpa-filtro');
-  if (limpa) limpa.addEventListener('click', function () {
-    FIN_FILTRO = '';
-    desenhaFinanceiro();
-  });
+  const limpar = document.getElementById('fin-limpar');
+  if (limpar) limpar.style.display = finTemFiltro() ? '' : 'none';
+
+  document.getElementById('fin-contador').textContent = finTemFiltro()
+    ? 'mostrando ' + visiveis.length + ' de ' + FIN_CLIENTES.length + ' cobrança(s)'
+    : FIN_CLIENTES.length + ' cobrança(s) nesta competência' + (compAtual ? '' : ' · mês já fechado');
 }
 
 function finLinha(r) {
@@ -673,7 +764,80 @@ function desenhaPreviaImportacao() {
 }
 
 /* ============================================================
-   OUTROS GASTOS
+   DRE — Entradas menos Despesas
+   Nenhum numero e digitado aqui: os tres saem dos lancamentos que
+   ja existem (cobranças pagas e despesas do mes). Marcou uma
+   cobrança como paga? O DRE muda junto, porque le da mesma fonte.
+   ============================================================ */
+async function carregaFinDre() {
+  const alvo = document.getElementById('painel-findre');
+  alvo.innerHTML = '<div class="spinner"></div>';
+  try {
+    const d = await apiFin('fin_dre', { params: finCompParams() });
+    finGuardaComp(d);
+    desenhaFinDre(d);
+  } catch (e) {
+    alvo.innerHTML = '<div class="alert alert-erro">' + esc(e.message) + '</div>';
+  }
+}
+
+function desenhaFinDre(d) {
+  const positivo = Number(d.resultado || 0) >= 0;
+
+  document.getElementById('painel-findre').innerHTML =
+    '<div class="row row-wrap" style="justify-content:space-between;align-items:center;margin-bottom:6px;gap:12px">' +
+      finSeletorComp('dr') +
+    '</div>' +
+    '<div class="small muted" style="margin:0 0 16px">Os números saem sozinhos das cobranças e das despesas ' +
+      'desta competência. Nada é digitado aqui.</div>' +
+
+    '<div class="fd2-grade" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr))">' +
+      '<div class="fd2-carta">' +
+        '<div class="fd2-tit">Entradas</div>' +
+        '<div class="fd2-val" style="color:#157347">' + finDinheiro(d.entradas) + '</div>' +
+        '<div class="fd2-sub">' + (d.entradas_qtd || 0) + ' cobrança(s) recebida(s)</div>' +
+        '<div class="fd2-barra" style="background:#1fbf6e"></div>' +
+      '</div>' +
+      '<div class="fd2-carta">' +
+        '<div class="fd2-tit">Despesas</div>' +
+        '<div class="fd2-val" style="color:#b02a20">' + finDinheiro(d.despesas) + '</div>' +
+        '<div class="fd2-sub">' + (d.despesas_qtd || 0) + ' gasto(s) no mês</div>' +
+        '<div class="fd2-barra" style="background:#d9453a"></div>' +
+      '</div>' +
+      '<div class="fd2-carta dre-resultado' + (positivo ? '' : ' negativo') + '">' +
+        '<div class="fd2-tit">Resultado líquido</div>' +
+        '<div class="fd2-val" style="color:' + (positivo ? '#157347' : '#b02a20') + '">' +
+          (positivo ? '' : '− ') + finDinheiro(Math.abs(Number(d.resultado || 0))) + '</div>' +
+        '<div class="fd2-sub">entradas menos despesas</div>' +
+        '<div class="fd2-barra" style="background:' + (positivo ? '#1fbf6e' : '#d9453a') + '"></div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="card" style="padding:18px;margin-top:16px">' +
+      '<h3 style="font-size:14px;margin:0 0 10px">De onde vem cada número</h3>' +
+      '<div class="dre-conta">' +
+        '<div><span>Entradas</span><b style="color:#157347">' + finDinheiro(d.entradas) + '</b></div>' +
+        '<div><span>Despesas</span><b style="color:#b02a20">− ' + finDinheiro(d.despesas) + '</b></div>' +
+        '<div class="total"><span>Resultado líquido</span><b style="color:' +
+          (positivo ? '#157347' : '#b02a20') + '">' + (positivo ? '' : '− ') +
+          finDinheiro(Math.abs(Number(d.resultado || 0))) + '</b></div>' +
+      '</div>' +
+      '<p class="small muted" style="margin:14px 0 0;line-height:1.6">' +
+        '<strong>Entradas</strong> são as cobranças marcadas como <strong>Pagas</strong> em Cobranças — ' +
+        'dinheiro que o cliente realmente pagou, não o que está a receber.' +
+        (Number(d.em_aberto) > 0
+          ? ' Ainda há <strong>' + finDinheiro(d.em_aberto) + '</strong> em aberto neste mês, que entra no ' +
+            'DRE assim que for marcado como pago.'
+          : '') +
+        '<br><strong>Despesas</strong> são os lançamentos da tela Despesas com data dentro deste mês.' +
+      '</p>' +
+    '</div>';
+
+  finLigaSeletor('dr', carregaFinDre);
+}
+
+/* ============================================================
+   DESPESAS (a tela continua a mesma; só mudou o nome no menu)
    De propósito simples: um caderninho de despesas avulsas com o
    total do período em cima. O mesmo filtro do dashboard.
    ============================================================ */
