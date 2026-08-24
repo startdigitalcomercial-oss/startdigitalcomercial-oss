@@ -42,22 +42,127 @@ async function carregaFinanceiro() {
   }
 }
 
+/* ============================================================
+   AS CONTAS DA TELA DE COBRANÇAS
+   Funções puras, de propósito: os indicadores nascem das MESMAS
+   linhas da tabela — nada de número paralelo — e dá para testar
+   a matemática das datas sem abrir tela nenhuma.
+   ============================================================ */
+
+// Inadimplente = o vencimento desta cobrança já passou e não há
+// pagamento confirmado. Vale o que o time marcou (inadimplente) e
+// também o "aguardando" com a data estourada.
+function finEhInadimplente(c, hoje) {
+  if (!c.ativo || c.status === 'pago') return false;
+  if (c.status === 'inadimplente') return true;
+  const ultimo = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
+  const venc = new Date(hoje.getFullYear(), hoje.getMonth(), Math.min(Number(c.vencimento_dia) || 1, ultimo));
+  const hoje0 = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+  return venc < hoje0;
+}
+
+// A PRÓXIMA semana do calendário: de segunda a domingo, a que vem.
+// Não é "os próximos 7 dias" — se hoje é quarta, começa na segunda
+// que vem e termina no domingo seguinte.
+function finJanelaProximaSemana(hoje) {
+  const dia = hoje.getDay();                       // 0=domingo … 6=sábado
+  const ateSegunda = dia === 0 ? 1 : (8 - dia);    // quantos dias até a próxima segunda
+  const de = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + ateSegunda);
+  const ate = new Date(de.getFullYear(), de.getMonth(), de.getDate() + 6, 23, 59, 59);
+  return { de: de, ate: ate };
+}
+
+// O dia de vencimento (ex.: "todo dia 30") cai dentro da janela?
+// Mês curto encosta no último dia, como a cobrança faz na vida real.
+function finVenceNaJanela(diaVenc, janela) {
+  const d = Math.min(Math.max(Number(diaVenc) || 1, 1), 31);
+  let ano = janela.de.getFullYear(), mes = janela.de.getMonth();
+  for (let volta = 0; volta < 2; volta++) {
+    const ultimo = new Date(ano, mes + 1, 0).getDate();
+    const cand = new Date(ano, mes, Math.min(d, ultimo), 12);
+    if (cand >= janela.de && cand <= janela.ate) return true;
+    mes++;
+    if (mes > 11) { mes = 0; ano++; }
+  }
+  return false;
+}
+
+function finIndicadores(linhas, hoje) {
+  const abertas = linhas.filter(function (c) { return c.ativo && c.status !== 'pago'; });
+  const janela = finJanelaProximaSemana(hoje);
+  let aReceber = 0, semana = 0, inad = 0;
+  abertas.forEach(function (c) {
+    const cent = Math.round(Number(c.valor || 0) * 100);
+    aReceber += cent;
+    if (finVenceNaJanela(c.vencimento_dia, janela)) semana += cent;
+    if (finEhInadimplente(c, hoje)) inad++;
+  });
+  function diaMes(d) {
+    return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+  return {
+    a_receber: aReceber / 100,
+    a_receber_qtd: abertas.length,
+    proxima_semana: semana / 100,
+    semana_de: diaMes(janela.de),
+    semana_ate: diaMes(janela.ate),
+    inadimplentes: inad
+  };
+}
+
+/* O filtro da tabela. '' = todas; 'inadimplentes' = só quem venceu. */
+let FIN_FILTRO = '';
+
 function desenhaFinanceiro() {
   const linhas = FIN_CLIENTES;
-  const soma = function (campo) {
-    return linhas.reduce(function (a, r) { return a + Number(r[campo] || 0); }, 0);
-  };
+  const hoje = new Date();
+  const ind = finIndicadores(linhas, hoje);
+
+  // a MESMA regra do indicador decide quem fica na tabela filtrada
+  const visiveis = FIN_FILTRO === 'inadimplentes'
+    ? linhas.filter(function (c) { return finEhInadimplente(c, hoje); })
+    : linhas;
 
   document.getElementById('painel-financeiro').innerHTML =
     '<div class="row row-wrap" style="justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px">' +
-      '<div class="small muted">' + linhas.length + ' cliente(s) na carteira · ' +
-      'mensalidades ' + finDinheiro(soma('valor')) + '</div>' +
+      '<div class="small muted">' + linhas.length + ' cobrança(s) na carteira</div>' +
       '<div class="row row-wrap" style="gap:10px">' +
         '<button class="btn btn-sm btn-ghost" id="fin-baixar">Baixar relatório</button>' +
         '<button class="btn btn-sm btn-ghost" id="fin-importar">Importar clientes</button>' +
         '<button class="btn btn-sm" id="fin-novo">Novo cliente</button>' +
       '</div>' +
     '</div>' +
+
+    /* ---- os indicadores, nascidos das mesmas linhas da tabela ---- */
+    '<div class="fd2-grade" style="margin-bottom:16px">' +
+      '<div class="fd2-carta">' +
+        '<div class="fd2-tit">Valor total a receber</div>' +
+        '<div class="fd2-val" style="color:#157347">' + finDinheiro(ind.a_receber) + '</div>' +
+        '<div class="fd2-sub">' + ind.a_receber_qtd + ' cobrança(s) em aberto</div>' +
+        '<div class="fd2-barra" style="background:#1fbf6e"></div>' +
+      '</div>' +
+      '<div class="fd2-carta">' +
+        '<div class="fd2-tit">Previsão próxima semana</div>' +
+        '<div class="fd2-val" style="color:#26418f">' + finDinheiro(ind.proxima_semana) + '</div>' +
+        '<div class="fd2-sub">vencimentos de ' + esc(ind.semana_de) + ' a ' + esc(ind.semana_ate) + '</div>' +
+        '<div class="fd2-barra" style="background:#6f8bf0"></div>' +
+      '</div>' +
+      '<button type="button" class="fd2-carta fd2-clique' +
+        (FIN_FILTRO === 'inadimplentes' ? ' on' : '') + '" id="fin-card-inad">' +
+        '<div class="fd2-tit">Inadimplentes</div>' +
+        '<div class="fd2-val" style="color:#b02a20">' + ind.inadimplentes +
+          ' <span style="font-size:15px;font-weight:600">cliente' + (ind.inadimplentes === 1 ? '' : 's') + '</span></div>' +
+        '<div class="fd2-sub">' + (FIN_FILTRO === 'inadimplentes'
+          ? 'filtrando a tabela — clique para ver todas'
+          : 'clique para filtrar a tabela') + '</div>' +
+        '<div class="fd2-barra" style="background:#d9453a"></div>' +
+      '</button>' +
+    '</div>' +
+
+    (FIN_FILTRO === 'inadimplentes'
+      ? '<div class="row" style="margin-bottom:12px"><span class="fin-chip">Mostrando só os inadimplentes' +
+        '<button type="button" id="fin-limpa-filtro" title="ver todas">✕ ver todas</button></span></div>'
+      : '') +
 
     '<div class="fin-quadro">' +
       '<div class="fin-topo">' +
@@ -67,11 +172,12 @@ function desenhaFinanceiro() {
       '</div>' +
       '<div style="overflow-x:auto">' +
       '<table class="fin-tab"><thead><tr>' +
-        '<th>Clientes</th><th>Valor</th><th>Setup</th><th>Hospedagem</th>' +
-        '<th>Vencimento</th><th>Status</th><th>Responsável</th><th>Observação</th><th></th>' +
+        '<th>Cliente</th><th>Valor</th><th>Vencimento</th><th>Status</th>' +
+        '<th>Responsável</th><th>Observação</th><th></th>' +
       '</tr></thead><tbody>' +
-      (linhas.length ? linhas.map(finLinha).join('')
-        : '<tr><td colspan="9" style="padding:26px">Nenhum cliente cadastrado ainda.</td></tr>') +
+      (visiveis.length ? visiveis.map(finLinha).join('')
+        : '<tr><td colspan="7" style="padding:26px">' +
+          (FIN_FILTRO ? 'Nenhum inadimplente. 🎉' : 'Nenhuma cobrança cadastrada ainda.') + '</td></tr>') +
       '</tbody></table>' +
       '</div>' +
     '</div>';
@@ -82,14 +188,23 @@ function desenhaFinanceiro() {
   document.querySelectorAll('.fin-editar').forEach(function (b) {
     b.addEventListener('click', function () { abreFinCliente(b.dataset.id); });
   });
+
+  // o cartão liga e desliga o filtro — sem recarregar nada
+  document.getElementById('fin-card-inad').addEventListener('click', function () {
+    FIN_FILTRO = FIN_FILTRO === 'inadimplentes' ? '' : 'inadimplentes';
+    desenhaFinanceiro();
+  });
+  const limpa = document.getElementById('fin-limpa-filtro');
+  if (limpa) limpa.addEventListener('click', function () {
+    FIN_FILTRO = '';
+    desenhaFinanceiro();
+  });
 }
 
 function finLinha(r) {
   return '<tr>' +
     '<td class="fin-nome' + (r.destaque ? ' on' : '') + '">' + esc(r.cliente) + '</td>' +
     '<td class="fin-val">' + finDinheiro(r.valor) + '</td>' +
-    '<td class="fin-val">' + (r.setup ? finDinheiro(r.setup) : '') + '</td>' +
-    '<td class="fin-val">' + (r.hospedagem ? finDinheiro(r.hospedagem) : '') + '</td>' +
     '<td>' + String(r.vencimento_dia).padStart(2, '0') + '/mês</td>' +
     '<td><span class="fin-st ' + esc(r.status) + '">' + esc(r.status_nome) + '</span></td>' +
     '<td class="fin-resp">' + esc(r.responsavel || '') +
@@ -448,6 +563,204 @@ function desenhaPreviaImportacao() {
       this.textContent = 'Importar ' + corpo.length + ' cliente(s)';
     }
   });
+}
+
+/* ============================================================
+   OUTROS GASTOS
+   De propósito simples: um caderninho de despesas avulsas com o
+   total do período em cima. O mesmo filtro do dashboard.
+   ============================================================ */
+let GASTOS_PERIODO = { tipo: 'mes', de: '', ate: '' };
+
+function gastosPeriodoDatas() {
+  const hoje = new Date();
+  function iso(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0');
+  }
+  if (GASTOS_PERIODO.tipo === 'hoje') return { de: iso(hoje), ate: iso(hoje) };
+  if (GASTOS_PERIODO.tipo === 'ano') return { de: hoje.getFullYear() + '-01-01', ate: hoje.getFullYear() + '-12-31' };
+  if (GASTOS_PERIODO.tipo === 'personalizado' && GASTOS_PERIODO.de && GASTOS_PERIODO.ate) {
+    return { de: GASTOS_PERIODO.de, ate: GASTOS_PERIODO.ate };
+  }
+  return {
+    de: iso(new Date(hoje.getFullYear(), hoje.getMonth(), 1)),
+    ate: iso(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0))
+  };
+}
+
+async function carregaFinGastos() {
+  const alvo = document.getElementById('painel-fingastos');
+  alvo.innerHTML = '<div class="spinner"></div>';
+  try {
+    const p = gastosPeriodoDatas();
+    const d = await apiFin('fg_lista', { params: { de: p.de, ate: p.ate } });
+    desenhaFinGastos(d);
+  } catch (e) {
+    alvo.innerHTML = '<div class="alert alert-erro">' + esc(e.message) + '</div>';
+  }
+}
+
+function dataBrCurta(iso) {
+  if (!iso) return '—';
+  const p = String(iso).split('-');
+  return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : iso;
+}
+
+function desenhaFinGastos(d) {
+  const gastos = d.gastos || [];
+  const P = GASTOS_PERIODO;
+
+  document.getElementById('painel-fingastos').innerHTML =
+    '<div class="row row-wrap" style="justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px">' +
+      '<div class="fd2-filtro" id="fg-filtro">' +
+        ['hoje|Hoje', 'mes|Este mês', 'ano|Este ano', 'personalizado|Personalizado'].map(function (op) {
+          const par = op.split('|');
+          return '<button type="button" data-p="' + par[0] + '"' +
+            (P.tipo === par[0] ? ' class="on"' : '') + '>' + par[1] + '</button>';
+        }).join('') +
+      '</div>' +
+      '<button class="btn btn-sm" id="fg-novo">+ Novo gasto</button>' +
+    '</div>' +
+
+    '<div class="row row-wrap" id="fg-datas" style="gap:10px;align-items:flex-end;margin:0 0 14px;' +
+      (P.tipo === 'personalizado' ? '' : 'display:none') + '">' +
+      '<div class="field" style="margin:0"><label for="fg-de">Data inicial</label>' +
+        '<input type="date" id="fg-de" value="' + esc(P.de) + '"></div>' +
+      '<div class="field" style="margin:0"><label for="fg-ate">Data final</label>' +
+        '<input type="date" id="fg-ate" value="' + esc(P.ate) + '"></div>' +
+      '<button class="btn btn-sm" id="fg-aplicar">Aplicar</button>' +
+    '</div>' +
+
+    '<div class="fd2-grade" style="grid-template-columns:minmax(240px,340px);margin-bottom:16px">' +
+      '<div class="fd2-carta">' +
+        '<div class="fd2-tit">Total de gastos</div>' +
+        '<div class="fd2-val" style="color:#b02a20">' + finDinheiro(d.total) + '</div>' +
+        '<div class="fd2-sub">' + gastos.length + ' gasto(s) no período</div>' +
+        '<div class="fd2-barra" style="background:#d9453a"></div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="card" style="padding:0;overflow:hidden">' +
+      '<div style="overflow-x:auto">' +
+      '<table class="tbl" style="min-width:560px"><thead><tr>' +
+        '<th style="padding:14px 16px 10px">Item</th><th>Valor</th><th>Data</th><th>Observação</th><th></th>' +
+      '</tr></thead><tbody>' +
+      (gastos.length ? gastos.map(function (g) {
+        return '<tr>' +
+          '<td style="padding-left:16px;font-weight:600">' + esc(g.item) + '</td>' +
+          '<td style="font-variant-numeric:tabular-nums">' + finDinheiro(g.valor) + '</td>' +
+          '<td class="small muted" style="white-space:nowrap">' + dataBrCurta(g.data) + '</td>' +
+          '<td class="small muted">' + esc(g.observacao || '') + '</td>' +
+          '<td style="text-align:right;padding-right:14px;white-space:nowrap">' +
+            '<button class="btn btn-sm btn-ghost fg-editar" data-id="' + esc(g.id) + '">Editar</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('')
+        : '<tr><td colspan="5" style="padding:26px" class="muted">Nenhum gasto neste período.</td></tr>') +
+      '</tbody></table>' +
+      '</div>' +
+    '</div>';
+
+  document.getElementById('fg-novo').addEventListener('click', function () { abreGasto(null, d); });
+  document.querySelectorAll('.fg-editar').forEach(function (b) {
+    b.addEventListener('click', function () { abreGasto(b.dataset.id, d); });
+  });
+
+  document.querySelectorAll('#fg-filtro button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      GASTOS_PERIODO.tipo = btn.dataset.p;
+      if (GASTOS_PERIODO.tipo === 'personalizado') {
+        document.querySelectorAll('#fg-filtro button').forEach(function (x) { x.classList.toggle('on', x === btn); });
+        document.getElementById('fg-datas').style.display = '';
+        if (GASTOS_PERIODO.de && GASTOS_PERIODO.ate) carregaFinGastos();
+      } else {
+        carregaFinGastos();
+      }
+    });
+  });
+  const aplicar = document.getElementById('fg-aplicar');
+  if (aplicar) aplicar.addEventListener('click', function () {
+    const de = (document.getElementById('fg-de') || {}).value;
+    const ate = (document.getElementById('fg-ate') || {}).value;
+    if (!de || !ate) return toast('Escolha as duas datas', true);
+    GASTOS_PERIODO.de = de;
+    GASTOS_PERIODO.ate = ate;
+    carregaFinGastos();
+  });
+}
+
+function abreGasto(id, dados) {
+  const novo = !id;
+  const g = novo ? { data: gastosPeriodoDatas().ate ? new Date().toISOString().slice(0, 10) : '' }
+    : ((dados.gastos || []).filter(function (x) { return x.id === id; })[0] || {});
+
+  document.getElementById('g-nome').textContent = novo ? 'Novo gasto' : (g.item || 'Gasto');
+  document.getElementById('g-sub').textContent = 'Entra na tabela e o total do período atualiza sozinho.';
+
+  document.getElementById('g-corpo').innerHTML =
+    '<div class="field"><label for="fg-item">O que foi</label>' +
+      '<span class="hint">Ex.: Material de escritório, cabo HDMI, café, manutenção…</span>' +
+      '<input id="fg-item" value="' + esc(g.item || '') + '" maxlength="160"></div>' +
+    '<div class="row row-wrap" style="gap:14px">' +
+      '<div class="field" style="flex:1;min-width:150px"><label for="fg-valor">Valor</label>' +
+        '<span class="hint">Ex.: 350 ou 89,90</span>' +
+        '<input id="fg-valor" value="' + esc(g.valor === undefined ? '' : g.valor) + '"></div>' +
+      '<div class="field" style="flex:1;min-width:170px"><label for="fg-data">Data</label>' +
+        '<span class="hint">Quando o gasto aconteceu.</span>' +
+        '<input type="date" id="fg-data" value="' + esc(g.data || new Date().toISOString().slice(0, 10)) + '"></div>' +
+    '</div>' +
+    '<div class="field"><label for="fg-obs">Observação</label>' +
+      '<span class="hint">Opcional.</span>' +
+      '<input id="fg-obs" value="' + esc(g.observacao || '') + '" maxlength="400"></div>' +
+    '<div class="row" style="gap:12px;margin-top:20px">' +
+      '<button class="btn" id="fg-salvar">' + (novo ? 'Adicionar' : 'Salvar') + '</button>' +
+      (novo ? '' : '<button class="btn btn-ghost" id="fg-excluir" style="color:var(--red)">Excluir</button>') +
+    '</div>' +
+    '<div id="fg-saida"></div>';
+
+  document.getElementById('fundo').style.display = 'block';
+  document.getElementById('gaveta').style.display = 'flex';
+
+  document.getElementById('fg-salvar').addEventListener('click', async function () {
+    const corpo = {
+      item: (document.getElementById('fg-item') || {}).value || '',
+      valor: (document.getElementById('fg-valor') || {}).value || '',
+      data: (document.getElementById('fg-data') || {}).value || '',
+      observacao: (document.getElementById('fg-obs') || {}).value || ''
+    };
+    if (!novo) corpo.id = g.id;
+    if (!corpo.item.trim()) return toast('Escreva o que foi o gasto', true);
+
+    this.disabled = true;
+    this.innerHTML = '<span class="spinner"></span> Salvando…';
+    try {
+      await apiFin('fg_salvar', { body: corpo });
+      toast(novo ? 'Gasto adicionado' : 'Gasto salvo');
+      fechaGaveta();
+      carregaFinGastos();
+    } catch (e) {
+      document.getElementById('fg-saida').innerHTML =
+        '<div class="alert alert-erro" style="margin-top:14px">' + esc(e.message) + '</div>';
+      this.disabled = false;
+      this.textContent = novo ? 'Adicionar' : 'Salvar';
+    }
+  });
+
+  const btnEx = document.getElementById('fg-excluir');
+  if (btnEx) {
+    btnEx.addEventListener('click', function () {
+      spConfirma('Excluir este gasto?', '<strong>' + esc(g.item || '') + '</strong> de ' +
+        finDinheiro(g.valor) + ' sai da tabela e do total.', async function () {
+        try {
+          await apiFin('fg_excluir', { body: { id: g.id } });
+          toast('Gasto excluído');
+          fechaGaveta();
+          carregaFinGastos();
+        } catch (e) { toast(e.message, true); }
+      }, 'Excluir');
+    });
+  }
 }
 
 /* ---------------------------------------------- o relatório
