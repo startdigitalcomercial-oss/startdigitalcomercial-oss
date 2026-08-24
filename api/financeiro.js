@@ -494,6 +494,55 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    // ---------------------------------------------------- DRE
+    // Entradas - Despesas = Resultado. Nenhum numero e digitado nem
+    // guardado: os tres saem dos lancamentos que ja existem. Marcou
+    // uma cobranca como paga ou mexeu numa despesa? O DRE muda junto,
+    // porque ele le da mesma fonte.
+    if (action === 'fin_dre') {
+      await garantirCompetencias();
+      const comp = competenciaDe(params);
+
+      // ENTRADAS = o que o cliente REALMENTE pagou nesta competencia.
+      // Nao e "valor a receber": so entra quem esta com status pago.
+      const cobrancas = await carteira(comp);
+      const pagas = cobrancas.filter(function (c) { return c.ativo && c.status === 'pago'; });
+      const entradasCent = pagas.reduce(function (a, c) { return a + centavos(c.valor); }, 0);
+
+      // A MESMA competencia vira o intervalo de datas das despesas:
+      // do dia 1 ao ultimo dia daquele mes.
+      const de = comp.ano + '-' + String(comp.mes).padStart(2, '0') + '-01';
+      const ultimoDia = new Date(comp.ano, comp.mes, 0).getDate();
+      const ate = comp.ano + '-' + String(comp.mes).padStart(2, '0') + '-' + String(ultimoDia).padStart(2, '0');
+
+      const todasDespesas = await db.select('finance_expenses', { order: 'data.desc', select: '*' });
+      const despesas = todasDespesas.filter(function (g) {
+        const d = String(g.data || '').slice(0, 10);
+        return d >= de && d <= ate;
+      });
+      const despesasCent = despesas.reduce(function (a, g) { return a + centavos(g.valor); }, 0);
+
+      // em centavos ate o fim: subtracao em ponto flutuante erra
+      const resultadoCent = entradasCent - despesasCent;
+
+      return u.ok(res, {
+        competencia: comp,
+        competencia_atual: competenciaAtual(),
+        competencias: await competenciasExistentes(),
+        meses: MESES,
+        entradas: reais(entradasCent),
+        entradas_qtd: pagas.length,
+        despesas: reais(despesasCent),
+        despesas_qtd: despesas.length,
+        resultado: reais(resultadoCent),
+        // quanto ainda esta em aberto no mes — nao entra na conta,
+        // mas explica por que a entrada nao e a carteira inteira
+        em_aberto: reais(cobrancas.filter(function (c) { return c.ativo && c.status !== 'pago'; })
+          .reduce(function (a, c) { return a + centavos(c.valor); }, 0)),
+        periodo: { de: de, ate: ate }
+      });
+    }
+
     // A virada por fora (cron mensal). Devolve o que criou, e chamar
     // duas vezes no mesmo mês não cria nada de novo.
     if (action === 'fin_virada') {
