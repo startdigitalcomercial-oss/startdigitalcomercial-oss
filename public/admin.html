@@ -469,6 +469,20 @@
   .fd2-linha:hover { color: var(--label); }
   .fd2-linha:disabled { color: var(--label-3); cursor: default; opacity: .6; }
 
+  /* o cartao de inadimplentes e um botao: clicou, filtrou a tabela */
+  button.fd2-carta { font-family: inherit; text-align: left; cursor: pointer;
+                     transition: border-color .15s, box-shadow .15s, transform .12s; }
+  button.fd2-carta:hover { border-color: #e0a29c; box-shadow: var(--shadow-1); transform: translateY(-1px); }
+  button.fd2-carta.on { border-color: #d9453a; box-shadow: 0 0 0 3px rgba(217,69,58,.12); }
+
+  .fin-chip { display: inline-flex; align-items: center; gap: 10px; background: #fbe3e0;
+              color: #b02a20; font-size: 13px; font-weight: 600; padding: 7px 8px 7px 14px;
+              border-radius: 999px; }
+  .fin-chip button { border: 0; background: rgba(176,42,32,.12); color: #b02a20; font-family: inherit;
+                     font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px;
+                     cursor: pointer; }
+  .fin-chip button:hover { background: rgba(176,42,32,.2); }
+
   .fd2-filtro { display: flex; gap: 2px; background: var(--fill-1); padding: 3px;
                 border-radius: 10px; }
   .fd2-filtro button { border: 0; background: transparent; font-family: inherit; font-size: 12.5px;
@@ -558,7 +572,8 @@
       <button type="button" class="nav-cab">Financeiro<svg class="seta" width="12" height="12" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
       <div class="nav-itens"><div>
       <button data-aba="findash"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M4 19.6h16"/><path d="M7.2 19.6v-6M12 19.6V8.4M16.8 19.6v-9"/><path d="M6.4 6.6 11 4.2l4.4 2 3.4-2.6"/></svg><span>Dashboard</span></button>
-      <button data-aba="financeiro"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6.6 12h.1M17.3 12h.1"/></svg><span>Clientes</span></button>
+      <button data-aba="financeiro"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6.6 12h.1M17.3 12h.1"/></svg><span>Cobranças</span></button>
+      <button data-aba="fingastos"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M6.2 4.2h11.6a1.6 1.6 0 0 1 1.6 1.6v13.4l-2.6-1.6-2.4 1.6-2.4-1.6-2.4 1.6-2.6-1.6V5.8a1.6 1.6 0 0 1 1.6-1.6z"/><path d="M8.6 9h6.8M8.6 12.6h4.6"/></svg><span>Outros Gastos</span></button>
 </div></div></div>
       <div class="nav-grupo" data-grupo="admin">
       <button type="button" class="nav-cab">Administração<svg class="seta" width="12" height="12" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
@@ -709,6 +724,11 @@
     <!-- ---------- FINANCEIRO: a planilha ---------- -->
     <section data-painel="financeiro" style="display:none">
       <div style="padding:22px 0 40px" id="painel-financeiro"></div>
+    </section>
+
+    <!-- ---------- FINANCEIRO: outros gastos ---------- -->
+    <section data-painel="fingastos" style="display:none">
+      <div style="padding:22px 0 40px" id="painel-fingastos"></div>
     </section>
 
     <!-- ---------- FINANCEIRO: o dashboard ---------- -->
