@@ -212,7 +212,10 @@ document.getElementById('abas').addEventListener('click', function (ev) {
     prequalificacao: carregaPrequal, aurea: carregaAurea, preonboarding: carregaBoasVindas,
     colaboradores: carregaColaboradores, avisos: carregaAvisos, usuarios: carregaUsuarios,
     conteudo: carregaConteudo, quiz: carregaQuiz, mensagens: carregaTemplates, ajustes: carregaAjustes,
-    financeiro: carregaFinanceiro, findash: carregaFinDash, fingastos: carregaFinGastos, findre: carregaFinDre, finclientes: carregaFinClientes,
+    financeiro: carregaFinanceiro, findash: carregaFinDash, fingastos: carregaFinGastos, findre: carregaFinDre,
+    // Se um arquivo de tela ainda nao subiu, o menu INTEIRO nao pode
+    // morrer por causa disso. Nome que falta = aba que nao carrega, so.
+    finclientes: (typeof carregaFinClientes === 'function' ? carregaFinClientes : null),
     space: carregaSpace
   };
   marcaGrupoAtivo();
