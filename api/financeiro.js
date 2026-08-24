@@ -482,6 +482,79 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    // ==========================================================
+    // OUTROS GASTOS — o caderninho de despesas avulsas.
+    // O total do período sai das MESMAS linhas da tabela: uma
+    // fonte só, sem número paralelo para divergir depois.
+    // ==========================================================
+    if (action === 'fg_lista') {
+      const todas = await db.select('finance_expenses', { order: 'data.desc,created_at.desc', select: '*' });
+
+      // filtro de período feito aqui mesmo, sobre as linhas
+      function dataOk(s) { return /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')) ? String(s) : null; }
+      const de = dataOk(params.de);
+      const ate = dataOk(params.ate);
+      const noPeriodo = todas.filter(function (g) {
+        const d = String(g.data || '').slice(0, 10);
+        if (de && d < de) return false;
+        if (ate && d > ate) return false;
+        return true;
+      });
+
+      const totalCent = noPeriodo.reduce(function (a, g) { return a + centavos(g.valor); }, 0);
+      return u.ok(res, {
+        gastos: noPeriodo.map(function (g) {
+          return {
+            id: g.id, item: g.item, valor: Number(g.valor || 0),
+            data: String(g.data || '').slice(0, 10), observacao: g.observacao || ''
+          };
+        }),
+        total: reais(totalCent),
+        total_geral_qtd: todas.length,
+        de: de, ate: ate
+      });
+    }
+
+    if (action === 'fg_salvar') {
+      if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
+      const body = await u.readBody(req);
+
+      const item = limpaTexto(body.item, 160);
+      if (!item) return u.fail(res, 400, 'Escreva o que foi o gasto.');
+      const valor = limpaValor(body.valor);
+      if (valor <= 0) return u.fail(res, 400, 'Confira o valor do gasto.');
+
+      let data = String(body.data || '').slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || isNaN(new Date(data + 'T12:00:00').getTime())) {
+        data = new Date().toISOString().slice(0, 10);
+      }
+
+      const patch = {
+        item: item, valor: valor, data: data,
+        observacao: limpaTexto(body.observacao, 400),
+        updated_at: new Date().toISOString()
+      };
+
+      let row;
+      if (body.id) {
+        row = await db.update('finance_expenses', patch, { id: 'eq.' + body.id });
+        if (!row) return u.fail(res, 404, 'Gasto nao encontrado.');
+      } else {
+        row = await db.insert('finance_expenses', patch);
+      }
+      return u.ok(res, {
+        gasto: { id: row.id, item: row.item, valor: Number(row.valor || 0), data: String(row.data || '').slice(0, 10), observacao: row.observacao || '' }
+      });
+    }
+
+    if (action === 'fg_excluir') {
+      if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
+      const body = await u.readBody(req);
+      if (!body.id) return u.fail(res, 400, 'Falta dizer qual gasto.');
+      await db.remove('finance_expenses', { id: 'eq.' + body.id });
+      return u.ok(res, { removido: true });
+    }
+
     if (action === 'fin_excluir') {
       if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
       const body = await u.readBody(req);
