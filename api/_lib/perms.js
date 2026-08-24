@@ -85,6 +85,7 @@ const ACOES = {
   fin_lista: 'financeiro', fin_resumo: 'financeiro', fin_relatorio: 'financeiro',
   fin_salvar: 'financeiro_mexer', fin_excluir: 'financeiro_mexer',
   fin_importar: 'financeiro_mexer',
+  fg_lista: 'financeiro', fg_salvar: 'financeiro_mexer', fg_excluir: 'financeiro_mexer',
 
   // --- Space Colaborador: libera dinheiro de verdade, mesma tranca ---
   sp_painel: 'financeiro',
@@ -138,12 +139,12 @@ function menuDoPapel(papel) {
   if (papel === 'dono') {
     return ['dashboard', 'vagas', 'triagem', 'candidatos', 'prequalificacao', 'aurea', 'preonboarding',
       'colaboradores', 'avisos', 'space', 'conteudo', 'quiz', 'mensagens',
-      'financeiro', 'findash', 'ajustes', 'usuarios'];
+      'financeiro', 'findash', 'fingastos', 'ajustes', 'usuarios'];
   }
   if (papel === 'rh') {
     return ['dashboard', 'vagas', 'triagem', 'candidatos', 'prequalificacao', 'aurea', 'preonboarding',
       'colaboradores', 'avisos', 'space', 'conteudo', 'quiz', 'mensagens',
-      'financeiro', 'findash', 'ajustes'];
+      'financeiro', 'findash', 'fingastos', 'ajustes'];
   }
   if (papel === 'avaliador') {
     return ['dashboard', 'vagas', 'triagem', 'candidatos', 'quiz', 'conteudo'];
