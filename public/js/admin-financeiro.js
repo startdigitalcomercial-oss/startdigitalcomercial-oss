@@ -7,6 +7,86 @@
 
 let FIN_CLIENTES = [];
 
+/* ============================================================
+   COMPETÊNCIA (mês/ano)
+   Um estado só, usado pela tela de Cobranças E pelo Dashboard —
+   é isso que impede um mostrar agosto enquanto o outro calcula
+   setembro. Começa no mês atual e o servidor confirma qual é.
+   ============================================================ */
+const FIN_MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+let FIN_COMP = null;              // {mes, ano} — null = "use o mês atual"
+let FIN_COMPS = [];               // as competências que existem no banco
+let FIN_COMP_ATUAL = null;        // qual é o mês corrente, segundo o servidor
+
+function finCompParams() {
+  return FIN_COMP ? { mes: FIN_COMP.mes, ano: FIN_COMP.ano } : {};
+}
+
+// Guarda o que o servidor devolveu sobre competências.
+function finGuardaComp(d) {
+  if (d.competencia) FIN_COMP = { mes: d.competencia.mes, ano: d.competencia.ano };
+  if (d.competencia_atual) FIN_COMP_ATUAL = d.competencia_atual;
+  if (Array.isArray(d.competencias)) FIN_COMPS = d.competencias;
+}
+
+// Os anos que o seletor oferece: os que existem no banco, mais o ano
+// corrente e o seguinte. Nada travado em 2026.
+function finAnosDisponiveis() {
+  const anos = {};
+  FIN_COMPS.forEach(function (c) { anos[c.ano] = true; });
+  const base = (FIN_COMP_ATUAL && FIN_COMP_ATUAL.ano) || new Date().getFullYear();
+  anos[base] = true;
+  anos[base + 1] = true;
+  if (FIN_COMP) anos[FIN_COMP.ano] = true;
+  return Object.keys(anos).map(Number).sort(function (a, b) { return b - a; });
+}
+
+// O seletor em si. `onde` é só um prefixo de id, para a mesma peça
+// poder aparecer nas duas telas sem os ids colidirem.
+function finSeletorComp(onde) {
+  const c = FIN_COMP || FIN_COMP_ATUAL || { mes: new Date().getMonth() + 1, ano: new Date().getFullYear() };
+  const ehAtual = FIN_COMP_ATUAL && c.mes === FIN_COMP_ATUAL.mes && c.ano === FIN_COMP_ATUAL.ano;
+  return '<div class="fin-comp">' +
+    '<svg width="15" height="15" viewBox="0 0 24 24" style="fill:none;stroke:currentColor;stroke-width:1.9;' +
+      'stroke-linecap:round;flex:none;opacity:.7"><rect x="3.5" y="5" width="17" height="15" rx="2.2"/>' +
+      '<path d="M3.5 9.6h17M8 3.4v3M16 3.4v3"/></svg>' +
+    '<select id="' + onde + '-mes">' +
+      FIN_MESES.map(function (nome, i) {
+        return '<option value="' + (i + 1) + '"' + (c.mes === i + 1 ? ' selected' : '') + '>' + nome + '</option>';
+      }).join('') +
+    '</select>' +
+    '<span class="barra">/</span>' +
+    '<select id="' + onde + '-ano">' +
+      finAnosDisponiveis().map(function (a) {
+        return '<option value="' + a + '"' + (c.ano === a ? ' selected' : '') + '>' + a + '</option>';
+      }).join('') +
+    '</select>' +
+    (ehAtual ? '<span class="agora">mês atual</span>'
+      : '<button type="button" class="voltar" id="' + onde + '-hoje">ir para o mês atual</button>') +
+  '</div>';
+}
+
+// Liga o seletor: trocou mês ou ano, recarrega a tela que o chamou.
+function finLigaSeletor(onde, recarrega) {
+  function troca() {
+    const mes = Number((document.getElementById(onde + '-mes') || {}).value);
+    const ano = Number((document.getElementById(onde + '-ano') || {}).value);
+    if (mes && ano) FIN_COMP = { mes: mes, ano: ano };
+    recarrega();
+  }
+  const m = document.getElementById(onde + '-mes');
+  const a = document.getElementById(onde + '-ano');
+  if (m) m.addEventListener('change', troca);
+  if (a) a.addEventListener('change', troca);
+  const hoje = document.getElementById(onde + '-hoje');
+  if (hoje) hoje.addEventListener('click', function () {
+    FIN_COMP = FIN_COMP_ATUAL ? { mes: FIN_COMP_ATUAL.mes, ano: FIN_COMP_ATUAL.ano } : null;
+    recarrega();
+  });
+}
+
 async function apiFin(action, opts) {
   opts = opts || {};
   const qs = new URLSearchParams(Object.assign({ action: action }, opts.params || {}));
@@ -34,8 +114,12 @@ async function carregaFinanceiro() {
   const alvo = document.getElementById('painel-financeiro');
   alvo.innerHTML = '<div class="spinner"></div>';
   try {
-    const d = await apiFin('fin_lista');
+    const d = await apiFin('fin_lista', { params: finCompParams() });
+    finGuardaComp(d);
     FIN_CLIENTES = d.clientes || [];
+    if ((d.viradas || []).length) {
+      toast('Competência ' + d.viradas.join(', ') + ' criada a partir do mês anterior');
+    }
     desenhaFinanceiro();
   } catch (e) {
     alvo.innerHTML = '<div class="alert alert-erro">' + esc(e.message) + '</div>';
@@ -87,6 +171,21 @@ function finVenceNaJanela(diaVenc, janela) {
   return false;
 }
 
+/* Qual é o "hoje" da competência que estou olhando?
+   No mês corrente, é hoje mesmo. Num mês já fechado, é o último dia
+   daquele mês — em agosto fechado, tudo que não foi pago venceu. Num
+   mês futuro, é a véspera: nada venceu ainda. */
+function finHojeDaCompetencia() {
+  const agora = new Date();
+  const c = FIN_COMP || FIN_COMP_ATUAL;
+  if (!c) return agora;
+  const at = FIN_COMP_ATUAL || { mes: agora.getMonth() + 1, ano: agora.getFullYear() };
+  const ord = function (x) { return x.ano * 12 + x.mes; };
+  if (ord(c) === ord(at)) return agora;
+  if (ord(c) < ord(at)) return new Date(c.ano, c.mes, 0, 23, 59, 59);   // último dia do mês
+  return new Date(c.ano, c.mes - 1, 1, 0, 0, 0);                        // 1º dia do mês futuro
+}
+
 function finIndicadores(linhas, hoje) {
   const abertas = linhas.filter(function (c) { return c.ativo && c.status !== 'pago'; });
   const janela = finJanelaProximaSemana(hoje);
@@ -115,8 +214,10 @@ let FIN_FILTRO = '';
 
 function desenhaFinanceiro() {
   const linhas = FIN_CLIENTES;
-  const hoje = new Date();
+  const hoje = finHojeDaCompetencia();
   const ind = finIndicadores(linhas, hoje);
+  const compAtual = FIN_COMP_ATUAL &&
+    FIN_COMP && FIN_COMP.mes === FIN_COMP_ATUAL.mes && FIN_COMP.ano === FIN_COMP_ATUAL.ano;
 
   // a MESMA regra do indicador decide quem fica na tabela filtrada
   const visiveis = FIN_FILTRO === 'inadimplentes'
@@ -125,13 +226,15 @@ function desenhaFinanceiro() {
 
   document.getElementById('painel-financeiro').innerHTML =
     '<div class="row row-wrap" style="justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px">' +
-      '<div class="small muted">' + linhas.length + ' cobrança(s) na carteira</div>' +
+      finSeletorComp('fc') +
       '<div class="row row-wrap" style="gap:10px">' +
         '<button class="btn btn-sm btn-ghost" id="fin-baixar">Baixar relatório</button>' +
         '<button class="btn btn-sm btn-ghost" id="fin-importar">Importar clientes</button>' +
         '<button class="btn btn-sm" id="fin-novo">Novo cliente</button>' +
       '</div>' +
     '</div>' +
+    '<div class="small muted" style="margin:-6px 0 14px">' + linhas.length + ' cobrança(s) nesta competência' +
+      (compAtual ? '' : ' · mês já fechado, o histórico fica como está') + '</div>' +
 
     /* ---- os indicadores, nascidos das mesmas linhas da tabela ---- */
     '<div class="fd2-grade" style="margin-bottom:16px">' +
@@ -143,9 +246,12 @@ function desenhaFinanceiro() {
       '</div>' +
       '<div class="fd2-carta">' +
         '<div class="fd2-tit">Previsão próxima semana</div>' +
-        '<div class="fd2-val" style="color:#26418f">' + finDinheiro(ind.proxima_semana) + '</div>' +
-        '<div class="fd2-sub">vencimentos de ' + esc(ind.semana_de) + ' a ' + esc(ind.semana_ate) + '</div>' +
-        '<div class="fd2-barra" style="background:#6f8bf0"></div>' +
+        '<div class="fd2-val" style="color:#26418f">' +
+          (compAtual ? finDinheiro(ind.proxima_semana) : '<span style="color:var(--label-3)">—</span>') + '</div>' +
+        '<div class="fd2-sub">' + (compAtual
+          ? 'vencimentos de ' + esc(ind.semana_de) + ' a ' + esc(ind.semana_ate)
+          : 'só no mês corrente') + '</div>' +
+        '<div class="fd2-barra" style="background:' + (compAtual ? '#6f8bf0' : 'var(--fio)') + '"></div>' +
       '</div>' +
       '<button type="button" class="fd2-carta fd2-clique' +
         (FIN_FILTRO === 'inadimplentes' ? ' on' : '') + '" id="fin-card-inad">' +
@@ -182,6 +288,7 @@ function desenhaFinanceiro() {
       '</div>' +
     '</div>';
 
+  finLigaSeletor('fc', carregaFinanceiro);
   document.getElementById('fin-novo').addEventListener('click', function () { abreFinCliente(null); });
   document.getElementById('fin-baixar').addEventListener('click', baixaRelatorioFin);
   document.getElementById('fin-importar').addEventListener('click', abreImportacao);
@@ -296,7 +403,7 @@ function abreFinCliente(id) {
     this.disabled = true;
     this.innerHTML = '<span class="spinner"></span> Salvando…';
     try {
-      await apiFin('fin_salvar', { body: corpo });
+      await apiFin('fin_salvar', { body: Object.assign(corpo, novo ? finCompParams() : {}) });
       toast(novo ? 'Cliente adicionado' : 'Cliente salvo');
       fechaGaveta();
       carregaFinanceiro();
@@ -541,7 +648,7 @@ function desenhaPreviaImportacao() {
     this.disabled = true;
     this.innerHTML = '<span class="spinner"></span> Importando…';
     try {
-      const r = await apiFin('fin_importar', { body: { linhas: linhas } });
+      const r = await apiFin('fin_importar', { body: Object.assign({ linhas: linhas }, finCompParams()) });
       document.getElementById('imp-saida').innerHTML =
         '<div class="alert ' + (r.importados ? 'alert-ok' : 'alert-aviso') + '" style="margin-top:16px">' +
           '<strong>' + r.importados + ' cliente(s) importado(s).</strong>' +
@@ -772,7 +879,8 @@ async function baixaRelatorioFin() {
   const antes = b ? b.textContent : '';
   if (b) { b.disabled = true; b.textContent = 'Gerando…'; }
   try {
-    const res = await fetch('/api/financeiro?action=fin_relatorio', {
+    const qs = new URLSearchParams(Object.assign({ action: 'fin_relatorio' }, finCompParams()));
+    const res = await fetch('/api/financeiro?' + qs, {
       headers: { Authorization: 'Bearer ' + TOKEN }
     });
     if (!res.ok) throw new Error('Não deu para gerar o relatório agora.');
@@ -822,53 +930,16 @@ async function escondeFinanceiroSeNaoPode() {
 /* ============================================================
    TELA 2 — o dashboard
    ============================================================ */
-/* O período escolhido fica guardado entre um redesenho e outro. */
-let FIN_PERIODO = { tipo: 'mes', de: '', ate: '' };
-
-function finPeriodoDatas() {
-  const hoje = new Date();
-  function iso(d) {
-    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' +
-      String(d.getDate()).padStart(2, '0');
-  }
-  if (FIN_PERIODO.tipo === 'hoje') return { de: iso(hoje), ate: iso(hoje) };
-  if (FIN_PERIODO.tipo === 'ano') {
-    return { de: hoje.getFullYear() + '-01-01', ate: hoje.getFullYear() + '-12-31' };
-  }
-  if (FIN_PERIODO.tipo === 'personalizado' && FIN_PERIODO.de && FIN_PERIODO.ate) {
-    return { de: FIN_PERIODO.de, ate: FIN_PERIODO.ate };
-  }
-  // padrão: este mês
-  return {
-    de: iso(new Date(hoje.getFullYear(), hoje.getMonth(), 1)),
-    ate: iso(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0))
-  };
-}
-
 async function carregaFinDash() {
   const alvo = document.getElementById('painel-findash');
   alvo.innerHTML = '<div class="spinner"></div>';
   try {
-    const p = finPeriodoDatas();
-    const d = await apiFin('fin_resumo', { params: { de: p.de, ate: p.ate } });
+    const d = await apiFin('fin_resumo', { params: finCompParams() });
+    finGuardaComp(d);
     desenhaFinDash(d.resumo || {}, d.cartoes || {});
   } catch (e) {
     alvo.innerHTML = '<div class="alert alert-erro">' + esc(e.message) + '</div>';
   }
-}
-
-/* Troca só os números quando o período muda — a página não pisca. */
-async function atualizaFinCartoes() {
-  const caixa = document.getElementById('fd2-cartoes');
-  if (!caixa) return carregaFinDash();
-  caixa.style.opacity = '.45';
-  try {
-    const p = finPeriodoDatas();
-    const d = await apiFin('fin_resumo', { params: { de: p.de, ate: p.ate } });
-    caixa.outerHTML = finCartoesHtml(d.cartoes || {});
-  } catch (e) { toast(e.message, true); }
-  const nova = document.getElementById('fd2-cartoes');
-  if (nova) nova.style.opacity = '';
 }
 
 /* Os três cartões no padrão da referência: borda clara, canto bem
@@ -917,30 +988,14 @@ function fdFila(s) {
 function desenhaFinDash(r, cartoes) {
   const semana = r.proxima_semana_lista || [];
   const depois = r.proximas_depois || [];
-  const P = FIN_PERIODO;
 
   document.getElementById('painel-findash').innerHTML =
     '<div class="row row-wrap" style="justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px">' +
-      '<div class="small muted">' + (r.clientes || 0) + ' cliente(s) com contrato ativo</div>' +
-      '<div class="row row-wrap" style="gap:8px;align-items:center">' +
-        '<div class="fd2-filtro" id="fd2-filtro">' +
-          ['hoje|Hoje', 'mes|Este mês', 'ano|Este ano', 'personalizado|Personalizado'].map(function (op) {
-            const par = op.split('|');
-            return '<button type="button" data-p="' + par[0] + '"' +
-              (P.tipo === par[0] ? ' class="on"' : '') + '>' + par[1] + '</button>';
-          }).join('') +
-        '</div>' +
+      '<div class="small muted">' + (r.clientes || 0) + ' cobrança(s) nesta competência</div>' +
+      '<div class="row row-wrap" style="gap:10px;align-items:center">' +
+        finSeletorComp('fd') +
         '<button class="btn btn-sm" id="fd-baixar">Baixar relatório completo</button>' +
       '</div>' +
-    '</div>' +
-
-    '<div class="row row-wrap" id="fd2-datas" style="gap:10px;align-items:flex-end;margin:0 0 14px;' +
-      (P.tipo === 'personalizado' ? '' : 'display:none') + '">' +
-      '<div class="field" style="margin:0"><label for="fd2-de">Data inicial</label>' +
-        '<input type="date" id="fd2-de" value="' + esc(P.de) + '"></div>' +
-      '<div class="field" style="margin:0"><label for="fd2-ate">Data final</label>' +
-        '<input type="date" id="fd2-ate" value="' + esc(P.ate) + '"></div>' +
-      '<button class="btn btn-sm" id="fd2-aplicar">Aplicar</button>' +
     '</div>' +
 
     finCartoesHtml(cartoes || {}) +
@@ -958,20 +1013,20 @@ function desenhaFinDash(r, cartoes) {
         (r.recebido_qtd || 0) + ' cliente(s) em dia.', 'ok') +
     '</div>' +
 
-    '<hr class="sep" style="margin:26px 0 18px">' +
-    '<h3 style="font-size:15px;margin:0 0 4px">Previsão de recebimento — próxima semana</h3>' +
-    '<p class="small muted" style="margin:0 0 14px">De hoje até ' + esc(r.proxima_semana_ate || '') +
-      '. Total previsto: <strong>' + finDinheiro(r.proxima_semana) + '</strong> ' +
-      'em ' + (r.proxima_semana_qtd || 0) + ' cobrança(s).</p>' +
-
-    '<div class="fd-sem">' +
-      (semana.length ? semana.map(fdFila).join('')
-        : '<div class="fd-sem-linha"><span class="muted">Nada vence nos próximos 7 dias.</span></div>') +
-    '</div>' +
-
-    (semana.length || !depois.length ? '' :
-      '<p class="small muted" style="margin:18px 0 8px">O que vem depois:</p>' +
-      '<div class="fd-sem">' + depois.map(fdFila).join('') + '</div>') +
+    // a previsão olha para a frente: em mês fechado, não faz sentido
+    (r.competencia_corrente === false ? '' :
+      '<hr class="sep" style="margin:26px 0 18px">' +
+      '<h3 style="font-size:15px;margin:0 0 4px">Previsão de recebimento — próxima semana</h3>' +
+      '<p class="small muted" style="margin:0 0 14px">De hoje até ' + esc(r.proxima_semana_ate || '') +
+        '. Total previsto: <strong>' + finDinheiro(r.proxima_semana) + '</strong> ' +
+        'em ' + (r.proxima_semana_qtd || 0) + ' cobrança(s).</p>' +
+      '<div class="fd-sem">' +
+        (semana.length ? semana.map(fdFila).join('')
+          : '<div class="fd-sem-linha"><span class="muted">Nada vence nos próximos 7 dias.</span></div>') +
+      '</div>' +
+      (semana.length || !depois.length ? '' :
+        '<p class="small muted" style="margin:18px 0 8px">O que vem depois:</p>' +
+        '<div class="fd-sem">' + depois.map(fdFila).join('') + '</div>')) +
 
     '<hr class="sep" style="margin:26px 0 18px">' +
     '<div class="card" style="padding:18px">' +
@@ -987,33 +1042,8 @@ function desenhaFinDash(r, cartoes) {
     if (b) b.addEventListener('click', baixaRelatorioFinDash);
   });
 
-  // ---- o seletor de período ----
-  document.querySelectorAll('#fd2-filtro button').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      FIN_PERIODO.tipo = btn.dataset.p;
-      document.querySelectorAll('#fd2-filtro button').forEach(function (x) {
-        x.classList.toggle('on', x === btn);
-      });
-      const datas = document.getElementById('fd2-datas');
-      if (FIN_PERIODO.tipo === 'personalizado') {
-        datas.style.display = '';
-        // só busca quando as duas datas estiverem escolhidas
-        if (FIN_PERIODO.de && FIN_PERIODO.ate) atualizaFinCartoes();
-      } else {
-        datas.style.display = 'none';
-        atualizaFinCartoes();
-      }
-    });
-  });
-  const aplicar = document.getElementById('fd2-aplicar');
-  if (aplicar) aplicar.addEventListener('click', function () {
-    const de = (document.getElementById('fd2-de') || {}).value;
-    const ate = (document.getElementById('fd2-ate') || {}).value;
-    if (!de || !ate) return toast('Escolha as duas datas', true);
-    FIN_PERIODO.de = de;
-    FIN_PERIODO.ate = ate;
-    atualizaFinCartoes();
-  });
+  // ---- a competência manda em tudo nesta tela ----
+  finLigaSeletor('fd', carregaFinDash);
 
   // os cartões levam para a lista de clientes
   document.querySelectorAll('.fd2-ver-clientes').forEach(function (b) {
@@ -1030,7 +1060,8 @@ async function baixaRelatorioFinDash() {
   const antes = b.textContent;
   b.disabled = true; b.textContent = 'Gerando…';
   try {
-    const res = await fetch('/api/financeiro?action=fin_relatorio', {
+    const qs = new URLSearchParams(Object.assign({ action: 'fin_relatorio' }, finCompParams()));
+    const res = await fetch('/api/financeiro?' + qs, {
       headers: { Authorization: 'Bearer ' + TOKEN }
     });
     if (!res.ok) throw new Error('Não deu para gerar o relatório agora.');
