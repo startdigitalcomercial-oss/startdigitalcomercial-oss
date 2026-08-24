@@ -49,15 +49,156 @@ function paraTela(r) {
     destaque: r.destaque === true,
     ativo: r.ativo !== false,
     pago_em: r.pago_em || null,
+    ref_mes: Number(r.ref_mes || 0),
+    ref_ano: Number(r.ref_ano || 0),
     position: Number(r.position || 1)
   };
 }
 
-async function carteira() {
-  const linhas = await db.select('finance_clients', {
-    order: 'position.asc,created_at.asc', select: '*'
-  });
+// ============================================================
+// COMPETENCIA MENSAL
+//
+// Cada cobranca pertence a um mes/ano. "Agosto/2026" e uma lista
+// propria: mexer em setembro nao toca agosto, e apagar agosto nao
+// apaga setembro. Toda a tela — tabela, cartoes e dashboard — le da
+// MESMA competencia, entao nunca divergem.
+// ============================================================
+const MESES = ['Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+// O mes de hoje NO BRASIL. O servidor roda em UTC: as 21h de dia 31
+// em Sao Paulo ja e dia 1 em UTC, e a virada aconteceria cedo demais.
+function hojeNoBrasil() {
+  const s = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date());
+  const p = s.split('-');
+  return { ano: Number(p[0]), mes: Number(p[1]), dia: Number(p[2]), iso: s };
+}
+
+function competenciaAtual() {
+  const h = hojeNoBrasil();
+  return { mes: h.mes, ano: h.ano };
+}
+
+// Numero unico e crescente por competencia: 2026*12+8. Serve para
+// comparar e para andar mes a mes sem errar a virada do ano.
+function ordinal(mes, ano) { return ano * 12 + (mes - 1); }
+function deOrdinal(n) { return { mes: (n % 12) + 1, ano: Math.floor(n / 12) }; }
+
+// A competencia pedida pela tela, com o mes atual como padrao.
+function competenciaDe(params) {
+  const mes = Number(params && params.mes);
+  const ano = Number(params && params.ano);
+  if (mes >= 1 && mes <= 12 && ano >= 2000 && ano <= 2200) return { mes: mes, ano: ano };
+  return competenciaAtual();
+}
+
+async function carteira(comp) {
+  const q = { order: 'position.asc,created_at.asc', select: '*' };
+  if (comp) {
+    q.ref_mes = 'eq.' + comp.mes;
+    q.ref_ano = 'eq.' + comp.ano;
+  }
+  const linhas = await db.select('finance_clients', q);
   return linhas.map(paraTela);
+}
+
+// ------------------------------------------------------------
+// A VIRADA DO MES
+//
+// Idempotente de proposito: roda toda vez que alguem abre o
+// Financeiro e so cria o que falta. Se ninguem abrir o sistema por
+// tres meses, ela cria os tres de uma vez, cada um herdando do
+// anterior — o historico nunca fica com buraco.
+//
+// A trava contra duplicidade nao e este codigo: e o indice unico
+// (cliente, mes, ano) no banco. Duas pessoas abrindo no mesmo
+// segundo? Uma insere, a outra leva erro e segue a vida.
+// ------------------------------------------------------------
+async function garantirCompetencias() {
+  const atual = competenciaAtual();
+  const alvo = ordinal(atual.mes, atual.ano);
+
+  // qual e a competencia mais recente que ja existe?
+  const ultimas = await db.select('finance_clients', {
+    order: 'ref_ano.desc,ref_mes.desc', select: 'ref_mes,ref_ano', limit: 1
+  });
+  if (!ultimas.length) return { criadas: [] };          // carteira vazia: nada a virar
+
+  let cursor = ordinal(Number(ultimas[0].ref_mes), Number(ultimas[0].ref_ano));
+  if (cursor >= alvo) return { criadas: [] };           // ja estamos em dia
+
+  const criadas = [];
+  // no maximo 24 saltos: protege contra data maluca do servidor
+  for (let volta = 0; volta < 24 && cursor < alvo; volta++) {
+    const origem = deOrdinal(cursor);
+    const destino = deOrdinal(cursor + 1);
+
+    // ja existe? (outra requisicao pode ter criado meio segundo atras)
+    const jaTem = await db.selectOne('finance_clients', {
+      ref_mes: 'eq.' + destino.mes, ref_ano: 'eq.' + destino.ano, select: 'id'
+    });
+
+    if (!jaTem) {
+      const base = await db.select('finance_clients', {
+        ref_mes: 'eq.' + origem.mes, ref_ano: 'eq.' + origem.ano,
+        ativo: 'is.true',                                 // contrato encerrado nao gera cobranca nova
+        order: 'position.asc', select: '*'
+      });
+
+      if (base.length) {
+        const agora = new Date().toISOString();
+        const novas = base.map(function (r) {
+          return {
+            cliente: r.cliente,
+            valor: r.valor, setup: r.setup, hospedagem: r.hospedagem,
+            vencimento_dia: r.vencimento_dia,
+            // mes novo, cobranca nova: comeca em aberto. O que era
+            // "pago" em agosto nao nasce pago em setembro.
+            status: 'aguardando',
+            pago_em: null,
+            responsavel: r.responsavel, telefone: r.telefone,
+            // a observacao e do mes ("prometeu pagar sexta"), nao viaja
+            observacao: null,
+            destaque: r.destaque, ativo: true,
+            position: r.position,
+            ref_mes: destino.mes, ref_ano: destino.ano,
+            created_at: agora, updated_at: agora
+          };
+        });
+        try {
+          await db.insert('finance_clients', novas);
+          criadas.push(destino.mes + '/' + destino.ano);
+        } catch (e) {
+          // o indice unico barrou: alguem criou primeiro. Tudo certo.
+          console.error('[financeiro] virada ja feita por outra chamada:', destino.mes + '/' + destino.ano);
+        }
+      }
+    }
+    cursor++;
+  }
+  return { criadas: criadas };
+}
+
+// As competencias que existem no banco, da mais nova para a mais
+// velha — e o mes atual sempre entra, mesmo que ainda esteja vazio.
+async function competenciasExistentes() {
+  const linhas = await db.select('finance_clients', {
+    order: 'ref_ano.desc,ref_mes.desc', select: 'ref_mes,ref_ano'
+  });
+  const vistos = {};
+  const lista = [];
+  linhas.forEach(function (r) {
+    const chave = r.ref_ano + '-' + r.ref_mes;
+    if (vistos[chave]) return;
+    vistos[chave] = true;
+    lista.push({ mes: Number(r.ref_mes), ano: Number(r.ref_ano) });
+  });
+  const atual = competenciaAtual();
+  if (!vistos[atual.ano + '-' + atual.mes]) lista.unshift(atual);
+  lista.sort(function (a, b) { return ordinal(b.mes, b.ano) - ordinal(a.mes, a.ano); });
+  return lista;
 }
 
 // ------------------------------------------------------------
@@ -235,7 +376,7 @@ function celula(v) {
   return t;
 }
 
-function relatorioCsv(linhas, res) {
+function relatorioCsv(linhas, res, comp) {
   const cab = ['Cliente', 'Mensalidade', 'Setup', 'Hospedagem', 'Total',
     'Vencimento', 'Status', 'Responsavel', 'Telefone', 'Observacao', 'Situacao do contrato'];
   const corpo = linhas.map(function (r) {
@@ -259,8 +400,10 @@ function relatorioCsv(linhas, res) {
 
   const texto = '﻿' + [cab.map(celula).join(';')].concat(corpo).join('\r\n') + '\r\n';
   const hoje = new Date();
-  const nome = 'financeiro-startdigital-' + hoje.getFullYear() +
-    String(hoje.getMonth() + 1).padStart(2, '0') + String(hoje.getDate()).padStart(2, '0') + '.csv';
+  const nome = comp
+    ? 'cobrancas-' + comp.ano + '-' + String(comp.mes).padStart(2, '0') + '.csv'
+    : 'financeiro-startdigital-' + hoje.getFullYear() +
+      String(hoje.getMonth() + 1).padStart(2, '0') + String(hoje.getDate()).padStart(2, '0') + '.csv';
 
   res.statusCode = 200;
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -310,40 +453,60 @@ module.exports = async function handler(req, res) {
 
     // ---------------------------------------------------- a tabela
     if (action === 'fin_lista') {
-      const linhas = await carteira();
-      return u.ok(res, { clientes: linhas, status: STATUS, status_nomes: STATUS_NOME });
+      const virada = await garantirCompetencias();
+      const comp = competenciaDe(params);
+      const linhas = await carteira(comp);
+      return u.ok(res, {
+        clientes: linhas, status: STATUS, status_nomes: STATUS_NOME,
+        competencia: comp,
+        competencia_atual: competenciaAtual(),
+        competencias: await competenciasExistentes(),
+        meses: MESES,
+        viradas: virada.criadas
+      });
     }
 
     // ---------------------------------------------------- o dashboard
     if (action === 'fin_resumo') {
-      const linhas = await carteira();
+      await garantirCompetencias();
+      const comp = competenciaDe(params);
+      const linhas = await carteira(comp);
       const hoje = new Date();
 
-      // O período vem da tela (YYYY-MM-DD). Sem período: este mês.
-      function dataOk(s, fim) {
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(s || ''))) return null;
-        const d = new Date(s + (fim ? 'T23:59:59' : 'T00:00:00'));
-        return isNaN(d.getTime()) ? null : d;
-      }
-      let de = dataOk(params.de);
-      let ate = dataOk(params.ate, true);
-      if (!de || !ate) {
-        de = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-        ate = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59);
-      }
-      if (de > ate) { const troca = de; de = ate; ate = troca; }
+      // O período do dashboard É a competência escolhida: do dia 1 ao
+      // último dia daquele mês. É isso que faz Cobranças e Dashboard
+      // nunca mostrarem meses diferentes.
+      const de = new Date(comp.ano, comp.mes - 1, 1);
+      const ate = new Date(comp.ano, comp.mes, 0, 23, 59, 59);
+
+      const atual = competenciaAtual();
+      const ehAtual = comp.mes === atual.mes && comp.ano === atual.ano;
 
       return u.ok(res, {
-        resumo: resumo(linhas, hoje),
-        cartoes: cartoesDoPeriodo(linhas, de, ate, hoje)
+        // a previsão da próxima semana só faz sentido no mês corrente;
+        // em mês fechado ela viraria adivinhação sobre o passado
+        resumo: Object.assign(resumo(linhas, hoje), { competencia_corrente: ehAtual }),
+        cartoes: cartoesDoPeriodo(linhas, de, ate, hoje),
+        competencia: comp,
+        competencia_atual: atual,
+        competencias: await competenciasExistentes(),
+        meses: MESES
       });
+    }
+
+    // A virada por fora (cron mensal). Devolve o que criou, e chamar
+    // duas vezes no mesmo mês não cria nada de novo.
+    if (action === 'fin_virada') {
+      const r = await garantirCompetencias();
+      return u.ok(res, { criadas: r.criadas, competencia_atual: competenciaAtual() });
     }
 
     // ---------------------------------------------------- o relatório
     // Sai como arquivo mesmo, não como JSON: o navegador baixa direto.
     if (action === 'fin_relatorio') {
-      const linhas = await carteira();
-      return relatorioCsv(linhas, res);
+      const comp = competenciaDe(params);
+      const linhas = await carteira(comp);
+      return relatorioCsv(linhas, res, comp);
     }
 
     // ---------------------------------------------------- gravar
@@ -388,11 +551,20 @@ module.exports = async function handler(req, res) {
         if (!row) return u.fail(res, 404, 'Cliente nao encontrado.');
       } else {
         if (status === 'pago') patch.pago_em = new Date().toISOString();
-        const todos = await db.select('finance_clients', { select: 'position' });
+        const comp = competenciaDe(body);
+        patch.ref_mes = comp.mes;
+        patch.ref_ano = comp.ano;
+        const todos = await db.select('finance_clients', {
+          ref_mes: 'eq.' + comp.mes, ref_ano: 'eq.' + comp.ano, select: 'position'
+        });
         patch.position = todos.reduce(function (a, r) {
           return Math.max(a, Number(r.position || 0));
         }, 0) + 1;
-        row = await db.insert('finance_clients', patch);
+        try {
+          row = await db.insert('finance_clients', patch);
+        } catch (e) {
+          return u.fail(res, 409, 'Ja existe uma cobranca desse cliente em ' + MESES[comp.mes - 1] + '/' + comp.ano + '.');
+        }
       }
       return u.ok(res, { cliente: paraTela(row) });
     }
@@ -415,7 +587,10 @@ module.exports = async function handler(req, res) {
           .toLowerCase().replace(/\s+/g, ' ').trim();
       }
 
-      const existentes = await db.select('finance_clients', { select: 'cliente,position' });
+      const comp = competenciaDe(body);
+      const existentes = await db.select('finance_clients', {
+        ref_mes: 'eq.' + comp.mes, ref_ano: 'eq.' + comp.ano, select: 'cliente,position'
+      });
       const vistos = {};
       existentes.forEach(function (r) { vistos[identidade(r.cliente)] = true; });
       let posicao = existentes.reduce(function (a, r) { return Math.max(a, Number(r.position || 0)); }, 0);
@@ -462,6 +637,7 @@ module.exports = async function handler(req, res) {
           observacao: limpaTexto(l.observacao, 400),
           destaque: false, ativo: true,
           position: ++posicao,
+          ref_mes: comp.mes, ref_ano: comp.ano,
           updated_at: new Date().toISOString()
         };
 
@@ -478,7 +654,8 @@ module.exports = async function handler(req, res) {
         importados: importados,
         pulados: pulados.slice(0, 100),
         total_pulados: pulados.length,
-        total_no_arquivo: linhas.length
+        total_no_arquivo: linhas.length,
+        competencia: comp
       });
     }
 
@@ -572,5 +749,9 @@ module.exports = async function handler(req, res) {
 
 // exportado para o teste conferir a conta sem subir servidor
 module.exports.resumo = resumo;
+module.exports.ordinal = ordinal;
+module.exports.deOrdinal = deOrdinal;
+module.exports.competenciaAtual = competenciaAtual;
+module.exports.MESES = MESES;
 module.exports.proximaData = proximaData;
 module.exports.limpaValor = limpaValor;
