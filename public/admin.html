@@ -503,6 +503,36 @@
                       cursor: pointer; white-space: nowrap; }
   .fin-comp .voltar:hover { background: var(--fill-3, var(--fio)); color: var(--label); }
 
+  /* ---- barra de filtros das Cobrancas: busca + vencimento ---- */
+  .fin-filtros { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 14px; }
+  .fin-busca { display: flex; align-items: center; gap: 8px; background: var(--surface);
+               border: 1.5px solid var(--fio); border-radius: 11px; padding: 0 12px;
+               height: 38px; min-width: 230px; flex: 1 1 230px; max-width: 340px;
+               transition: border-color .15s, box-shadow .15s; }
+  .fin-busca:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
+  .fin-busca svg { fill: none; stroke: var(--label-3); stroke-width: 2; stroke-linecap: round; flex: none; }
+  .fin-busca input { flex: 1; min-width: 0; border: 0; background: transparent; outline: none;
+                     font-family: inherit; font-size: 14px; color: var(--label); height: 100%;
+                     padding: 0; box-shadow: none; }
+  .fin-busca input::-webkit-search-cancel-button { cursor: pointer; }
+
+  .fin-venc { display: flex; align-items: center; gap: 8px; background: var(--fill-1);
+              border-radius: 11px; padding: 0 12px; height: 38px; white-space: nowrap; }
+  .fin-venc > span { font-size: 12.5px; font-weight: 600; color: var(--label-3); }
+  .fin-venc select { width: auto !important; border: 0; background: transparent; font-family: inherit;
+                     font-size: 13.5px; font-weight: 600; color: var(--label); cursor: pointer;
+                     height: auto; padding: 2px 20px 2px 0; margin: 0; box-shadow: none; min-width: 0; }
+
+  /* ---- DRE ---- */
+  .dre-resultado { background: linear-gradient(180deg, var(--accent-tint), var(--card) 70%); }
+  .dre-resultado.negativo { background: linear-gradient(180deg, #fdf0ef, var(--card) 70%); }
+  .dre-conta > div { display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+                     padding: 11px 0; border-top: 1px solid var(--hairline); font-size: 14.5px; }
+  .dre-conta > div:first-child { border-top: 0; }
+  .dre-conta b { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .dre-conta .total { border-top: 2px solid var(--fio); margin-top: 4px; font-weight: 700; }
+  .dre-conta .total b { font-size: 18px; }
+
   .fd2-filtro { display: flex; gap: 2px; background: var(--fill-1); padding: 3px;
                 border-radius: 10px; }
   .fd2-filtro button { border: 0; background: transparent; font-family: inherit; font-size: 12.5px;
@@ -593,7 +623,8 @@
       <div class="nav-itens"><div>
       <button data-aba="findash"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M4 19.6h16"/><path d="M7.2 19.6v-6M12 19.6V8.4M16.8 19.6v-9"/><path d="M6.4 6.6 11 4.2l4.4 2 3.4-2.6"/></svg><span>Dashboard</span></button>
       <button data-aba="financeiro"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6.6 12h.1M17.3 12h.1"/></svg><span>Cobranças</span></button>
-      <button data-aba="fingastos"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M6.2 4.2h11.6a1.6 1.6 0 0 1 1.6 1.6v13.4l-2.6-1.6-2.4 1.6-2.4-1.6-2.4 1.6-2.6-1.6V5.8a1.6 1.6 0 0 1 1.6-1.6z"/><path d="M8.6 9h6.8M8.6 12.6h4.6"/></svg><span>Outros Gastos</span></button>
+      <button data-aba="fingastos"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M6.2 4.2h11.6a1.6 1.6 0 0 1 1.6 1.6v13.4l-2.6-1.6-2.4 1.6-2.4-1.6-2.4 1.6-2.6-1.6V5.8a1.6 1.6 0 0 1 1.6-1.6z"/><path d="M8.6 9h6.8M8.6 12.6h4.6"/></svg><span>Despesas</span></button>
+      <button data-aba="findre"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M4 19.6h16"/><path d="M7.6 16.4v-5.2M12 16.4V5.6M16.4 16.4v-8"/></svg><span>DRE</span></button>
 </div></div></div>
       <div class="nav-grupo" data-grupo="admin">
       <button type="button" class="nav-cab">Administração<svg class="seta" width="12" height="12" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
@@ -744,6 +775,11 @@
     <!-- ---------- FINANCEIRO: a planilha ---------- -->
     <section data-painel="financeiro" style="display:none">
       <div style="padding:22px 0 40px" id="painel-financeiro"></div>
+    </section>
+
+    <!-- ---------- FINANCEIRO: DRE ---------- -->
+    <section data-painel="findre" style="display:none">
+      <div style="padding:22px 0 40px" id="painel-findre"></div>
     </section>
 
     <!-- ---------- FINANCEIRO: outros gastos ---------- -->
