@@ -424,7 +424,14 @@ module.exports = async function handler(req, res) {
     if (action === 'logout_todos') {
       const antes = await u.requireAdmin(req, res);
       if (!antes) return;
-      await db.upsert('settings', { key: 'session_epoch', value: { valor: Date.now() } }, 'key');
+      // A epoca TEM que andar para a frente, sempre. Se o relogio do
+      // servidor ja esteve adiantado um dia, a epoca guardada pode ser
+      // maior que o agora — e ai um Date.now() puro deixaria os tokens
+      // antigos continuarem valendo. Este botao e o freio de emergencia
+      // quando uma senha vaza: ele nunca pode virar um botao morto.
+      const anterior = await epocaSessao();
+      const nova = Math.max(Date.now(), Number(anterior || 0) + 1);
+      await db.upsert('settings', { key: 'session_epoch', value: { valor: nova } }, 'key');
       return u.ok(res, { aviso: 'Todas as sessoes foram encerradas. Todo mundo precisa entrar de novo.' });
     }
 
