@@ -1349,6 +1349,138 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
     }
   }
 
+  // ============================================================
+  console.log('\n5b-cli) CLIENTES — cadastro proprio, ficha e historico');
+  // ============================================================
+  {
+    const NOME = 'Empresa ABC ' + SUF;
+
+    // ---- 1) uma cobranca nova cria o cadastro do cliente ----
+    const c1 = await fin('fin_salvar', {
+      cliente: NOME, valor: 1500, vencimento_dia: 10,
+      telefone: '13 99999-9999', responsavel: 'Joao',
+      status: 'aguardando', mes: 1, ano: 2024
+    });
+    check('cobranca nova cria o cadastro do cliente', c1.ok, c1.error);
+
+    let lista = await fin('fc_lista');
+    check('a lista de clientes responde', lista.ok, lista.error);
+    const meu = (lista.clientes || []).filter(function (x) { return x.nome === NOME; });
+    check('o cliente aparece UMA vez so', meu.length === 1, meu.length);
+    check('o cadastro guardou telefone e responsavel',
+      meu[0] && meu[0].telefone === '13 99999-9999' && meu[0].responsavel === 'Joao', meu[0]);
+
+    const idCliente = meu[0].id;
+
+    // ---- 2) outra competencia NAO cria cliente novo ----
+    const c2 = await fin('fin_salvar', {
+      cliente: NOME, valor: 1500, vencimento_dia: 10,
+      status: 'aguardando', mes: 2, ano: 2024
+    });
+    check('da para cobrar o mesmo cliente noutro mes', c2.ok, c2.error);
+
+    lista = await fin('fc_lista');
+    check('DUAS cobrancas, UM cliente so',
+      (lista.clientes || []).filter(function (x) { return x.nome === NOME; }).length === 1);
+
+    // ---- 3) nome com acento/caixa diferente cai no MESMO cadastro ----
+    const c3 = await fin('fin_salvar', {
+      cliente: NOME.toUpperCase(), valor: 1500, vencimento_dia: 10,
+      status: 'aguardando', mes: 3, ano: 2024
+    });
+    check('escrever o nome em CAIXA ALTA nao duplica o cliente',
+      c3.ok && (await fin('fc_lista')).clientes.filter(function (x) {
+        return x.nome.toLowerCase() === NOME.toLowerCase();
+      }).length === 1);
+
+    // ---- 4) a ficha ----
+    const ficha = await fin('fc_ficha', null, { id: idCliente });
+    check('a ficha do cliente abre', ficha.ok, ficha.error);
+    check('a ficha traz nome, telefone e responsavel',
+      ficha.cliente.nome === NOME && ficha.cliente.telefone === '13 99999-9999' &&
+      ficha.cliente.responsavel === 'Joao', ficha.cliente);
+    check('o historico tem as tres cobrancas', (ficha.historico || []).length === 3, (ficha.historico || []).length);
+    check('o historico vem do mais NOVO para o mais antigo',
+      ficha.historico[0].competencia.mes === 3 && ficha.historico[2].competencia.mes === 1,
+      ficha.historico.map(function (h) { return h.competencia_nome; }));
+    check('cada linha do historico diz a competencia por extenso',
+      ficha.historico[0].competencia_nome === 'Marco/2024', ficha.historico[0].competencia_nome);
+    check('cada linha traz o vencimento como DATA', ficha.historico[0].vencimento === '2024-03-10',
+      ficha.historico[0].vencimento);
+    check('sem pagamento, a data de pagamento fica vazia', !ficha.historico[0].pago_em);
+    check('o resumo soma o que esta em aberto', ficha.resumo.em_aberto === 4500, ficha.resumo);
+    check('e ainda nao recebemos nada', ficha.resumo.recebido === 0, ficha.resumo);
+
+    // ---- 5) pagamento entra na ficha, com data diferente do vencimento ----
+    const alvo = ficha.historico[2];   // janeiro
+    await fin('fin_salvar', { id: alvo.id, cliente: NOME, valor: 1500,
+      vencimento_dia: 10, status: 'pago', mes: 1, ano: 2024 });
+    const ficha2 = await fin('fc_ficha', null, { id: idCliente });
+    const jan = ficha2.historico.filter(function (h) { return h.competencia.mes === 1; })[0];
+    check('marcou pago: a ficha mostra o pagamento', jan.status === 'pago' && !!jan.pago_em, jan);
+    check('vencimento e pagamento sao datas DIFERENTES',
+      String(jan.pago_em).slice(0, 10) !== jan.vencimento, { venc: jan.vencimento, pago: jan.pago_em });
+    check('o resumo passou o valor de aberto para recebido',
+      ficha2.resumo.recebido === 1500 && ficha2.resumo.em_aberto === 3000, ficha2.resumo);
+
+    // ---- 6) observacoes do CADASTRO atravessam os meses ----
+    const obs = await fin('fc_salvar', {
+      id: idCliente, nome: NOME, telefone: '13 99999-9999',
+      responsavel: 'Joao', observacoes: 'Sempre paga depois do dia 15.'
+    });
+    check('salva a observacao do cadastro', obs.ok, obs.error);
+    check('a observacao volta na ficha',
+      (await fin('fc_ficha', null, { id: idCliente })).cliente.observacoes === 'Sempre paga depois do dia 15.');
+    check('a observacao do cadastro NAO vira observacao de cobranca',
+      ((await fin('fin_lista', null, { mes: 2, ano: 2024 })).clientes
+        .filter(function (x) { return x.cliente === NOME; })[0] || {}).observacao !== 'Sempre paga depois do dia 15.');
+
+    // ---- 7) editar o cadastro nao mexe em cobranca ----
+    const ren = await fin('fc_salvar', {
+      id: idCliente, nome: NOME + ' LTDA', telefone: '13 98888-8888',
+      responsavel: 'Maria', observacoes: 'Sempre paga depois do dia 15.'
+    });
+    check('da para editar o cadastro', ren.ok && ren.cliente.nome === NOME + ' LTDA', ren.error);
+    check('o historico continua inteiro depois de renomear',
+      (await fin('fc_ficha', null, { id: idCliente })).historico.length === 3);
+    check('cadastro sem nome nao grava',
+      !(await fin('fc_salvar', { id: idCliente, nome: '   ' })).ok);
+
+    // ---- 8) exclusao logica: some da tela, nao some do banco ----
+    const antesDeApagar = (await fin('fc_ficha', null, { id: idCliente })).historico.length;
+    await fin('fin_excluir', { id: alvo.id });
+    const fichaPos = await fin('fc_ficha', null, { id: idCliente });
+    check('cobranca excluida sai do historico', fichaPos.historico.length === antesDeApagar - 1,
+      { antes: antesDeApagar, depois: fichaPos.historico.length });
+    check('e o resumo se ajusta sozinho', fichaPos.resumo.recebido === 0, fichaPos.resumo);
+    check('excluir cobranca NAO apaga o cadastro do cliente',
+      (await fin('fc_lista')).clientes.filter(function (x) { return x.id === idCliente; }).length === 1);
+    check('e a vaga do mes fica livre de novo (indice parcial)',
+      (await fin('fin_salvar', { cliente: NOME + ' LTDA', valor: 100, vencimento_dia: 5,
+        status: 'aguardando', mes: 1, ano: 2024 })).ok);
+
+    // ---- 9) ficha inexistente ----
+    check('ficha de cliente que nao existe da erro claro',
+      !(await fin('fc_ficha', null, { id: '00000000-0000-4000-8000-000000000000' })).ok);
+    check('pedir ficha sem id da erro', !(await fin('fc_ficha')).ok);
+
+    // ---- 10) a tranca de permissao ----
+    {
+      const perms = require('../api/_lib/perms.js');
+      check('dono ve os clientes', perms.permite('dono', 'fc_lista') === true);
+      check('leitura NAO ve os clientes', perms.permite('leitura', 'fc_lista') === false);
+      check('leitura nao edita cadastro', perms.permite('leitura', 'fc_salvar') === false);
+      check('o menu do dono tem Clientes', perms.menuDoPapel('dono').indexOf('finclientes') >= 0);
+    }
+
+    // limpeza
+    for (const mes of [1, 2, 3]) {
+      for (const c of (await fin('fin_lista', null, { mes: mes, ano: 2024 })).clientes) {
+        if (/Empresa ABC/i.test(c.cliente)) await fin('fin_excluir', { id: c.id });
+      }
+    }
+  }
+
   console.log('\n5b-space) SPACE COLABORADOR — beneficio por Pix (Asaas)');
   // ============================================================
   const MARINA = 'cccc0001-0001-4001-8001-000000000001';

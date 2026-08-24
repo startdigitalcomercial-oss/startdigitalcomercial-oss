@@ -1,6 +1,6 @@
 #!/bin/sh
 # sobe o espelho local do banco + servicos + servidor de teste
-cd /home/claude/start-rh
+cd "$(dirname "$0")/.."
 node tools/mock-supabase.js > /tmp/mock.log 2>&1 &
 echo $! > /tmp/mock.pid
 node tools/mock-servicos.js > /tmp/mocksvc.log 2>&1 &
