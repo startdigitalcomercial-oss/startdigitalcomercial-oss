@@ -1276,6 +1276,79 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
     await fin('fg_excluir', { id: g3.gasto.id });
   }
 
+  // ============================================================
+  console.log('\n5b-dre) DRE — entradas menos despesas, sem numero digitado');
+  // ============================================================
+  {
+    const MES_T = 3, ANO_T = 2024;
+    const antes = await fin('fin_lista', null, { mes: MES_T, ano: ANO_T });
+    for (const c of (antes.clientes || [])) await fin('fin_excluir', { id: c.id });
+    const gAntes = await fin('fg_lista', null, { de: '2024-03-01', ate: '2024-04-30' });
+    for (const g of (gAntes.gastos || [])) await fin('fg_excluir', { id: g.id });
+
+    const dreVazio = await fin('fin_dre', null, { mes: MES_T, ano: ANO_T });
+    check('DRE responde para competencia vazia', dreVazio.ok, dreVazio.error);
+    check('competencia vazia da tudo zero',
+      dreVazio.entradas === 0 && dreVazio.despesas === 0 && dreVazio.resultado === 0, dreVazio);
+
+    // uma cobranca PAGA (vira entrada) e uma em aberto (nao vira)
+    await fin('fin_salvar', { cliente: 'Pagou DRE ' + SUF, valor: '1.000,00',
+      vencimento_dia: 10, status: 'pago', mes: MES_T, ano: ANO_T });
+    await fin('fin_salvar', { cliente: 'Nao pagou DRE ' + SUF, valor: '500',
+      vencimento_dia: 20, status: 'aguardando', mes: MES_T, ano: ANO_T });
+
+    let dre = await fin('fin_dre', null, { mes: MES_T, ano: ANO_T });
+    check('ENTRADAS contam so o que foi PAGO', dre.entradas === 1000, dre.entradas);
+    check('o que esta em aberto NAO entra como entrada', dre.em_aberto === 500, dre.em_aberto);
+    check('conta quantas cobrancas foram recebidas', dre.entradas_qtd === 1, dre.entradas_qtd);
+    check('sem despesas, o resultado e a entrada inteira', dre.resultado === 1000, dre.resultado);
+
+    const dDentro = await fin('fg_salvar', { item: 'Cafe DRE ' + SUF, valor: '300', data: '2024-03-15' });
+    await fin('fg_salvar', { item: 'Fora do mes ' + SUF, valor: '999', data: '2024-04-02' });
+
+    dre = await fin('fin_dre', null, { mes: MES_T, ano: ANO_T });
+    check('DESPESAS vem da tela Despesas, so as do mes', dre.despesas === 300, dre.despesas);
+    check('despesa de outro mes fica de fora', dre.despesas_qtd === 1, dre.despesas_qtd);
+    check('RESULTADO = entradas - despesas', dre.resultado === 700, dre.resultado);
+
+    const emAberto = (await fin('fin_lista', null, { mes: MES_T, ano: ANO_T })).clientes
+      .filter(function (c) { return c.status !== 'pago'; })[0];
+    await fin('fin_salvar', { id: emAberto.id, cliente: emAberto.cliente, valor: emAberto.valor,
+      vencimento_dia: emAberto.vencimento_dia, status: 'pago' });
+    dre = await fin('fin_dre', null, { mes: MES_T, ano: ANO_T });
+    check('marcar como paga JA reflete no DRE', dre.entradas === 1500 && dre.resultado === 1200, dre);
+
+    await fin('fg_salvar', { id: dDentro.gasto.id, item: dDentro.gasto.item, valor: '800', data: '2024-03-15' });
+    dre = await fin('fin_dre', null, { mes: MES_T, ano: ANO_T });
+    check('alterar despesa reflete no DRE', dre.despesas === 800 && dre.resultado === 700, dre);
+    await fin('fg_excluir', { id: dDentro.gasto.id });
+    dre = await fin('fin_dre', null, { mes: MES_T, ano: ANO_T });
+    check('excluir despesa reflete no DRE', dre.despesas === 0 && dre.resultado === 1500, dre);
+
+    await fin('fg_salvar', { item: 'Rombo ' + SUF, valor: '2.500', data: '2024-03-20' });
+    dre = await fin('fin_dre', null, { mes: MES_T, ano: ANO_T });
+    check('resultado NEGATIVO e calculado certo', dre.resultado === -1000, dre.resultado);
+
+    const dreOutro = await fin('fin_dre', null, { mes: 4, ano: 2024 });
+    check('abril ve so a despesa de abril', dreOutro.despesas === 999 && dreOutro.entradas === 0, dreOutro);
+    check('e o resultado de abril e so o negativo da despesa', dreOutro.resultado === -999, dreOutro.resultado);
+
+    const inventado = await fin('fin_dre', { entradas: 999999, despesas: 0 }, { mes: MES_T, ano: ANO_T });
+    check('mandar total no corpo nao muda nada (nao ha valor digitado)',
+      inventado.entradas === 1500, inventado.entradas);
+
+    const perms = require('../api/_lib/perms.js');
+    check('leitura nao ve o DRE', perms.permite('leitura', 'fin_dre') === false);
+    check('o menu do dono tem o DRE', perms.menuDoPapel('dono').indexOf('findre') >= 0);
+
+    for (const c of (await fin('fin_lista', null, { mes: MES_T, ano: ANO_T })).clientes) {
+      await fin('fin_excluir', { id: c.id });
+    }
+    for (const g of (await fin('fg_lista', null, { de: '2024-03-01', ate: '2024-04-30' })).gastos) {
+      await fin('fg_excluir', { id: g.id });
+    }
+  }
+
   console.log('\n5b-space) SPACE COLABORADOR — beneficio por Pix (Asaas)');
   // ============================================================
   const MARINA = 'cccc0001-0001-4001-8001-000000000001';
@@ -1623,6 +1696,27 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   const usandoAntigo = await (await fetch(BASE + '/api/admin?action=board', {
     headers: { Authorization: 'Bearer ' + tokenAntigo }
   })).json();
+  // A epoca precisa andar para a FRENTE mesmo que o relogio do servidor
+  // esteja atrasado — senao "encerrar todas as sessoes" vira um botao
+  // morto justamente no dia em que uma senha vazar.
+  {
+    await fetch('http://127.0.0.1:54321/rest/v1/settings?key=eq.session_epoch', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: { valor: Date.now() + 5 * 365 * 24 * 3600 * 1000 } })
+    }).catch(function () { return null; });
+    const loginFuturo = await (await fetch(BASE + '/api/admin?action=login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: SENHA_PAINEL })
+    })).json();
+    await comoUsuario(loginFuturo.token, 'logout_todos');
+    const aindaVale = await comoUsuario(loginFuturo.token, 'board');
+    check('com a epoca no futuro, encerrar sessoes AINDA funciona', !aindaVale.ok, aindaVale.ok);
+    T = (await (await fetch(BASE + '/api/admin?action=login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: SENHA_PAINEL })
+    })).json()).token;
+  }
+
   check('token antigo para de valer', usandoAntigo.ok === false && /encerrada|expirada/i.test(usandoAntigo.error || ''), usandoAntigo.error);
   T = (await tentaLogin(SENHA_PAINEL)).token;
   check('login novo volta a funcionar', !!T);
