@@ -206,16 +206,16 @@ const DB = {
 
   // ---- financeiro: os mesmos 10 clientes ficticios do banco de verdade ----
   finance_clients: [
-    { id: 'ffff0001-0001-4001-8001-000000000001', cliente: 'VITRAUX', valor: 2500, setup: 1500, hospedagem: 120, vencimento_dia: 9, status: 'pago', pago_em: agora(), responsavel: 'Ketery', telefone: '13 3496-5502', observacao: '', destaque: false, ativo: true, position: 1, created_at: agora(), updated_at: agora() },
-    { id: 'ffff0002-0002-4002-8002-000000000002', cliente: 'LABELE', valor: 2000, setup: 0, hospedagem: 90, vencimento_dia: 10, status: 'pago', pago_em: agora(), responsavel: 'Bruno', telefone: '11 93209-7227', observacao: '', destaque: false, ativo: true, position: 2, created_at: agora(), updated_at: agora() },
-    { id: 'ffff0003-0003-4003-8003-000000000003', cliente: 'TR BRAND', valor: 2700, setup: 2000, hospedagem: 150, vencimento_dia: 20, status: 'pago', pago_em: agora(), responsavel: 'Tiago', telefone: '11 95313-4378', observacao: '', destaque: false, ativo: true, position: 3, created_at: agora(), updated_at: agora() },
-    { id: 'ffff0004-0004-4004-8004-000000000004', cliente: 'ANDERSON COSTA', valor: 1390, setup: 0, hospedagem: 90, vencimento_dia: 10, status: 'pago', pago_em: agora(), responsavel: 'Gil', telefone: '83 8831-3182', observacao: '', destaque: false, ativo: true, position: 4, created_at: agora(), updated_at: agora() },
-    { id: 'ffff0005-0005-4005-8005-000000000005', cliente: 'ESDRAS EDUCACIONAL', valor: 1390, setup: 800, hospedagem: 120, vencimento_dia: 30, status: 'aguardando', pago_em: null, responsavel: 'Eduardo', telefone: '11 96603-3037', observacao: '', destaque: false, ativo: true, position: 5, created_at: agora(), updated_at: agora() },
-    { id: 'ffff0006-0006-4006-8006-000000000006', cliente: 'ESCOLA DOM MANOEL', valor: 997, setup: 0, hospedagem: 90, vencimento_dia: 30, status: 'pago', pago_em: agora(), responsavel: 'Sandra', telefone: '11 95902-2651', observacao: '', destaque: true, ativo: true, position: 6, created_at: agora(), updated_at: agora() },
-    { id: 'ffff0007-0007-4007-8007-000000000007', cliente: 'CEB', valor: 1000, setup: 1200, hospedagem: 180, vencimento_dia: 30, status: 'aguardando', pago_em: null, responsavel: 'Alessandra', telefone: '34 634 386339', observacao: 'Primeiro pgto 30/01', destaque: true, ativo: true, position: 7, created_at: agora(), updated_at: agora() },
-    { id: 'ffff0008-0008-4008-8008-000000000008', cliente: 'EDUCARE', valor: 1000, setup: 900, hospedagem: 90, vencimento_dia: 30, status: 'inadimplente', pago_em: null, responsavel: 'Marcelo', telefone: '13 97401-8786', observacao: 'Atrasado desde 30/06', destaque: false, ativo: true, position: 8, created_at: agora(), updated_at: agora() },
-    { id: 'ffff0009-0009-4009-8009-000000000009', cliente: 'BENE VIEIRA', valor: 2800, setup: 1500, hospedagem: 220, vencimento_dia: 20, status: 'pago', pago_em: agora(), responsavel: 'Wellington', telefone: '13 99603-7333', observacao: 'Imobiliaria', destaque: false, ativo: true, position: 9, created_at: agora(), updated_at: agora() },
-    { id: 'ffff0010-0010-4010-8010-000000000010', cliente: 'BRAZ', valor: 1200, setup: 0, hospedagem: 90, vencimento_dia: 30, status: 'inadimplente', pago_em: null, responsavel: 'Tania Izelli', telefone: '44 9979-0712', observacao: 'Cobranca enviada', destaque: false, ativo: true, position: 10, created_at: agora(), updated_at: agora() }
+    { id: 'ffff0001-0001-4001-8001-000000000001', cliente: 'VITRAUX', valor: 2500, setup: 1500, hospedagem: 120, vencimento_dia: 9, ref_mes: 8, ref_ano: 2026, status: 'pago', pago_em: agora(), responsavel: 'Ketery', telefone: '13 3496-5502', observacao: '', destaque: false, ativo: true, position: 1, created_at: agora(), updated_at: agora() },
+    { id: 'ffff0002-0002-4002-8002-000000000002', cliente: 'LABELE', valor: 2000, setup: 0, hospedagem: 90, vencimento_dia: 10, ref_mes: 8, ref_ano: 2026, status: 'pago', pago_em: agora(), responsavel: 'Bruno', telefone: '11 93209-7227', observacao: '', destaque: false, ativo: true, position: 2, created_at: agora(), updated_at: agora() },
+    { id: 'ffff0003-0003-4003-8003-000000000003', cliente: 'TR BRAND', valor: 2700, setup: 2000, hospedagem: 150, vencimento_dia: 20, ref_mes: 8, ref_ano: 2026, status: 'pago', pago_em: agora(), responsavel: 'Tiago', telefone: '11 95313-4378', observacao: '', destaque: false, ativo: true, position: 3, created_at: agora(), updated_at: agora() },
+    { id: 'ffff0004-0004-4004-8004-000000000004', cliente: 'ANDERSON COSTA', valor: 1390, setup: 0, hospedagem: 90, vencimento_dia: 10, ref_mes: 8, ref_ano: 2026, status: 'pago', pago_em: agora(), responsavel: 'Gil', telefone: '83 8831-3182', observacao: '', destaque: false, ativo: true, position: 4, created_at: agora(), updated_at: agora() },
+    { id: 'ffff0005-0005-4005-8005-000000000005', cliente: 'ESDRAS EDUCACIONAL', valor: 1390, setup: 800, hospedagem: 120, vencimento_dia: 30, ref_mes: 8, ref_ano: 2026, status: 'aguardando', pago_em: null, responsavel: 'Eduardo', telefone: '11 96603-3037', observacao: '', destaque: false, ativo: true, position: 5, created_at: agora(), updated_at: agora() },
+    { id: 'ffff0006-0006-4006-8006-000000000006', cliente: 'ESCOLA DOM MANOEL', valor: 997, setup: 0, hospedagem: 90, vencimento_dia: 30, ref_mes: 8, ref_ano: 2026, status: 'pago', pago_em: agora(), responsavel: 'Sandra', telefone: '11 95902-2651', observacao: '', destaque: true, ativo: true, position: 6, created_at: agora(), updated_at: agora() },
+    { id: 'ffff0007-0007-4007-8007-000000000007', cliente: 'CEB', valor: 1000, setup: 1200, hospedagem: 180, vencimento_dia: 30, ref_mes: 8, ref_ano: 2026, status: 'aguardando', pago_em: null, responsavel: 'Alessandra', telefone: '34 634 386339', observacao: 'Primeiro pgto 30/01', destaque: true, ativo: true, position: 7, created_at: agora(), updated_at: agora() },
+    { id: 'ffff0008-0008-4008-8008-000000000008', cliente: 'EDUCARE', valor: 1000, setup: 900, hospedagem: 90, vencimento_dia: 30, ref_mes: 8, ref_ano: 2026, status: 'inadimplente', pago_em: null, responsavel: 'Marcelo', telefone: '13 97401-8786', observacao: 'Atrasado desde 30/06', destaque: false, ativo: true, position: 8, created_at: agora(), updated_at: agora() },
+    { id: 'ffff0009-0009-4009-8009-000000000009', cliente: 'BENE VIEIRA', valor: 2800, setup: 1500, hospedagem: 220, vencimento_dia: 20, ref_mes: 8, ref_ano: 2026, status: 'pago', pago_em: agora(), responsavel: 'Wellington', telefone: '13 99603-7333', observacao: 'Imobiliaria', destaque: false, ativo: true, position: 9, created_at: agora(), updated_at: agora() },
+    { id: 'ffff0010-0010-4010-8010-000000000010', cliente: 'BRAZ', valor: 1200, setup: 0, hospedagem: 90, vencimento_dia: 30, ref_mes: 8, ref_ano: 2026, status: 'inadimplente', pago_em: null, responsavel: 'Tania Izelli', telefone: '44 9979-0712', observacao: 'Cobranca enviada', destaque: false, ativo: true, position: 10, created_at: agora(), updated_at: agora() }
   ],
 
   finance_expenses: [],
@@ -250,7 +250,7 @@ const DEFAULTS = {
   benefit_vouchers: function () { return { id: uuid(), valor: 0, descricao: null, ativo: true, position: 1, created_at: agora(), updated_at: agora() }; },
   benefit_releases: function () { return { id: uuid(), status: 'liberado', voucher_id: null, liberado_por: null, liberado_em: agora(), pix_chave: null, pix_tipo: null, asaas_id: null, asaas_status: null, comprovante_url: null, falha_motivo: null, solicitado_em: null, pago_em: null, created_at: agora(), updated_at: agora() }; },
     finance_expenses: function () { return { id: uuid(), valor: 0, data: agora().slice(0, 10), observacao: null, created_at: agora(), updated_at: agora() }; },
-  finance_clients: function () { return { id: uuid(), valor: 0, setup: 0, hospedagem: 0, vencimento_dia: 10, status: 'aguardando', pago_em: null, pago_em: null, responsavel: null, telefone: null, observacao: null, destaque: false, ativo: true, position: 1, created_at: agora(), updated_at: agora() }; },
+  finance_clients: function () { return { id: uuid(), valor: 0, setup: 0, hospedagem: 0, vencimento_dia: 10, status: 'aguardando', pago_em: null, ref_mes: 8, ref_ano: 2026, pago_em: null, responsavel: null, telefone: null, observacao: null, destaque: false, ativo: true, position: 1, created_at: agora(), updated_at: agora() }; },
   disc_results: function () { return { id: uuid(), answers: {}, created_at: agora() }; },
   quiz_attempts: function () { return { id: uuid(), answers: {}, score: null, max_score: null, percent: null, passed: null, focus_lost: 0, paste_blocked: 0, integrity_flags: [], started_at: agora(), finished_at: null }; },
   lesson_progress: function () { return { completed: true, completed_at: agora() }; },
@@ -406,6 +406,42 @@ const server = http.createServer(function (req, res) {
     if (req.method === 'POST') {
       const arr = Array.isArray(body) ? body : [body];
       const conflito = params.on_conflict ? params.on_conflict.split(',') : null;
+
+      // OS INDICES UNICOS DO BANCO DE VERDADE.
+      // Um espelho que aceita o que a producao recusa e um espelho que
+      // mente: o teste passa e o sistema quebra em producao. Entao aqui
+      // as mesmas travas valem.
+      const UNICOS = {
+        // uma cobranca por cliente em cada competencia
+        finance_clients: function (r) {
+          return [String(r.cliente || '').trim().toLowerCase(), r.ref_mes, r.ref_ano].join('|');
+        },
+        // um beneficio em aberto por colaborador
+        benefit_releases: function (r) {
+          if (['liberado', 'processando'].indexOf(String(r.status)) < 0) return null;
+          return 'aberto|' + r.collaborator_id;
+        }
+      };
+      if (!conflito && UNICOS[tabela]) {
+        const chaveDe = UNICOS[tabela];
+        const jaNoBanco = {};
+        DB[tabela].forEach(function (x) {
+          const k = chaveDe(x);
+          if (k) jaNoBanco[k] = true;
+        });
+        for (const r of arr) {
+          const k = chaveDe(r);
+          if (k && jaNoBanco[k]) {
+            return responder(409, {
+              code: '23505',
+              message: 'duplicate key value violates unique constraint',
+              details: 'Key ' + k + ' already exists.'
+            });
+          }
+          if (k) jaNoBanco[k] = true;
+        }
+      }
+
       const criados = arr.map(function (r) {
         if (conflito) {
           const achado = DB[tabela].find(function (x) {
