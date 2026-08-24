@@ -54,7 +54,27 @@ async function fin(T, action, body, query) {
   })).json();
 }
 
+// O espelho local guarda tudo na memoria: reiniciar ele = voltar ao
+// estado inicial. Sem isso, sobras de outros testes (competencias
+// futuras criadas por fixtures) fazem a virada parecer quebrada.
+function zeraEspelho() {
+  try { execSync('kill $(cat /tmp/mock.pid) 2>/dev/null'); } catch (e) {}
+  execSync('sleep 1');
+  const fs = require('fs');
+  const p = spawn('node', ['tools/mock-supabase.js'],
+    { stdio: ['ignore', fs.openSync('/tmp/mock.log', 'a'), fs.openSync('/tmp/mock.log', 'a')], detached: true });
+  fs.writeFileSync('/tmp/mock.pid', String(p.pid));
+  p.unref();
+  for (let i = 0; i < 40; i++) {
+    try { execSync('curl -sf -m 1 http://127.0.0.1:54321/rest/v1/settings?limit=1 > /dev/null 2>&1'); return; }
+    catch (e) { execSync('sleep 0.3'); }
+  }
+  throw new Error('o espelho local nao voltou');
+}
+
 (async function () {
+  zeraEspelho();
+
   // ---------- 31/08/2026, ultimo dia: nada deve virar ----------
   sobe('2026-08-31T18:00:00-03:00');
   let T = await entra();

@@ -51,6 +51,7 @@ function paraTela(r) {
     pago_em: r.pago_em || null,
     ref_mes: Number(r.ref_mes || 0),
     ref_ano: Number(r.ref_ano || 0),
+    customer_id: r.customer_id || null,
     position: Number(r.position || 1)
   };
 }
@@ -95,13 +96,73 @@ function competenciaDe(params) {
 }
 
 async function carteira(comp) {
-  const q = { order: 'position.asc,created_at.asc', select: '*' };
+  const q = {
+    order: 'position.asc,created_at.asc', select: '*',
+    excluida_em: 'is.null'          // cobranca excluida some da tela, fica no banco
+  };
   if (comp) {
     q.ref_mes = 'eq.' + comp.mes;
     q.ref_ano = 'eq.' + comp.ano;
   }
   const linhas = await db.select('finance_clients', q);
   return linhas.map(paraTela);
+}
+
+// ============================================================
+// CLIENTE x COBRANCA
+//
+// Cliente e cadastro permanente: nome, telefone, responsavel e as
+// observacoes que valem para sempre. Cobranca e o lancamento do mes.
+// Um cliente tem N cobrancas — virar o mes nao cria cliente novo.
+// ============================================================
+
+// A identidade do cliente enquanto nao houver CNPJ: o nome sem
+// acento, sem caixa e sem espaco sobrando. E o que impede
+// "Start Digital" e "START DIGITAL" virarem dois cadastros.
+function chaveDoCliente(nome) {
+  return String(nome || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+// Acha o cadastro do cliente; se nao existir, cria. Devolve o id.
+async function clienteDeCobranca(nome, dados) {
+  const chave = chaveDoCliente(nome);
+  if (!chave) return null;
+
+  const achado = await db.selectOne('finance_customers', { chave: 'eq.' + chave, select: 'id' });
+  if (achado) return achado.id;
+
+  try {
+    const novo = await db.insert('finance_customers', {
+      nome: String(nome).trim(),
+      chave: chave,
+      telefone: (dados && dados.telefone) || null,
+      responsavel: (dados && dados.responsavel) || null
+    });
+    return novo ? novo.id : null;
+  } catch (e) {
+    // dois pedidos ao mesmo tempo: o indice unico barrou o segundo.
+    const agora = await db.selectOne('finance_customers', { chave: 'eq.' + chave, select: 'id' });
+    return agora ? agora.id : null;
+  }
+}
+
+function clienteParaTela(c) {
+  return {
+    id: c.id, nome: c.nome, telefone: c.telefone || '',
+    responsavel: c.responsavel || '', observacoes: c.observacoes || '',
+    ativo: c.ativo !== false
+  };
+}
+
+// A data em que a cobranca VENCE, de verdade (dia do mes + competencia).
+// Mes curto encosta no ultimo dia, como a cobranca faz na vida real.
+function dataDeVencimento(linha) {
+  const mes = Number(linha.ref_mes), ano = Number(linha.ref_ano);
+  if (!mes || !ano) return null;
+  const ultimo = new Date(ano, mes, 0).getDate();
+  const dia = Math.min(Math.max(Number(linha.vencimento_dia) || 1, 1), ultimo);
+  return ano + '-' + String(mes).padStart(2, '0') + '-' + String(dia).padStart(2, '0');
 }
 
 // ------------------------------------------------------------
@@ -122,7 +183,7 @@ async function garantirCompetencias() {
 
   // qual e a competencia mais recente que ja existe?
   const ultimas = await db.select('finance_clients', {
-    order: 'ref_ano.desc,ref_mes.desc', select: 'ref_mes,ref_ano', limit: 1
+    order: 'ref_ano.desc,ref_mes.desc', select: 'ref_mes,ref_ano', excluida_em: 'is.null', limit: 1
   });
   if (!ultimas.length) return { criadas: [] };          // carteira vazia: nada a virar
 
@@ -144,6 +205,7 @@ async function garantirCompetencias() {
       const base = await db.select('finance_clients', {
         ref_mes: 'eq.' + origem.mes, ref_ano: 'eq.' + origem.ano,
         ativo: 'is.true',                                 // contrato encerrado nao gera cobranca nova
+        excluida_em: 'is.null',
         order: 'position.asc', select: '*'
       });
 
@@ -163,6 +225,8 @@ async function garantirCompetencias() {
             observacao: null,
             destaque: r.destaque, ativo: true,
             position: r.position,
+            // o mes novo aponta para o MESMO cadastro de cliente
+            customer_id: r.customer_id || null,
             ref_mes: destino.mes, ref_ano: destino.ano,
             created_at: agora, updated_at: agora
           };
@@ -185,7 +249,7 @@ async function garantirCompetencias() {
 // velha — e o mes atual sempre entra, mesmo que ainda esteja vazio.
 async function competenciasExistentes() {
   const linhas = await db.select('finance_clients', {
-    order: 'ref_ano.desc,ref_mes.desc', select: 'ref_mes,ref_ano'
+    order: 'ref_ano.desc,ref_mes.desc', select: 'ref_mes,ref_ano', excluida_em: 'is.null'
   });
   const vistos = {};
   const lista = [];
@@ -494,6 +558,121 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    // ==========================================================
+    // CLIENTES — o cadastro e a ficha financeira de cada um
+    // ==========================================================
+    if (action === 'fc_lista') {
+      await garantirCompetencias();
+      const cadastros = await db.select('finance_customers', { order: 'nome.asc', select: '*' });
+      const cobrancas = await db.select('finance_clients', {
+        excluida_em: 'is.null', select: 'customer_id,valor,status,ref_mes,ref_ano'
+      });
+
+      const porCliente = {};
+      cobrancas.forEach(function (c) {
+        if (!c.customer_id) return;
+        const a = porCliente[c.customer_id] || (porCliente[c.customer_id] = {
+          total: 0, pagas: 0, abertas: 0, recebido: 0, ultima: null
+        });
+        a.total++;
+        if (c.status === 'pago') { a.pagas++; a.recebido += centavos(c.valor); }
+        else a.abertas++;
+        const ord = ordinal(Number(c.ref_mes), Number(c.ref_ano));
+        if (!a.ultima || ord > a.ultima.ord) a.ultima = { ord: ord, mes: Number(c.ref_mes), ano: Number(c.ref_ano) };
+      });
+
+      return u.ok(res, {
+        clientes: cadastros.map(function (c) {
+          const a = porCliente[c.id] || { total: 0, pagas: 0, abertas: 0, recebido: 0, ultima: null };
+          return Object.assign(clienteParaTela(c), {
+            cobrancas: a.total, pagas: a.pagas, em_aberto: a.abertas,
+            total_recebido: reais(a.recebido),
+            ultima_competencia: a.ultima ? { mes: a.ultima.mes, ano: a.ultima.ano } : null
+          });
+        }),
+        meses: MESES
+      });
+    }
+
+    // A FICHA: o rastro financeiro completo daquele cliente. O
+    // historico nao e digitado — sai das cobrancas vinculadas a ele.
+    if (action === 'fc_ficha') {
+      const id = String(params.id || '');
+      if (!id) return u.fail(res, 400, 'Falta dizer qual cliente.');
+      const c = await db.selectOne('finance_customers', { id: 'eq.' + id, select: '*' });
+      if (!c) return u.fail(res, 404, 'Cliente nao encontrado.');
+
+      const linhas = await db.select('finance_clients', {
+        customer_id: 'eq.' + id, excluida_em: 'is.null',
+        order: 'ref_ano.desc,ref_mes.desc', select: '*'
+      });
+
+      // do mais recente para o mais antigo
+      linhas.sort(function (a, b) {
+        return ordinal(Number(b.ref_mes), Number(b.ref_ano)) - ordinal(Number(a.ref_mes), Number(a.ref_ano));
+      });
+
+      let recebido = 0, aberto = 0;
+      const historico = linhas.map(function (r) {
+        const t = paraTela(r);
+        if (t.status === 'pago') recebido += centavos(t.valor); else aberto += centavos(t.valor);
+        return {
+          id: t.id,
+          competencia: { mes: t.ref_mes, ano: t.ref_ano },
+          competencia_nome: (MESES[t.ref_mes - 1] || '?') + '/' + t.ref_ano,
+          valor: t.valor,
+          // vencimento e pagamento sao DATAS DIFERENTES, de proposito:
+          // e a diferenca entre elas que conta como o cliente paga.
+          vencimento: dataDeVencimento(r),
+          vencimento_dia: t.vencimento_dia,
+          pago_em: t.pago_em,
+          status: t.status,
+          status_nome: t.status_nome,
+          observacao: t.observacao
+        };
+      });
+
+      return u.ok(res, {
+        cliente: clienteParaTela(c),
+        historico: historico,
+        resumo: {
+          cobrancas: historico.length,
+          recebido: reais(recebido),
+          em_aberto: reais(aberto)
+        },
+        meses: MESES
+      });
+    }
+
+    // Editar o CADASTRO — nome, telefone, responsavel e as observacoes
+    // que atravessam os meses. Nao mexe em cobranca nenhuma.
+    if (action === 'fc_salvar') {
+      if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
+      const body = await u.readBody(req);
+      if (!body.id) return u.fail(res, 400, 'Falta dizer qual cliente.');
+
+      const nome = limpaTexto(body.nome, 160);
+      if (!nome) return u.fail(res, 400, 'Escreva o nome do cliente.');
+
+      const patch = {
+        nome: nome,
+        chave: chaveDoCliente(nome),
+        telefone: limpaTexto(body.telefone, 40),
+        responsavel: limpaTexto(body.responsavel, 120),
+        observacoes: limpaTexto(body.observacoes, 2000),
+        updated_at: new Date().toISOString()
+      };
+
+      let row;
+      try {
+        row = await db.update('finance_customers', patch, { id: 'eq.' + body.id });
+      } catch (e) {
+        return u.fail(res, 409, 'Ja existe outro cliente com esse nome.');
+      }
+      if (!row) return u.fail(res, 404, 'Cliente nao encontrado.');
+      return u.ok(res, { cliente: clienteParaTela(row) });
+    }
+
     // ---------------------------------------------------- DRE
     // Entradas - Despesas = Resultado. Nenhum numero e digitado nem
     // guardado: os tres saem dos lancamentos que ja existem. Marcou
@@ -600,6 +779,11 @@ module.exports = async function handler(req, res) {
         if (!row) return u.fail(res, 404, 'Cliente nao encontrado.');
       } else {
         if (status === 'pago') patch.pago_em = new Date().toISOString();
+        // toda cobranca nasce ligada a um cadastro de cliente; se o
+        // cliente ainda nao existe, ele e criado aqui — uma vez so.
+        patch.customer_id = await clienteDeCobranca(cliente, {
+          telefone: patch.telefone, responsavel: patch.responsavel
+        });
         const comp = competenciaDe(body);
         patch.ref_mes = comp.mes;
         patch.ref_ano = comp.ano;
@@ -638,7 +822,8 @@ module.exports = async function handler(req, res) {
 
       const comp = competenciaDe(body);
       const existentes = await db.select('finance_clients', {
-        ref_mes: 'eq.' + comp.mes, ref_ano: 'eq.' + comp.ano, select: 'cliente,position'
+        ref_mes: 'eq.' + comp.mes, ref_ano: 'eq.' + comp.ano,
+        excluida_em: 'is.null', select: 'cliente,position'
       });
       const vistos = {};
       existentes.forEach(function (r) { vistos[identidade(r.cliente)] = true; });
@@ -691,6 +876,9 @@ module.exports = async function handler(req, res) {
         };
 
         try {
+          novo.customer_id = await clienteDeCobranca(nome, {
+            telefone: novo.telefone, responsavel: novo.responsavel
+          });
           await db.insert('finance_clients', novo);
           vistos[id] = true;
           importados++;
@@ -785,7 +973,12 @@ module.exports = async function handler(req, res) {
       if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
       const body = await u.readBody(req);
       if (!body.id) return u.fail(res, 400, 'Falta dizer qual cliente.');
-      await db.remove('finance_clients', { id: 'eq.' + body.id });
+      // EXCLUSAO LOGICA: historico financeiro nao se joga fora. A linha
+      // some das telas e do calculo, mas continua no banco — se alguem
+      // apagar por engano, da para trazer de volta.
+      await db.update('finance_clients', {
+        excluida_em: new Date().toISOString(), updated_at: new Date().toISOString()
+      }, { id: 'eq.' + body.id });
       return u.ok(res, { removido: true });
     }
 
