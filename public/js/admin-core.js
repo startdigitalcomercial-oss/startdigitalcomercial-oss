@@ -151,7 +151,7 @@ const TITULOS = {
   conteudo: 'Aulas da integração', quiz: 'Quiz de seleção',
   colaboradores: 'Colaboradores', avisos: 'Avisos para o time', usuarios: 'Usuários do painel',
   mensagens: 'Modelos de mensagem', ajustes: 'Ajustes',
-  financeiro: 'Cobranças', findash: 'Dashboard financeiro', fingastos: 'Outros Gastos',
+  financeiro: 'Cobranças', findash: 'Dashboard financeiro', fingastos: 'Despesas', findre: 'DRE',
   space: 'Benefícios'
 };
 /* ---------------------------------------------- sanfona do menu
@@ -212,7 +212,7 @@ document.getElementById('abas').addEventListener('click', function (ev) {
     prequalificacao: carregaPrequal, aurea: carregaAurea, preonboarding: carregaBoasVindas,
     colaboradores: carregaColaboradores, avisos: carregaAvisos, usuarios: carregaUsuarios,
     conteudo: carregaConteudo, quiz: carregaQuiz, mensagens: carregaTemplates, ajustes: carregaAjustes,
-    financeiro: carregaFinanceiro, findash: carregaFinDash, fingastos: carregaFinGastos,
+    financeiro: carregaFinanceiro, findash: carregaFinDash, fingastos: carregaFinGastos, findre: carregaFinDre,
     space: carregaSpace
   };
   marcaGrupoAtivo();
