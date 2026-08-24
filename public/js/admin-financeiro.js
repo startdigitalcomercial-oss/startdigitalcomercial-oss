@@ -1245,3 +1245,266 @@ async function baixaRelatorioFinDash() {
   } catch (e) { toast(e.message, true); }
   b.disabled = false; b.textContent = antes;
 }
+
+/* ============================================================
+   TELA 5 — CLIENTES
+   Cliente = quem paga. Cobrança = o que precisamos receber.
+   O cadastro é UM só e atravessa todos os meses; o histórico
+   aqui embaixo não é digitado — ele nasce das cobranças que
+   apontam para este cliente. Virar o mês não cria cliente novo.
+   ============================================================ */
+let FC_LISTA = [];          // o que veio do servidor
+let FC_BUSCA = '';          // pedaço do nome digitado na busca
+let FC_ABERTO = null;       // id do cliente cuja ficha está aberta
+
+async function carregaFinClientes() {
+  const alvo = document.getElementById('painel-finclientes');
+  // Se a pessoa estava numa ficha e voltou para cá, reabre a ficha.
+  if (FC_ABERTO) return abreFichaCliente(FC_ABERTO);
+  alvo.innerHTML = '<div class="spinner"></div>';
+  try {
+    const d = await apiFin('fc_lista');
+    FC_LISTA = d.clientes || [];
+    desenhaListaClientes();
+  } catch (e) {
+    alvo.innerHTML = '<div class="alert alert-erro">' + esc(e.message) + '</div>';
+  }
+}
+
+// tira acento e caixa: procurar "vitraux" acha "VITRAUX"
+function fcChave(t) {
+  return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+}
+
+function fcFiltrados() {
+  const b = fcChave(FC_BUSCA);
+  if (!b) return FC_LISTA;
+  return FC_LISTA.filter(function (c) { return fcChave(c.nome).indexOf(b) >= 0; });
+}
+
+// O casco da tela é desenhado UMA vez. Quem repinta a cada tecla é
+// só o corpo da tabela — assim o cursor não pula do campo de busca.
+function desenhaListaClientes() {
+  document.getElementById('painel-finclientes').innerHTML =
+    '<div class="row row-wrap" style="justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px">' +
+      '<div class="field" style="margin:0;min-width:260px;flex:1;max-width:380px">' +
+        '<input id="fc-busca" placeholder="Procurar cliente pelo nome…" value="' + esc(FC_BUSCA) + '" autocomplete="off">' +
+      '</div>' +
+      '<div class="small muted" id="fc-conta"></div>' +
+    '</div>' +
+
+    '<div class="card" style="padding:0;overflow:hidden">' +
+      '<div style="overflow-x:auto">' +
+      '<table class="tbl" style="min-width:620px"><thead><tr>' +
+        '<th style="padding:14px 16px 10px">Cliente</th>' +
+        '<th>Telefone</th><th>Responsável</th>' +
+        '<th>Cobranças</th><th>Em aberto</th><th>Última competência</th><th></th>' +
+      '</tr></thead><tbody id="fc-corpo"></tbody></table>' +
+      '</div>' +
+    '</div>';
+
+  pintaListaClientes();
+
+  // debounce curtinho: espera a pessoa parar de digitar
+  let timer = null;
+  document.getElementById('fc-busca').addEventListener('input', function () {
+    FC_BUSCA = this.value;
+    clearTimeout(timer);
+    timer = setTimeout(pintaListaClientes, 120);
+  });
+}
+
+function fcCompNome(c) {
+  if (!c || !c.ultima_competencia) return '—';
+  const m = FIN_MESES[c.ultima_competencia.mes - 1] || '?';
+  return m + '/' + c.ultima_competencia.ano;
+}
+
+function pintaListaClientes() {
+  const lista = fcFiltrados();
+  const conta = document.getElementById('fc-conta');
+  if (conta) {
+    conta.textContent = lista.length + (lista.length === 1 ? ' cliente' : ' clientes') +
+      (FC_BUSCA ? ' encontrado(s)' : ' no cadastro');
+  }
+
+  document.getElementById('fc-corpo').innerHTML = lista.length
+    ? lista.map(function (c) {
+        return '<tr class="fc-linha" data-id="' + esc(c.id) + '" style="cursor:pointer">' +
+          '<td style="padding-left:16px;font-weight:600">' + esc(c.nome) + '</td>' +
+          '<td class="small muted" style="white-space:nowrap">' + esc(c.telefone || '—') + '</td>' +
+          '<td class="small muted">' + esc(c.responsavel || '—') + '</td>' +
+          '<td style="font-variant-numeric:tabular-nums">' + (c.cobrancas || 0) + '</td>' +
+          '<td style="font-variant-numeric:tabular-nums">' + (c.em_aberto || 0) + '</td>' +
+          '<td class="small muted" style="white-space:nowrap">' + esc(fcCompNome(c)) + '</td>' +
+          '<td style="text-align:right;padding-right:14px;white-space:nowrap">' +
+            '<button class="btn btn-sm btn-ghost">Ver ficha</button></td>' +
+        '</tr>';
+      }).join('')
+    : '<tr><td colspan="7" style="padding:26px" class="muted">' +
+        (FC_BUSCA ? 'Nenhum cliente com esse nome.' : 'Nenhum cliente cadastrado ainda.') + '</td></tr>';
+
+  document.querySelectorAll('#fc-corpo tr.fc-linha').forEach(function (tr) {
+    tr.addEventListener('click', function () { abreFichaCliente(tr.dataset.id); });
+  });
+}
+
+/* ---------------------------------------------- a ficha ---- */
+async function abreFichaCliente(id) {
+  const alvo = document.getElementById('painel-finclientes');
+  alvo.innerHTML = '<div class="spinner"></div>';
+  try {
+    const d = await apiFin('fc_ficha', { params: { id: id } });
+    FC_ABERTO = id;
+    desenhaFichaCliente(d);
+  } catch (e) {
+    FC_ABERTO = null;
+    alvo.innerHTML = '<div class="alert alert-erro">' + esc(e.message) + '</div>';
+  }
+}
+
+function desenhaFichaCliente(d) {
+  const c = d.cliente || {};
+  const h = d.historico || [];
+  const r = d.resumo || {};
+
+  document.getElementById('painel-finclientes').innerHTML =
+    '<button class="btn btn-sm btn-ghost" id="fc-voltar" style="margin-bottom:14px">‹ Todos os clientes</button>' +
+
+    '<div class="card" style="margin-bottom:16px">' +
+      '<div class="row row-wrap" style="justify-content:space-between;align-items:flex-start;gap:12px">' +
+        '<div>' +
+          '<h2 style="margin:0 0 6px;font-size:22px">' + esc(c.nome || '—') + '</h2>' +
+          '<div class="fc-dados">' +
+            '<span><b>Telefone:</b> ' + esc(c.telefone || '—') + '</span>' +
+            '<span><b>Responsável:</b> ' + esc(c.responsavel || '—') + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<button class="btn btn-sm btn-ghost" id="fc-editar">Editar cadastro</button>' +
+      '</div>' +
+
+      '<div class="row row-wrap" style="gap:40px;margin-top:22px">' +
+        fcTile('Já recebido', finDinheiro(r.recebido), 'somando todas as competências', '#146c43') +
+        fcTile('Em aberto', finDinheiro(r.em_aberto), 'ainda não pago', '#b02a20') +
+        fcTile('Cobranças', String(r.cobrancas || 0), 'no histórico', '') +
+      '</div>' +
+    '</div>' +
+
+    '<div class="card" style="margin-bottom:16px">' +
+      '<h3 style="margin:0 0 4px;font-size:16px">Observações</h3>' +
+      '<div class="hint" style="margin-bottom:10px">Ficam no cadastro do cliente e não somem quando vira o mês. ' +
+        'Ex.: "sempre paga depois do dia 15", "pede boleto pelo WhatsApp".</div>' +
+      '<textarea id="fc-obs" rows="3" maxlength="2000" style="width:100%">' + esc(c.observacoes || '') + '</textarea>' +
+      '<button class="btn btn-sm" id="fc-salvar-obs" style="margin-top:10px">Salvar observações</button>' +
+      '<div id="fc-obs-saida"></div>' +
+    '</div>' +
+
+    '<div class="card" style="padding:0;overflow:hidden">' +
+      '<h3 style="margin:0;padding:18px 20px 8px;font-size:16px">Histórico de cobranças</h3>' +
+      '<div style="overflow-x:auto">' +
+      '<table class="tbl" style="min-width:620px"><thead><tr>' +
+        '<th style="padding:6px 16px 10px">Competência</th>' +
+        '<th>Valor</th><th>Vencimento</th><th>Pagamento</th><th>Status</th>' +
+      '</tr></thead><tbody>' +
+      (h.length ? h.map(function (x) {
+        const pino = x.status === 'pago' ? 'pago-ok' : esc(x.status);
+        return '<tr>' +
+          '<td style="padding-left:16px;font-weight:600">' + esc(x.competencia_nome) + '</td>' +
+          '<td style="font-variant-numeric:tabular-nums">' + finDinheiro(x.valor) + '</td>' +
+          '<td class="small muted" style="white-space:nowrap">' + dataBrCurta(x.vencimento) + '</td>' +
+          '<td class="small muted" style="white-space:nowrap">' + dataBrCurta(x.pago_em ? String(x.pago_em).slice(0, 10) : '') + '</td>' +
+          '<td><span class="fd-pino ' + pino + '">' + esc(x.status_nome) + '</span></td>' +
+        '</tr>';
+      }).join('')
+        : '<tr><td colspan="5" style="padding:26px" class="muted">Este cliente ainda não tem cobranças.</td></tr>') +
+      '</tbody></table></div>' +
+    '</div>';
+
+  document.getElementById('fc-voltar').addEventListener('click', function () {
+    FC_ABERTO = null;
+    carregaFinClientes();
+  });
+
+  document.getElementById('fc-editar').addEventListener('click', function () {
+    abreCadastroCliente(c);
+  });
+
+  document.getElementById('fc-salvar-obs').addEventListener('click', async function () {
+    this.disabled = true;
+    this.innerHTML = '<span class="spinner"></span> Salvando…';
+    try {
+      await apiFin('fc_salvar', {
+        body: {
+          id: c.id, nome: c.nome, telefone: c.telefone,
+          responsavel: c.responsavel,
+          observacoes: (document.getElementById('fc-obs') || {}).value || ''
+        }
+      });
+      toast('Observações salvas');
+      abreFichaCliente(c.id);
+    } catch (e) {
+      document.getElementById('fc-obs-saida').innerHTML =
+        '<div class="alert alert-erro" style="margin-top:12px">' + esc(e.message) + '</div>';
+      this.disabled = false;
+      this.textContent = 'Salvar observações';
+    }
+  });
+}
+
+function fcTile(rot, valor, pe, cor) {
+  return '<div>' +
+    '<div class="small muted" style="font-weight:600;margin-bottom:4px">' + rot + '</div>' +
+    '<div style="font-size:24px;font-weight:700;font-variant-numeric:tabular-nums' +
+      (cor ? ';color:' + cor : '') + '">' + esc(valor) + '</div>' +
+    '<div class="small muted" style="margin-top:2px">' + pe + '</div>' +
+  '</div>';
+}
+
+/* editar o cadastro — não encosta em cobrança nenhuma */
+function abreCadastroCliente(c) {
+  document.getElementById('g-nome').textContent = c.nome || 'Cliente';
+  document.getElementById('g-sub').textContent = 'Isto é o cadastro. As cobranças de todos os meses continuam ligadas a ele.';
+
+  document.getElementById('g-corpo').innerHTML =
+    '<div class="field"><label for="fcc-nome">Nome do cliente</label>' +
+      '<span class="hint">Trocar o nome aqui NÃO cria cliente novo — o histórico vem junto.</span>' +
+      '<input id="fcc-nome" maxlength="160" value="' + esc(c.nome || '') + '"></div>' +
+    '<div class="row row-wrap" style="gap:14px">' +
+      '<div class="field" style="flex:1;min-width:170px"><label for="fcc-tel">Telefone</label>' +
+        '<input id="fcc-tel" maxlength="40" value="' + esc(c.telefone || '') + '"></div>' +
+      '<div class="field" style="flex:1;min-width:170px"><label for="fcc-resp">Responsável</label>' +
+        '<input id="fcc-resp" maxlength="120" value="' + esc(c.responsavel || '') + '"></div>' +
+    '</div>' +
+    '<div class="row" style="gap:12px;margin-top:20px">' +
+      '<button class="btn" id="fcc-salvar">Salvar</button>' +
+    '</div>' +
+    '<div id="fcc-saida"></div>';
+
+  document.getElementById('fundo').style.display = 'block';
+  document.getElementById('gaveta').style.display = 'flex';
+
+  document.getElementById('fcc-salvar').addEventListener('click', async function () {
+    const nome = (document.getElementById('fcc-nome') || {}).value || '';
+    if (!nome.trim()) return toast('Escreva o nome do cliente', true);
+    this.disabled = true;
+    this.innerHTML = '<span class="spinner"></span> Salvando…';
+    try {
+      await apiFin('fc_salvar', {
+        body: {
+          id: c.id, nome: nome,
+          telefone: (document.getElementById('fcc-tel') || {}).value || '',
+          responsavel: (document.getElementById('fcc-resp') || {}).value || '',
+          observacoes: c.observacoes || ''
+        }
+      });
+      toast('Cadastro salvo');
+      fechaGaveta();
+      abreFichaCliente(c.id);
+    } catch (e) {
+      document.getElementById('fcc-saida').innerHTML =
+        '<div class="alert alert-erro" style="margin-top:14px">' + esc(e.message) + '</div>';
+      this.disabled = false;
+      this.textContent = 'Salvar';
+    }
+  });
+}

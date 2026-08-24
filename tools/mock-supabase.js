@@ -218,6 +218,7 @@ const DB = {
     { id: 'ffff0010-0010-4010-8010-000000000010', cliente: 'BRAZ', valor: 1200, setup: 0, hospedagem: 90, vencimento_dia: 30, ref_mes: 8, ref_ano: 2026, status: 'inadimplente', pago_em: null, responsavel: 'Tania Izelli', telefone: '44 9979-0712', observacao: 'Cobranca enviada', destaque: false, ativo: true, position: 10, created_at: agora(), updated_at: agora() }
   ],
 
+  finance_customers: [],
   finance_expenses: [],
 
   prequal_sessions: [],
@@ -249,8 +250,9 @@ const DEFAULTS = {
   stage_history: function () { return { id: seq('stage_history'), created_at: agora(), note: null, from_stage: null, to_stage: null }; },
   benefit_vouchers: function () { return { id: uuid(), valor: 0, descricao: null, ativo: true, position: 1, created_at: agora(), updated_at: agora() }; },
   benefit_releases: function () { return { id: uuid(), status: 'liberado', voucher_id: null, liberado_por: null, liberado_em: agora(), pix_chave: null, pix_tipo: null, asaas_id: null, asaas_status: null, comprovante_url: null, falha_motivo: null, solicitado_em: null, pago_em: null, created_at: agora(), updated_at: agora() }; },
-    finance_expenses: function () { return { id: uuid(), valor: 0, data: agora().slice(0, 10), observacao: null, created_at: agora(), updated_at: agora() }; },
-  finance_clients: function () { return { id: uuid(), valor: 0, setup: 0, hospedagem: 0, vencimento_dia: 10, status: 'aguardando', pago_em: null, ref_mes: 8, ref_ano: 2026, pago_em: null, responsavel: null, telefone: null, observacao: null, destaque: false, ativo: true, position: 1, created_at: agora(), updated_at: agora() }; },
+    finance_customers: function () { return { id: uuid(), telefone: null, responsavel: null, observacoes: null, ativo: true, created_at: agora(), updated_at: agora() }; },
+  finance_expenses: function () { return { id: uuid(), valor: 0, data: agora().slice(0, 10), observacao: null, created_at: agora(), updated_at: agora() }; },
+  finance_clients: function () { return { id: uuid(), valor: 0, setup: 0, hospedagem: 0, vencimento_dia: 10, status: 'aguardando', pago_em: null, ref_mes: 8, ref_ano: 2026, customer_id: null, excluida_em: null, pago_em: null, responsavel: null, telefone: null, observacao: null, destaque: false, ativo: true, position: 1, created_at: agora(), updated_at: agora() }; },
   disc_results: function () { return { id: uuid(), answers: {}, created_at: agora() }; },
   quiz_attempts: function () { return { id: uuid(), answers: {}, score: null, max_score: null, percent: null, passed: null, focus_lost: 0, paste_blocked: 0, integrity_flags: [], started_at: agora(), finished_at: null }; },
   lesson_progress: function () { return { completed: true, completed_at: agora() }; },
@@ -280,6 +282,31 @@ function seq(t) {
   }
   return ++contadores[t];
 }
+
+/* ---------------- cadastro de clientes do espelho ----------------
+   No banco de verdade a migracao criou um cadastro para cada cliente
+   das cobrancas. Aqui fazemos o mesmo na largada, senao a tela
+   "Clientes" nasce vazia no espelho local. */
+(function backfillClientes() {
+  const chave = function (nome) {
+    return String(nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase().replace(/\s+/g, ' ').trim();
+  };
+  const porChave = {};
+  DB.finance_clients.forEach(function (r) {
+    const k = chave(r.cliente);
+    if (!k) return;
+    if (!porChave[k]) {
+      porChave[k] = {
+        id: uuid(), nome: r.cliente, chave: k,
+        telefone: r.telefone || null, responsavel: r.responsavel || null,
+        observacoes: null, ativo: true, created_at: agora(), updated_at: agora()
+      };
+      DB.finance_customers.push(porChave[k]);
+    }
+    r.customer_id = porChave[k].id;
+  });
+})();
 
 /* ---------------- filtros ---------------- */
 function norm(v) {
@@ -323,16 +350,22 @@ function aplica(rows, params) {
     out = out.filter(function (r) { return combina(r, k, params[k]); });
   });
   if (params.order) {
-    params.order.split(',').forEach(function (o) {
+    // No PostgREST a PRIMEIRA chave manda; as seguintes so desempatam.
+    // (order=ref_ano.desc,ref_mes.desc = ano primeiro, mes depois)
+    const chaves = params.order.split(',').map(function (o) {
       const p = o.split('.');
-      const campo = p[0], dir = p[1] === 'desc' ? -1 : 1;
-      out.sort(function (a, b) {
+      return { campo: p[0], dir: p[1] === 'desc' ? -1 : 1 };
+    });
+    out.sort(function (a, b) {
+      for (let i = 0; i < chaves.length; i++) {
+        const campo = chaves[i].campo, dir = chaves[i].dir;
         const x = a[campo], y = b[campo];
-        if (x === y) return 0;
+        if (x === y) continue;
         if (x === null || x === undefined) return 1;
         if (y === null || y === undefined) return -1;
         return (x > y ? 1 : -1) * dir;
-      });
+      }
+      return 0;
     });
   }
   if (params.limit) out = out.slice(0, Number(params.limit));
@@ -414,8 +447,12 @@ const server = http.createServer(function (req, res) {
       const UNICOS = {
         // uma cobranca por cliente em cada competencia
         finance_clients: function (r) {
+          // indice PARCIAL: cobranca apagada nao ocupa a vaga do mes
+          if (r.excluida_em) return null;
           return [String(r.cliente || '').trim().toLowerCase(), r.ref_mes, r.ref_ano].join('|');
         },
+        // um cadastro por cliente (a chave e o nome sem acento/caixa)
+        finance_customers: function (r) { return 'cli|' + String(r.chave || ''); },
         // um beneficio em aberto por colaborador
         benefit_releases: function (r) {
           if (['liberado', 'processando'].indexOf(String(r.status)) < 0) return null;
