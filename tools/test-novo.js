@@ -1117,6 +1117,48 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
     check('desligou, esconde de novo', (await adm('usuarios_eu')).mostrar_automacao === false);
   }
 
+  // ============================================================
+  console.log('\n5b-gastos) OUTROS GASTOS — caderninho com total por periodo');
+  // ============================================================
+  {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const g1 = await fin('fg_salvar', { item: 'Cabo HDMI ' + SUF, valor: '89,90', data: hoje });
+    check('cadastra um gasto', g1.ok && g1.gasto.valor === 89.9, g1.error || g1.gasto);
+    const g2 = await fin('fg_salvar', { item: 'Cafe ' + SUF, valor: 'R$ 35', data: '2020-06-15', observacao: 'mercado' });
+    check('gasto antigo entra com a data dele', g2.ok && g2.gasto.data === '2020-06-15', g2.gasto);
+    check('gasto sem item e recusado', !(await fin('fg_salvar', { item: '  ', valor: '10' })).ok);
+    check('gasto com valor zero e recusado', !(await fin('fg_salvar', { item: 'x', valor: '0' })).ok);
+    const g3 = await fin('fg_salvar', { item: 'Data torta ' + SUF, valor: '5', data: '31/02/9999' });
+    check('data invalida vira hoje, sem quebrar', g3.ok && g3.gasto.data === hoje, g3.gasto);
+
+    const doMes = await fin('fg_lista', null, { de: hoje.slice(0, 8) + '01', ate: hoje });
+    check('total do periodo soma so o que esta dentro',
+      doMes.ok && doMes.total === 89.9 + 5 && doMes.gastos.length === 2,
+      { total: doMes.total, qtd: doMes.gastos && doMes.gastos.length });
+    const de2020 = await fin('fg_lista', null, { de: '2020-01-01', ate: '2020-12-31' });
+    check('o periodo de 2020 ve so o cafe', de2020.total === 35 && de2020.gastos.length === 1, de2020.total);
+    const tudo = await fin('fg_lista');
+    check('sem periodo, lista tudo', tudo.gastos.length === 3, tudo.gastos.length);
+
+    const editado = await fin('fg_salvar', { id: g1.gasto.id, item: g1.gasto.item, valor: '100', data: hoje });
+    check('edita um gasto', editado.ok && editado.gasto.valor === 100, editado.error);
+    const aposEdicao = await fin('fg_lista', null, { de: hoje, ate: hoje });
+    check('o total acompanha a edicao', aposEdicao.total === 105, aposEdicao.total);
+
+    check('exclui um gasto', (await fin('fg_excluir', { id: g2.gasto.id })).ok);
+    check('o excluido some da lista', (await fin('fg_lista')).gastos.length === 2);
+
+    // permissoes: mesmo padrao do financeiro
+    const perms = require('../api/_lib/perms.js');
+    check('leitura nao ve os gastos', perms.permite('leitura', 'fg_lista') === false);
+    check('avaliador nao cadastra gasto', perms.permite('avaliador', 'fg_salvar') === false);
+    check('o menu do dono tem Outros Gastos', perms.menuDoPapel('dono').indexOf('fingastos') >= 0);
+
+    // limpeza
+    await fin('fg_excluir', { id: g1.gasto.id });
+    await fin('fg_excluir', { id: g3.gasto.id });
+  }
+
   console.log('\n5b-space) SPACE COLABORADOR — beneficio por Pix (Asaas)');
   // ============================================================
   const MARINA = 'cccc0001-0001-4001-8001-000000000001';
