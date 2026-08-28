@@ -757,6 +757,7 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   const dd = disparo.data || disparo;
   check('dispara o aviso para o time', disparo.ok && dd.enviados >= 1, disparo.error);
   check('troca o nome de cada pessoa', dd.detalhe && dd.detalhe.length >= 1, dd.detalhe);
+
   const depoisAv = await adm('broadcast_info');
   const dda = depoisAv.data || depoisAv;
   check('guarda o aviso no historico', dda.historico.length >= 1, dda.historico && dda.historico.length);
@@ -1037,7 +1038,6 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
     check('dia 31 em fevereiro vira o ultimo dia',
       finmod.proximaData(31, new Date(2026, 1, 1)).getTime() === new Date(2026, 1, 28).getTime(),
       finmod.proximaData(31, new Date(2026, 1, 1)).toDateString());
-
     // valores digitados do jeito que o time digita
     check('aceita 2.500,00', finmod.limpaValor('2.500,00') === 2500);
     check('aceita R$ 1.890', finmod.limpaValor('R$ 1.890') === 1890);
