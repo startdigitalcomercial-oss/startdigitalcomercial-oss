@@ -6,7 +6,7 @@
 
 var CFG = {};
 var passo = 0;
-var TOTAL = 7;
+var TOTAL = 8;
 
 function $(id) { return document.getElementById(id); }
 function esc(s) {
@@ -126,8 +126,9 @@ function desenhaRevisao() {
     ['Na Start desde', dataBonita($('started_on').value), 2],
     ['CPF', $('cpf').value, 3],
     ['Endereço', montaEndereco(), 4],
-    ['Camisa', $('shirt_size').value, 5],
-    ['Número do pé', $('shoe_size').value, 5]
+    ['Acessibilidade', textoAcessibilidade(), 5],
+    ['Camisa', $('shirt_size').value, 6],
+    ['Número do pé', $('shoe_size').value, 6]
   ];
   $('revisao').innerHTML = linhas.map(function (l) {
     return '<div class="rev-linha"><dt>' + esc(l[0]) + '</dt>' +
@@ -138,6 +139,19 @@ function desenhaRevisao() {
   for (var i = 0; i < bts.length; i++) {
     bts[i].addEventListener('click', function () { mostra(Number(this.dataset.ir), true); });
   }
+}
+
+// Na revisao mostramos so o resumo. O que a pessoa escreveu sobre
+// saude nao fica exposto numa tela que ela pode estar dividindo com
+// alguem — para conferir, e so clicar em "alterar".
+function textoAcessibilidade() {
+  var r = $('accessibility').value;
+  if (!r) return '';
+  if (r === 'nao') return 'Não';
+  var partes = ['Sim'];
+  if ($('accessibility_detail').value.trim()) partes.push('com informação');
+  if ($('accessibility_support').value.trim()) partes.push('com pedido de suporte');
+  return partes.join(' · ');
 }
 
 function dataBonita(iso) {
@@ -166,7 +180,8 @@ function envia() {
   var dados = {};
   ['name', 'nickname', 'birth_date', 'cpf', 'email', 'phone', 'role_title', 'area',
     'work_mode', 'started_on', 'cep', 'street', 'number', 'complement', 'district', 'city', 'state',
-    'shirt_size', 'shoe_size'].forEach(function (c) {
+    'shirt_size', 'shoe_size',
+    'accessibility', 'accessibility_detail', 'accessibility_support'].forEach(function (c) {
       var el = $(c);
       if (el && el.value.trim()) dados[c] = el.value.trim();
     });
@@ -255,6 +270,19 @@ function buscaCep() {
       return { valor: m, rotulo: { presencial: 'Presencial', remoto: 'Remoto', hibrido: 'Híbrido' }[m] || m };
     }));
     montaEscolhas('camisas', 'shirt_size', c.camisas || ['P', 'M', 'G', 'GG']);
+    montaEscolhas('acess-opcoes', 'accessibility', [
+      { valor: 'nao', rotulo: 'Não' },
+      { valor: 'sim', rotulo: 'Sim' }
+    ]);
+    // O "qual" so aparece para quem respondeu Sim. Quem respondeu Nao
+    // nao ve o campo, e o que ja tinha sido escrito e apagado — senao
+    // a resposta ficaria contradizendo o que foi gravado.
+    var caixaQual = $('acess-qual-campo');
+    $('acess-opcoes').addEventListener('click', function () {
+      var sim = $('accessibility').value === 'sim';
+      caixaQual.style.display = sim ? '' : 'none';
+      if (!sim) $('accessibility_detail').value = '';
+    });
 
     document.querySelector('.passo[data-passo="0"] h1').textContent = c.titulo || 'Vamos começar pelo básico';
     document.querySelector('.passo[data-passo="0"] .apoio').textContent =

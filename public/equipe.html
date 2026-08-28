@@ -257,6 +257,38 @@
 
     <!-- 6 -->
     <section class="passo" data-passo="5">
+      <h1>Acessibilidade e bem-estar</h1>
+      <p class="apoio">Responder é opcional. É só para a gente poder ajudar do jeito certo.</p>
+
+      <div class="field">
+        <label>Você possui alguma deficiência, condição neurodivergente ou condição de saúde
+          que considere importante informar à empresa para que possamos oferecer acessibilidade,
+          adaptações ou suporte adequado no ambiente de trabalho?</label>
+        <div class="escolhas" id="acess-opcoes" style="margin-top:10px"></div>
+        <input type="hidden" id="accessibility" name="accessibility">
+      </div>
+
+      <div class="field" style="margin-top:18px;display:none" id="acess-qual-campo">
+        <label for="accessibility_detail">Caso tenha respondido “Sim”, você deseja informar qual?</label>
+        <span class="hint">Se preferir não dizer, pode deixar em branco — a resposta continua valendo.</span>
+        <textarea id="accessibility_detail" name="accessibility_detail" rows="3" maxlength="1000"></textarea>
+      </div>
+
+      <div class="field" style="margin-top:18px">
+        <label for="accessibility_support">Existe alguma adaptação, recurso ou forma de suporte
+          que poderia contribuir para o seu bem-estar e desempenho no trabalho?</label>
+        <span class="hint">Vale qualquer coisa: horário, cadeira, fone, leitor de tela, pausas, luz…</span>
+        <textarea id="accessibility_support" name="accessibility_support" rows="3" maxlength="1000"></textarea>
+      </div>
+
+      <div class="dica-lgpd">
+        As informações são confidenciais e serão utilizadas exclusivamente para fins de
+        acessibilidade, inclusão, saúde e segurança no ambiente de trabalho.
+      </div>
+    </section>
+
+    <!-- 7 -->
+    <section class="passo" data-passo="6">
       <h1>Camisa e tênis</h1>
       <p class="apoio">É com isso que a gente acerta o tamanho do seu kit — nada de camisa que não serve.</p>
       <div class="field"><label>Tamanho da camisa</label>
@@ -271,8 +303,8 @@
         <input type="hidden" id="shoe_size" name="shoe_size" value="40"></div>
     </section>
 
-    <!-- 7 -->
-    <section class="passo" data-passo="6">
+    <!-- 8 -->
+    <section class="passo" data-passo="7">
       <h1>Confere se está tudo certo</h1>
       <p class="apoio">Passe o olho. Clicando em qualquer linha você volta para corrigir.</p>
       <dl class="revisao" id="revisao"></dl>

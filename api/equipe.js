@@ -16,8 +16,15 @@ const CAMPOS = [
   'email', 'phone',
   'role_title', 'area', 'started_on', 'work_mode',
   'cep', 'street', 'number', 'complement', 'district', 'city', 'state',
-  'shirt_size', 'shoe_size'
+  'shirt_size', 'shoe_size',
+  // acessibilidade: dado sensivel de saude, todo opcional
+  'accessibility', 'accessibility_detail', 'accessibility_support'
 ];
+
+// Quanto cada campo aceita. O resto fica no limite normal de 400.
+const TAMANHOS = { accessibility_detail: 1000, accessibility_support: 1000 };
+
+const ACESSIBILIDADE = ['nao', 'sim'];
 
 const CAMISAS = ['PP', 'P', 'M', 'G', 'GG', 'XG', 'XGG'];
 const MODOS = ['presencial', 'remoto', 'hibrido'];
@@ -58,7 +65,8 @@ function limpa(body) {
     if (c === 'state') v = v.toUpperCase().slice(0, 2);
     if (c === 'shirt_size') v = v.toUpperCase();
     if (c === 'work_mode') v = v.toLowerCase();
-    dados[c] = v.slice(0, 400);
+    if (c === 'accessibility') v = v.toLowerCase();
+    dados[c] = v.slice(0, TAMANHOS[c] || 400);
   });
   return dados;
 }
@@ -81,6 +89,9 @@ function valida(d) {
   }
   if (d.work_mode && MODOS.indexOf(d.work_mode) < 0) {
     erros.push('Modo de trabalho desconhecido.');
+  }
+  if (d.accessibility && ACESSIBILIDADE.indexOf(d.accessibility) < 0) {
+    erros.push('Resposta de acessibilidade desconhecida.');
   }
   if (d.shoe_size) {
     const n = Number(String(d.shoe_size).replace(',', '.'));
