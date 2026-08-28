@@ -668,6 +668,53 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   check('aniversario traz nome completo e dias',
     !niver || (typeof niver.dias === 'number' && !!niver.nome_completo), niver);
 
+  // ---- acessibilidade: opcional, confidencial, so na ficha ----
+  {
+    const acess = await eqp('cadastrar', Object.assign({}, base, {
+      email: 'ac.' + SUF + '@exemplo.com', cpf: '',
+      accessibility: 'sim',
+      accessibility_detail: 'TDAH, diagnostico em 2019.',
+      accessibility_support: 'Fone com cancelamento de ruido e pausas curtas.'
+    }));
+    check('aceita a resposta de acessibilidade', acess.ok, acess.error);
+
+    const r2 = await adm('team'); const t2 = r2.data || r2;
+    const p2 = (t2.colaboradores || []).filter(function (c) { return c.email === 'ac.' + SUF + '@exemplo.com'; })[0];
+    check('guardou a resposta Sim', p2 && p2.accessibility === 'sim', p2 && p2.accessibility);
+    check('guardou o que a pessoa informou',
+      p2 && p2.accessibility_detail === 'TDAH, diagnostico em 2019.', p2 && p2.accessibility_detail);
+    check('guardou o suporte pedido',
+      p2 && /cancelamento de ruido/.test(p2.accessibility_support || ''), p2 && p2.accessibility_support);
+
+    // quem responde Nao nao precisa escrever mais nada
+    const naoResp = await eqp('cadastrar', Object.assign({}, base, {
+      email: 'ac2.' + SUF + '@exemplo.com', cpf: '', accessibility: 'nao'
+    }));
+    check('quem responde Nao cadastra sem escrever mais nada', naoResp.ok, naoResp.error);
+
+    // e da para pular a pergunta inteira
+    const semResp = await eqp('cadastrar', Object.assign({}, base, {
+      email: 'ac3.' + SUF + '@exemplo.com', cpf: ''
+    }));
+    check('a pergunta e opcional: da para nao responder', semResp.ok, semResp.error);
+
+    check('recusa resposta inventada',
+      !(await eqp('cadastrar', Object.assign({}, base, {
+        email: 'ac4.' + SUF + '@exemplo.com', cpf: '', accessibility: 'talvez'
+      }))).ok);
+
+    // o relato pode ser longo, mas nao infinito
+    const comprido = await eqp('cadastrar', Object.assign({}, base, {
+      email: 'ac5.' + SUF + '@exemplo.com', cpf: '', accessibility: 'sim',
+      accessibility_detail: 'a'.repeat(1500)
+    }));
+    check('texto comprido e cortado, nao recusado', comprido.ok, comprido.error);
+    const r3 = await adm('team'); const t3 = r3.data || r3;
+    const p3 = (t3.colaboradores || []).filter(function (c) { return c.email === 'ac5.' + SUF + '@exemplo.com'; })[0];
+    check('o relato guarda ate 1000 letras',
+      p3 && p3.accessibility_detail.length === 1000, p3 && p3.accessibility_detail.length);
+  }
+
   check('salva anotacao interna', (await adm('team_save', { id: eu.id, notes: 'Prefere reuniao de manha.' })).ok);
 
   console.log('\n5a2) AVISOS — mensagem para o time inteiro');

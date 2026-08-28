@@ -263,6 +263,27 @@ function abreColaborador(id) {
   const c = EQUIPE.filter(function (x) { return x.id === id; })[0];
   if (!c) return;
 
+  // Acessibilidade: dado de saude. Fica so aqui na ficha individual —
+  // nao entra na tabela geral nem no CSV que sai do painel.
+  const blocoAcessibilidade = function (p) {
+    if (!p.accessibility && !p.accessibility_support) return '';
+    const item = function (rot, val) {
+      if (!val) return '';
+      return '<div style="margin-top:10px"><div class="small muted" style="font-weight:600">' +
+        esc(rot) + '</div><div style="white-space:pre-wrap">' + esc(val) + '</div></div>';
+    };
+    const resposta = p.accessibility === 'sim' ? 'Sim' : (p.accessibility === 'nao' ? 'Não' : '');
+    return '<hr class="sep">' +
+      '<div class="alert alert-info small" style="margin:0 0 12px">' +
+        '<strong>Confidencial.</strong> Informação de acessibilidade, inclusão, saúde e segurança. ' +
+        'Use só para oferecer adaptação e suporte.</div>' +
+      (resposta ? '<div class="row" style="gap:8px;align-items:center">' +
+        '<span class="small muted" style="font-weight:600">Declarou condição:</span>' +
+        '<span class="tag">' + resposta + '</span></div>' : '') +
+      item('O que informou', p.accessibility_detail) +
+      item('Adaptação ou suporte que ajudaria', p.accessibility_support);
+  };
+
   const linha = function (rot, val) {
     return '<dt>' + esc(rot) + '</dt><dd>' + (val ? esc(val) : '<span class="muted">não informado</span>') + '</dd>';
   };
@@ -289,6 +310,7 @@ function abreColaborador(id) {
       linha('Número do pé', c.shoe_size) +
       linha('Cadastrado em', dataBr(c.created_at)) +
     '</dl>' +
+    blocoAcessibilidade(c) +
     '<hr class="sep">' +
     '<div class="field"><label>Anotações internas</label>' +
     '<textarea id="eq-notas" style="min-height:90px">' + esc(c.notes || '') + '</textarea></div>' +
