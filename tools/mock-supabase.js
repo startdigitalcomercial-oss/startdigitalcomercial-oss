@@ -323,8 +323,8 @@ function seq(t) {
    "Clientes" nasce vazia no espelho local. */
 (function backfillClientes() {
   const chave = function (nome) {
-    return String(nome || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')
-      .toLowerCase().replace(/\\s+/g, ' ').trim();
+    return String(nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase().replace(/\s+/g, ' ').trim();
   };
   const porChave = {};
   DB.finance_clients.forEach(function (r) {
@@ -361,11 +361,11 @@ function combina(row, campo, expr) {
   }
   if (expr.startsWith('neq.')) return String(val) !== String(norm(expr.slice(4)));
   if (expr.startsWith('like.')) {
-    const padrao = expr.slice(5).replace(/[.*+?^${}()|[\\]\\\\]/g, function (m) { return m === '*' ? m : '\\\\' + m; });
-    return new RegExp('^' + padrao.replace(/\\*/g, '.*') + '$').test(String(val == null ? '' : val));
+    const padrao = expr.slice(5).replace(/[.*+?^${}()|[\]\\]/g, function (m) { return m === '*' ? m : '\\' + m; });
+    return new RegExp('^' + padrao.replace(/\*/g, '.*') + '$').test(String(val == null ? '' : val));
   }
   // comparacoes de ordem: datas e numeros (gte/lte/gt/lt)
-  if (/^(gte|lte|gt|lt)\\./.test(expr)) {
+  if (/^(gte|lte|gt|lt)\./.test(expr)) {
     const op = expr.slice(0, expr.indexOf('.'));
     const cru = expr.slice(op.length + 1);
     if (val === null || val === undefined) return false;
@@ -377,7 +377,7 @@ function combina(row, campo, expr) {
     return a < b;
   }
   if (expr.startsWith('in.')) {
-    const lista = expr.slice(3).replace(/^\\(|\\)$/g, '').split(',')
+    const lista = expr.slice(3).replace(/^\(|\)$/g, '').split(',')
       .map(function (x) { return String(norm(x.trim().replace(/^"|"$/g, ''))); });
     return lista.indexOf(String(val)) >= 0;
   }
@@ -430,7 +430,7 @@ function aplica(rows, params) {
 /* ---------------- servidor ---------------- */
 const server = http.createServer(function (req, res) {
   const url = new URL(req.url, 'http://localhost');
-  const m = url.pathname.match(/^\\/rest\\/v1\\/([A-Za-z0-9_]+)$/);
+  const m = url.pathname.match(/^\/rest\/v1\/([A-Za-z0-9_]+)$/);
   const responder = function (status, data, headers) {
     res.statusCode = status;
     res.setHeader('Content-Type', 'application/json');
@@ -535,7 +535,7 @@ const server = http.createServer(function (req, res) {
           if (achado) { Object.assign(achado, r); return achado; }
         }
         const novo = Object.assign(DEFAULTS[tabela] ? DEFAULTS[tabela]() : { id: uuid() }, r);
-        if (tabela === 'candidates') novo.phone_digits = String(novo.phone || '').replace(/\\D/g, '');
+        if (tabela === 'candidates') novo.phone_digits = String(novo.phone || '').replace(/\D/g, '');
         DB[tabela].push(novo);
         return novo;
       });
@@ -552,7 +552,7 @@ const server = http.createServer(function (req, res) {
       const alvos = aplica(DB[tabela], params);
       alvos.forEach(function (r) {
         Object.assign(r, body);
-        if (tabela === 'candidates') r.phone_digits = String(r.phone || '').replace(/\\D/g, '');
+        if (tabela === 'candidates') r.phone_digits = String(r.phone || '').replace(/\D/g, '');
       });
       return responder(200, alvos);
     }
