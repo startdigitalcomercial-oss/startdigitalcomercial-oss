@@ -1118,6 +1118,7 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
     check('o periodo do dashboard e o mes da competencia',
       String(rMes.cartoes.de).slice(0, 7) === rMes.competencia.ano + '-' + String(rMes.competencia.mes).padStart(2, '0'),
       { de: rMes.cartoes.de, comp: rMes.competencia });
+
     // numa competencia vazia do passado, nao ha nada
     const rVazio = await fin('fin_resumo', null, { mes: 1, ano: 2020 });
     check('competencia sem cobrancas mostra tudo zerado',
