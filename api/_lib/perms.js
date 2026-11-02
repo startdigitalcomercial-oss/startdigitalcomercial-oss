@@ -88,6 +88,12 @@ const ACOES = {
   fc_lista: 'financeiro', fc_ficha: 'financeiro', fc_salvar: 'financeiro_mexer',
   fg_lista: 'financeiro', fg_salvar: 'financeiro_mexer', fg_excluir: 'financeiro_mexer',
 
+  // --- START PLAY: a roleta. Ver o historico e coisa de quem cuida
+  // do time; mexer nos premios tambem. Giro em si nao passa por aqui:
+  // a pagina do colaborador e publica, sem login.
+  pl_painel: 'ver', pl_historico: 'ver',
+  pl_premio_salvar: 'mexer', pl_ordem: 'mexer',
+
   // --- Space Colaborador: libera dinheiro de verdade, mesma tranca ---
   sp_painel: 'financeiro',
   sp_voucher_salvar: 'financeiro_mexer', sp_liberar: 'financeiro_mexer',
@@ -139,12 +145,12 @@ function recado(papel, acao) {
 function menuDoPapel(papel) {
   if (papel === 'dono') {
     return ['dashboard', 'vagas', 'triagem', 'candidatos', 'prequalificacao', 'aurea', 'preonboarding',
-      'colaboradores', 'avisos', 'space', 'conteudo', 'quiz', 'mensagens',
+      'colaboradores', 'avisos', 'space', 'play', 'conteudo', 'quiz', 'mensagens',
       'financeiro', 'finclientes', 'findash', 'fingastos', 'findre', 'ajustes', 'usuarios'];
   }
   if (papel === 'rh') {
     return ['dashboard', 'vagas', 'triagem', 'candidatos', 'prequalificacao', 'aurea', 'preonboarding',
-      'colaboradores', 'avisos', 'space', 'conteudo', 'quiz', 'mensagens',
+      'colaboradores', 'avisos', 'space', 'play', 'conteudo', 'quiz', 'mensagens',
       'financeiro', 'finclientes', 'findash', 'fingastos', 'findre', 'ajustes'];
   }
   if (papel === 'avaliador') {
