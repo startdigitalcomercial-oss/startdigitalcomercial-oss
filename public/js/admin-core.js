@@ -152,7 +152,7 @@ const TITULOS = {
   colaboradores: 'Colaboradores', avisos: 'Avisos para o time', usuarios: 'Usuários do painel',
   mensagens: 'Modelos de mensagem', ajustes: 'Ajustes',
   financeiro: 'Cobranças', findash: 'Dashboard financeiro', fingastos: 'Despesas', findre: 'DRE', finclientes: 'Clientes',
-  space: 'Benefícios'
+  space: 'Benefícios', play: 'START PLAY'
 };
 /* ---------------------------------------------- sanfona do menu
    Um grupo aberto por vez. O grupo da página em que você está abre
@@ -216,7 +216,8 @@ document.getElementById('abas').addEventListener('click', function (ev) {
     // Se um arquivo de tela ainda nao subiu, o menu INTEIRO nao pode
     // morrer por causa disso. Nome que falta = aba que nao carrega, so.
     finclientes: (typeof carregaFinClientes === 'function' ? carregaFinClientes : null),
-    space: carregaSpace
+    space: carregaSpace,
+    play: (typeof carregaPlay === 'function' ? carregaPlay : null)
   };
   marcaGrupoAtivo();
   if (carregar[b.dataset.aba]) carregar[b.dataset.aba]();
