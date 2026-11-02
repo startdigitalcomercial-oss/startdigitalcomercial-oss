@@ -1183,14 +1183,28 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
     check('a ordem cresce mes a mes, sem buraco na virada',
       fmod.ordinal(1, 2027) - fmod.ordinal(12, 2026) === 1);
 
-    // ---- a lista atual esta em 08/2026 ----
+    // ---- a lista atual esta no MES CORRENTE ----
+    // Nada de data fixa: o espelho semeia o mes de hoje, entao o teste
+    // continua valendo no ano que vem sem ninguem reescrever nada.
+    const HOJE = (function () {
+      const p = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit'
+      }).format(new Date()).split('-');
+      return { ano: Number(p[0]), mes: Number(p[1]) };
+    })();
+    const MES_HOJE = HOJE.mes, ANO_HOJE = HOJE.ano;
+    const PROX = fmod.deOrdinal(fmod.ordinal(MES_HOJE, ANO_HOJE) + 1);
+    const MES_PROX = PROX.mes, ANO_PROX = PROX.ano;
+    const NOME_PROX = ['Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho', 'Julho',
+      'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][MES_PROX - 1];
+
     const l0 = await fin('fin_lista');
     check('a lista abre na competencia atual', l0.ok && !!l0.competencia, l0.error);
     check('e o servidor diz qual e o mes corrente', !!l0.competencia_atual, l0.competencia_atual);
     check('os 12 meses vem para o seletor', (l0.meses || []).length === 12, (l0.meses || []).length);
-    check('as cobrancas de hoje estao em 08/2026',
-      l0.competencia.mes === 8 && l0.competencia.ano === 2026 && l0.clientes.length >= 10,
-      { comp: l0.competencia, qtd: l0.clientes.length });
+    check('as cobrancas de hoje estao na competencia de hoje',
+      l0.competencia.mes === MES_HOJE && l0.competencia.ano === ANO_HOJE && l0.clientes.length >= 10,
+      { comp: l0.competencia, esperado: MES_HOJE + '/' + ANO_HOJE, qtd: l0.clientes.length });
     const totalAgosto = l0.clientes.length;
 
     // ---- criar a competencia de setembro a partir de agosto ----
@@ -1199,29 +1213,29 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
     //  pedindo setembro e criando nele.)
     const novoSet = await fin('fin_salvar', {
       cliente: 'Cliente So De Setembro ' + SUF, valor: '900', vencimento_dia: 12,
-      mes: 9, ano: 2026
+      mes: MES_PROX, ano: ANO_PROX
     });
     check('cria cobranca direto em outra competencia', novoSet.ok, novoSet.error);
-    check('a cobranca nova nasce em 09/2026',
-      novoSet.cliente.ref_mes === 9 && novoSet.cliente.ref_ano === 2026, novoSet.cliente);
+    check('a cobranca nova nasce no mes seguinte',
+      novoSet.cliente.ref_mes === MES_PROX && novoSet.cliente.ref_ano === ANO_PROX, novoSet.cliente);
 
-    const lSet = await fin('fin_lista', null, { mes: 9, ano: 2026 });
+    const lSet = await fin('fin_lista', null, { mes: MES_PROX, ano: ANO_PROX });
     check('setembro tem a sua propria lista', lSet.clientes.length === 1, lSet.clientes.length);
-    const lAgo = await fin('fin_lista', null, { mes: 8, ano: 2026 });
+    const lAgo = await fin('fin_lista', null, { mes: MES_HOJE, ano: ANO_HOJE });
     check('e agosto continua intacto', lAgo.clientes.length === totalAgosto, lAgo.clientes.length);
     check('a lista de competencias mostra as duas',
-      (lSet.competencias || []).some(function (c) { return c.mes === 9 && c.ano === 2026; }) &&
-      (lSet.competencias || []).some(function (c) { return c.mes === 8 && c.ano === 2026; }),
+      (lSet.competencias || []).some(function (c) { return c.mes === MES_PROX && c.ano === ANO_PROX; }) &&
+      (lSet.competencias || []).some(function (c) { return c.mes === MES_HOJE && c.ano === ANO_HOJE; }),
       lSet.competencias);
 
     // ---- editar setembro NAO pode mexer em agosto ----
     const alvoAgo = lAgo.clientes.filter(function (c) { return c.cliente === 'VITRAUX'; })[0];
     const gemeoSet = await fin('fin_salvar', {
       cliente: 'VITRAUX', valor: '9999', vencimento_dia: 5, status: 'inadimplente',
-      responsavel: 'Setembro', mes: 9, ano: 2026
+      responsavel: 'Setembro', mes: MES_PROX, ano: ANO_PROX
     });
     check('o mesmo cliente pode existir em outro mes', gemeoSet.ok, gemeoSet.error);
-    const agoDepois = await fin('fin_lista', null, { mes: 8, ano: 2026 });
+    const agoDepois = await fin('fin_lista', null, { mes: MES_HOJE, ano: ANO_HOJE });
     const vitrauxAgo = agoDepois.clientes.filter(function (c) { return c.cliente === 'VITRAUX'; })[0];
     check('MEXER EM SETEMBRO NAO ALTERA AGOSTO',
       vitrauxAgo.valor === alvoAgo.valor && vitrauxAgo.status === alvoAgo.status &&
@@ -1229,23 +1243,23 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
       { antes: alvoAgo, depois: vitrauxAgo });
 
     // ---- duplicidade dentro da MESMA competencia e barrada ----
-    const repetido = await fin('fin_salvar', { cliente: 'VITRAUX', valor: '10', mes: 9, ano: 2026 });
+    const repetido = await fin('fin_salvar', { cliente: 'VITRAUX', valor: '10', mes: MES_PROX, ano: ANO_PROX });
     check('mesmo cliente duas vezes no mesmo mes e recusado', !repetido.ok, repetido);
 
     // ---- excluir de um mes nao apaga os outros ----
     await fin('fin_excluir', { id: gemeoSet.cliente.id });
-    const agoIntacto = await fin('fin_lista', null, { mes: 8, ano: 2026 });
+    const agoIntacto = await fin('fin_lista', null, { mes: MES_HOJE, ano: ANO_HOJE });
     check('EXCLUIR EM SETEMBRO NAO APAGA AGOSTO',
       agoIntacto.clientes.filter(function (c) { return c.cliente === 'VITRAUX'; }).length === 1);
     check('e agosto segue com o mesmo tamanho', agoIntacto.clientes.length === totalAgosto);
 
     // ---- os cartoes respeitam a competencia escolhida ----
-    const dSet = await fin('fin_resumo', null, { mes: 9, ano: 2026 });
-    const dAgo = await fin('fin_resumo', null, { mes: 8, ano: 2026 });
-    check('o dashboard de setembro ve so setembro',
-      dSet.competencia.mes === 9 && dSet.resumo.clientes === 1, { c: dSet.competencia, n: dSet.resumo.clientes });
-    check('o dashboard de agosto ve so agosto',
-      dAgo.competencia.mes === 8 && dAgo.resumo.clientes === totalAgosto, dAgo.resumo.clientes);
+    const dSet = await fin('fin_resumo', null, { mes: MES_PROX, ano: ANO_PROX });
+    const dAgo = await fin('fin_resumo', null, { mes: MES_HOJE, ano: ANO_HOJE });
+    check('o dashboard do mes seguinte ve so o mes seguinte',
+      dSet.competencia.mes === MES_PROX && dSet.resumo.clientes === 1, { c: dSet.competencia, n: dSet.resumo.clientes });
+    check('o dashboard do mes de hoje ve so o mes de hoje',
+      dAgo.competencia.mes === MES_HOJE && dAgo.resumo.clientes === totalAgosto, dAgo.resumo.clientes);
     check('tabela e dashboard falam da MESMA competencia',
       JSON.stringify(dAgo.competencia) === JSON.stringify(lAgo.competencia), { d: dAgo.competencia, l: lAgo.competencia });
     check('mes fechado nao promete previsao de semana', dAgo.resumo.competencia_corrente === true);
@@ -1253,13 +1267,13 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
 
     // ---- importar cai na competencia escolhida ----
     const impSet = await fin('fin_importar', {
-      mes: 9, ano: 2026,
+      mes: MES_PROX, ano: ANO_PROX,
       linhas: [{ linha: 2, cliente: 'Importado De Setembro ' + SUF, valor: '123' }]
     });
     check('a importacao entra na competencia aberta',
-      impSet.ok && impSet.importados === 1 && impSet.competencia.mes === 9, impSet);
-    check('e nao aparece em agosto',
-      (await fin('fin_lista', null, { mes: 8, ano: 2026 })).clientes
+      impSet.ok && impSet.importados === 1 && impSet.competencia.mes === MES_PROX, impSet);
+    check('e nao aparece no mes de hoje',
+      (await fin('fin_lista', null, { mes: MES_HOJE, ano: ANO_HOJE })).clientes
         .filter(function (c) { return /Importado De Setembro/.test(c.cliente); }).length === 0);
 
     // ---- a virada e idempotente ----
@@ -1268,12 +1282,12 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
     check('a virada roda sem erro', v1.ok && v2.ok, v1.error || v2.error);
     check('chamar duas vezes nao duplica nada',
       (v2.criadas || []).length === 0, v2.criadas);
-    const depoisVirada = await fin('fin_lista', null, { mes: 8, ano: 2026 });
+    const depoisVirada = await fin('fin_lista', null, { mes: MES_HOJE, ano: ANO_HOJE });
     check('e a competencia antiga continua do mesmo tamanho',
       depoisVirada.clientes.length === totalAgosto, depoisVirada.clientes.length);
 
     // limpeza do que este teste criou em setembro
-    const limparSet = await fin('fin_lista', null, { mes: 9, ano: 2026 });
+    const limparSet = await fin('fin_lista', null, { mes: MES_PROX, ano: ANO_PROX });
     for (const c of limparSet.clientes) await fin('fin_excluir', { id: c.id });
 
     // permissao
@@ -1526,6 +1540,188 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
         if (/Empresa ABC/i.test(c.cliente)) await fin('fin_excluir', { id: c.id });
       }
     }
+  }
+
+  // ============================================================
+  console.log('\n5b-play) START PLAY — a roleta');
+  // ============================================================
+  {
+    async function play(action, body, query) {
+      const qs = new URLSearchParams(Object.assign({ action: action }, query || {}));
+      return (await fetch(BASE + '/api/play?' + qs, {
+        method: body ? 'POST' : 'GET',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + T },
+        body: body ? JSON.stringify(body) : undefined
+      })).json();
+    }
+    // a pagina publica nao manda cracha nenhum
+    async function publico(action, body) {
+      return (await fetch(BASE + '/api/play?action=' + action, {
+        method: body ? 'POST' : 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined
+      })).json();
+    }
+
+    // ---- 1) a roda que o colaborador ve ----
+    const roda = await publico('play_roleta');
+    check('a roleta responde sem login', roda.ok, roda.error);
+    check('a roda tem 7 premios', (roda.premios || []).length === 7, (roda.premios || []).length);
+    check('cada premio vem com nome, cor e icone',
+      roda.premios.every(function (p) { return p.nome && p.cor && p.icone; }));
+    check('a roda NAO manda probabilidade nenhuma para a tela',
+      roda.premios.every(function (p) {
+        return p.chance === undefined && p.peso === undefined && p.probabilidade === undefined;
+      }), Object.keys(roda.premios[0]));
+
+    // ---- 2) sem nome nao gira ----
+    check('sem nome nao gira', !(await publico('play_girar', { nome: '' })).ok);
+    check('nome de uma letra nao gira', !(await publico('play_girar', { nome: 'a' })).ok);
+    check('so espaco nao gira', !(await publico('play_girar', { nome: '   ' })).ok);
+
+    // ---- 3) um giro de verdade ----
+    const g1 = await publico('play_girar', { nome: 'Clovis ' + SUF, giro_id: 'g1-' + SUF });
+    check('gira e devolve um premio', g1.ok && !!g1.giro.premio, g1.error);
+    check('o giro tem identificador proprio', !!g1.giro.id);
+    check('guarda o nome de quem jogou', g1.giro.participante === 'Clovis ' + SUF);
+    check('o indice sorteado cabe na roda',
+      g1.giro.indice >= 0 && g1.giro.indice < 7 && g1.giro.total === 7, g1.giro);
+    check('o premio anunciado E o da posicao sorteada',
+      roda.premios[g1.giro.indice].nome === g1.giro.premio,
+      { indice: g1.giro.indice, na_roda: roda.premios[g1.giro.indice].nome, veio: g1.giro.premio });
+
+    // ---- 4) clique duplo nao vira dois premios ----
+    const g1b = await publico('play_girar', { nome: 'Clovis ' + SUF, giro_id: 'g1-' + SUF });
+    check('CLIQUE DUPLO: a segunda chamada devolve o MESMO giro',
+      g1b.ok && g1b.giro.id === g1.giro.id && g1b.repetido === true, g1b.giro);
+
+    const juntos = await Promise.all([
+      publico('play_girar', { nome: 'Corrida ' + SUF, giro_id: 'c-' + SUF }),
+      publico('play_girar', { nome: 'Corrida ' + SUF, giro_id: 'c-' + SUF })
+    ]);
+    check('dois cliques no mesmo instante geram UM giro so',
+      juntos[0].giro.id === juntos[1].giro.id, juntos.map(function (x) { return x.giro.id; }));
+
+    // ---- 5) o sorteio e mesmo parelho ----
+    {
+      const conta = {};
+      const quantos = 350;
+      for (let i = 0; i < quantos; i++) {
+        const r = await publico('play_girar', { nome: 'Sorteio ' + SUF, giro_id: 's' + i + '-' + SUF });
+        conta[r.giro.indice] = (conta[r.giro.indice] || 0) + 1;
+      }
+      const saiu = Object.keys(conta).length;
+      check('em 350 giros TODOS os 7 premios sairam', saiu === 7, conta);
+      const esperado = quantos / 7;
+      const pior = Math.max.apply(null, Object.keys(conta).map(function (k) {
+        return Math.abs(conta[k] - esperado) / esperado;
+      }));
+      // margem larga de proposito: com 350 giros a sorte ainda balanca.
+      // O que este teste pega e viciado de verdade (um premio que nunca
+      // sai, ou um que sai o dobro), nao a variacao normal.
+      check('nenhum premio e favorecido nem esquecido', pior < 0.45, 'pior desvio ' + (pior * 100).toFixed(1) + '%');
+    }
+
+    // ---- 6) o painel ----
+    const painel = await play('pl_painel');
+    check('o painel abre o START PLAY', painel.ok, painel.error);
+    check('o painel lista os 7 premios', painel.premios.length === 7);
+    check('o painel conta quantas vezes cada premio saiu',
+      painel.premios.every(function (p) { return typeof p.saiu === 'number'; }));
+    check('o painel mostra o link da roleta', /\/play$/.test(painel.link || ''), painel.link);
+    check('o historico ja tem os giros do teste', painel.giros.length >= 3, painel.giros.length);
+
+    // ---- 7) editar premio ----
+    const alvo = painel.premios[0];
+    const ed = await play('pl_premio_salvar', {
+      id: alvo.id, nome: 'PIX R$ 200', descricao: 'Dobrou', cor: 'verde', icone: 'dinheiro', ativo: true
+    });
+    check('da para editar um premio', ed.ok && ed.premio.nome === 'PIX R$ 200', ed.error);
+    check('a cor mudou', ed.premio.cor === 'verde');
+    check('cor inventada vira roxo (nao quebra a roda)',
+      (await play('pl_premio_salvar', { id: alvo.id, nome: 'PIX R$ 200', cor: 'arco-iris' })).premio.cor === 'roxo');
+    check('premio sem nome nao salva', !(await play('pl_premio_salvar', { id: alvo.id, nome: '  ' })).ok);
+
+    // ---- 8) O HISTORICO NAO PODE SER REESCRITO ----
+    const antes = (await play('pl_painel')).giros.filter(function (x) { return x.id === g1.giro.id; })[0];
+    check('mudar o premio NAO muda o que a pessoa ja ganhou',
+      antes.premio === g1.giro.premio,
+      { ganhou: g1.giro.premio, historico: antes.premio });
+
+    // nao existe acao nenhuma na API para editar ou apagar um giro
+    check('nao existe acao para editar um giro',
+      !(await play('pl_giro_salvar', { id: g1.giro.id, premio: 'PIX R$ 100' })).ok);
+    check('nem para apagar', !(await play('pl_giro_excluir', { id: g1.giro.id })).ok);
+
+    // ---- 9) desligar um premio tira da roda, nao do historico ----
+    const desligado = painel.premios[6];
+    await play('pl_premio_salvar', {
+      id: desligado.id, nome: desligado.nome, descricao: desligado.descricao,
+      cor: desligado.cor, icone: desligado.icone, ativo: false
+    });
+    const roda6 = await publico('play_roleta');
+    check('premio desligado sai da roda', roda6.premios.length === 6, roda6.premios.length);
+    check('e com 6 premios a chance de cada um muda junto', roda6.total === 6);
+    const giro6 = await publico('play_girar', { nome: 'Seis ' + SUF, giro_id: 'seis-' + SUF });
+    check('com 6 na roda o sorteio respeita o novo tamanho',
+      giro6.giro.total === 6 && giro6.giro.indice < 6, giro6.giro);
+    check('o premio desligado nao sai mais no sorteio',
+      giro6.giro.premio !== desligado.nome);
+    check('mas continua no painel para poder religar',
+      (await play('pl_painel')).premios.length === 7);
+    // religa
+    await play('pl_premio_salvar', {
+      id: desligado.id, nome: desligado.nome, descricao: desligado.descricao,
+      cor: desligado.cor, icone: desligado.icone, ativo: true
+    });
+    check('religou e a roda volta a ter 7', (await publico('play_roleta')).premios.length === 7);
+
+    // ---- 10) a ordem ----
+    const ordemAntes = (await play('pl_painel')).premios.map(function (p) { return p.id; });
+    const trocada = ordemAntes.slice().reverse();
+    const ord = await play('pl_ordem', { ids: trocada });
+    check('da para reordenar os premios', ord.ok, ord.error);
+    check('a nova ordem valeu',
+      ord.premios.map(function (p) { return p.id; }).join() === trocada.join());
+    const rodaNova = await publico('play_roleta');
+    check('a roda do colaborador segue a nova ordem na hora',
+      rodaNova.premios.map(function (p) { return p.id; }).join() === trocada.join());
+    check('mudar a ordem NAO muda a quantidade de premios (nem a chance)',
+      rodaNova.premios.length === 7);
+    await play('pl_ordem', { ids: ordemAntes });     // devolve como estava
+
+    // ---- 11) filtros do historico ----
+    const porNome = await play('pl_historico', null, { nome: 'clovis ' + SUF });
+    check('filtra o historico por nome',
+      porNome.giros.length >= 1 && porNome.giros.every(function (g) { return /Clovis/i.test(g.participante); }),
+      porNome.giros.length);
+    check('a busca por nome ignora acento e caixa',
+      (await play('pl_historico', null, { nome: 'CLOVIS ' + SUF })).giros.length === porNome.giros.length);
+    const hoje = new Date().toISOString().slice(0, 10);
+    check('filtra por periodo', (await play('pl_historico', null, { de: hoje, ate: hoje })).giros.length >= 1);
+    check('periodo antigo nao traz nada',
+      (await play('pl_historico', null, { de: '2020-01-01', ate: '2020-01-02' })).giros.length === 0);
+    const umPremio = (await play('pl_painel')).premios[0];
+    const porPremio = await play('pl_historico', null, { premio_id: umPremio.id });
+    check('filtra por premio',
+      porPremio.giros.every(function (g) { return g.premio_id === umPremio.id; }), porPremio.giros.length);
+
+    // ---- 12) a tranca ----
+    {
+      const perms = require('../api/_lib/perms.js');
+      check('dono ve a roleta', perms.permite('dono', 'pl_painel') === true);
+      check('rh ve a roleta', perms.permite('rh', 'pl_painel') === true);
+      check('leitura NAO mexe nos premios', perms.permite('leitura', 'pl_premio_salvar') === false);
+      check('leitura NAO muda a ordem', perms.permite('leitura', 'pl_ordem') === false);
+      check('o menu do dono tem a roleta', perms.menuDoPapel('dono').indexOf('play') >= 0);
+      check('o menu de leitura nao tem', perms.menuDoPapel('leitura').indexOf('play') < 0);
+    }
+
+    // ---- 13) girar sem cracha continua liberado (a pagina e publica) ----
+    check('a pagina publica nao precisa de login para girar',
+      (await publico('play_girar', { nome: 'Sem Cracha ' + SUF, giro_id: 'sc-' + SUF })).ok);
+    check('mas o painel precisa',
+      !(await (await fetch(BASE + '/api/play?action=pl_painel')).json()).ok);
   }
 
   console.log('\n5b-space) SPACE COLABORADOR — beneficio por Pix (Asaas)');

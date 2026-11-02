@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#140a2e">
+<title>START PLAY — StartDigital</title>
+<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<style>
+/* ============================================================
+   START PLAY — folha própria.
+   Esta página não usa o ui.css do painel de propósito: ali o
+   assunto é trabalho, com fundo claro e verde Start. Aqui o
+   assunto é prêmio, e o palco é roxo e escuro.
+   ============================================================ */
+:root {
+  --fonte: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
+           'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  --breu:      #0b0616;
+  --breu-2:    #140a2e;
+  --roxo:      #7c3aed;
+  --roxo-forte:#5b21b6;
+  --lilas:     #c4b5fd;
+  --rosa:      #db2777;
+  --tinta:     #ffffff;
+  --tinta-2:   rgba(237, 233, 254, .72);
+  --tinta-3:   rgba(196, 181, 253, .52);
+  --vidro:     rgba(255, 255, 255, .055);
+  --borda:     rgba(196, 181, 253, .18);
+  --borda-viva:rgba(196, 181, 253, .42);
+
+  /* as 7 cores das fatias — modernas, não infantis */
+  --c-roxo:    #7c3aed;
+  --c-lilas:   #a78bfa;
+  --c-azul:    #3b82f6;
+  --c-rosa:    #ec4899;
+  --c-amarelo: #f5b301;
+  --c-verde:   #10b981;
+  --c-laranja: #f97316;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: var(--fonte);
+  color: var(--tinta);
+  background: var(--breu);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------------- o palco ---------------- */
+.palco {
+  position: fixed; inset: 0; z-index: 0; overflow: hidden;
+  background:
+    radial-gradient(90% 70% at 50% -10%, #4c1d95 0%, #2a1065 38%, var(--breu-2) 68%, var(--breu) 100%);
+}
+/* dois halos lentos: dão vida ao fundo sem poluir */
+.palco::before, .palco::after {
+  content: ''; position: absolute; border-radius: 50%; filter: blur(80px);
+  opacity: .5; will-change: transform;
+}
+.palco::before {
+  width: 54vmax; height: 54vmax; left: -16vmax; top: -14vmax;
+  background: radial-gradient(circle, rgba(124,58,237,.75), transparent 68%);
+  animation: vaga 19s ease-in-out infinite;
+}
+.palco::after {
+  width: 44vmax; height: 44vmax; right: -14vmax; bottom: -16vmax;
+  background: radial-gradient(circle, rgba(219,39,119,.52), transparent 68%);
+  animation: vaga 23s ease-in-out infinite reverse;
+}
+@keyframes vaga {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(4vmax, 3vmax, 0) scale(1.12); }
+}
+#poeira { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+
+.folha {
+  position: relative; z-index: 2;
+  min-height: 100%;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 26px 20px 48px;
+}
+
+/* ---------------- identidade ---------------- */
+.marca { display: flex; align-items: center; gap: 9px; align-self: flex-start; opacity: .82; }
+.marca img { width: 24px; height: 24px; }
+.marca span { font-size: 13px; font-weight: 600; letter-spacing: -.01em; }
+
+.cabeca { text-align: center; margin: 26px 0 4px; }
+.titulo {
+  margin: 0; line-height: .94;
+  font-size: clamp(42px, 11vw, 80px);
+  font-weight: 800; letter-spacing: -.045em;
+  display: inline-flex; align-items: center; gap: .13em; flex-wrap: wrap;
+  justify-content: center;
+}
+.titulo .start { color: #fff; }
+.titulo .play {
+  background: linear-gradient(104deg, #c4b5fd 4%, #a78bfa 32%, #ec4899 92%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+/* o ponto do PLAY: um botão de play que respira */
+.ponto {
+  width: .33em; height: .33em; border-radius: 50%;
+  background: linear-gradient(140deg, #f0abfc, #ec4899);
+  box-shadow: 0 0 .5em rgba(236,72,153,.9), 0 0 1.3em rgba(236,72,153,.55);
+  display: inline-block; margin-left: .06em;
+  animation: pulsa 2.6s ease-in-out infinite;
+}
+@keyframes pulsa { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(.82); opacity: .72; } }
+
+.assinatura {
+  margin: 12px 0 0; font-size: clamp(13px, 2.6vw, 15px);
+  color: var(--tinta-3); letter-spacing: .13em; text-transform: uppercase; font-weight: 600;
+}
+
+/* ---------------- a mesa: roda + alavanca ---------------- */
+.mesa {
+  display: flex; align-items: center; justify-content: center;
+  gap: clamp(10px, 4vw, 46px);
+  margin-top: clamp(18px, 4vh, 38px);
+  width: 100%;
+}
+
+.roda-area { position: relative; flex: 0 0 auto; }
+
+.aro {
+  position: relative;
+  width: clamp(252px, 74vmin, 460px); height: clamp(252px, 74vmin, 460px);
+  border-radius: 50%;
+  padding: clamp(11px, 2.4vmin, 17px);
+  background:
+    conic-gradient(from 0deg, #4c1d95, #7c3aed, #312e81, #7c3aed, #4c1d95);
+  box-shadow:
+    0 0 0 1px rgba(196,181,253,.30),
+    0 24px 70px rgba(76,29,149,.60),
+    inset 0 1px 0 rgba(255,255,255,.22);
+  transition: box-shadow .5s ease;
+}
+.aro.quente {
+  box-shadow:
+    0 0 0 1px rgba(196,181,253,.55),
+    0 0 46px rgba(167,139,250,.52),
+    0 24px 80px rgba(124,58,237,.72),
+    inset 0 1px 0 rgba(255,255,255,.26);
+}
+
+/* as lâmpadas da borda */
+.lampada {
+  position: absolute; width: 8px; height: 8px; border-radius: 50%;
+  top: 50%; left: 50%; margin: -4px 0 0 -4px;
+  background: rgba(237,233,254,.30);
+  transition: background .18s ease, box-shadow .18s ease;
+  opacity: 0;
+}
+.lampada.nasceu { opacity: 1; transition: opacity .24s ease, background .18s ease, box-shadow .18s ease; }
+.lampada.acesa {
+  background: #fde68a;
+  box-shadow: 0 0 9px rgba(253,230,138,.95), 0 0 20px rgba(245,179,1,.55);
+}
+
+.roda {
+  width: 100%; height: 100%; border-radius: 50%; display: block;
+  background: #1a1033;
+  will-change: transform;
+  transform: rotate(0deg);
+}
+.roda text { font-family: var(--fonte); }
+
+/* o miolo */
+.miolo {
+  position: absolute; top: 50%; left: 50%;
+  width: 21%; height: 21%; margin: -10.5% 0 0 -10.5%;
+  border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle at 34% 30%, #ffffff 0%, #ede9fe 26%, #a78bfa 68%, #6d28d9 100%);
+  box-shadow: 0 6px 22px rgba(0,0,0,.52), inset 0 -2px 7px rgba(91,33,182,.55);
+  pointer-events: none;
+}
+.miolo b {
+  font-size: clamp(8px, 1.9vmin, 11px); font-weight: 800; letter-spacing: .1em;
+  color: #4c1d95; text-transform: uppercase; line-height: 1;
+}
+
+/* o ponteiro, no topo */
+.ponteiro {
+  position: absolute; top: clamp(-12px, -2vmin, -8px); left: 50%;
+  width: clamp(26px, 5.4vmin, 38px); height: clamp(34px, 7vmin, 48px);
+  margin-left: calc(clamp(26px, 5.4vmin, 38px) / -2);
+  z-index: 4; transform-origin: 50% 18%;
+  filter: drop-shadow(0 5px 12px rgba(0,0,0,.6));
+}
+.ponteiro.bate { animation: bateu .085s ease-out; }
+@keyframes bateu {
+  0% { transform: rotate(0deg); } 45% { transform: rotate(13deg); } 100% { transform: rotate(0deg); }
+}
+
+/* ---------------- a alavanca ---------------- */
+.alavanca {
+  position: relative; flex: 0 0 auto;
+  width: clamp(54px, 12vmin, 78px);
+  height: clamp(190px, 42vmin, 270px);
+  touch-action: none; cursor: grab; user-select: none;
+}
+.alavanca.puxando { cursor: grabbing; }
+.alavanca[aria-disabled="true"] { cursor: not-allowed; opacity: .45; }
+
+.base {
+  position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; height: 26%;
+  border-radius: 16px 16px 13px 13px;
+  background: linear-gradient(180deg, #3b2a63 0%, #241544 60%, #170d2e 100%);
+  box-shadow: 0 10px 26px rgba(0,0,0,.52), inset 0 1px 0 rgba(255,255,255,.14);
+}
+.base::after {
+  content: ''; position: absolute; top: 14%; left: 50%; transform: translateX(-50%);
+  width: 46%; height: 7px; border-radius: 5px;
+  background: rgba(11,6,22,.85); box-shadow: inset 0 2px 5px rgba(0,0,0,.85);
+}
+.haste-caixa {
+  position: absolute; bottom: 19%; left: 50%; transform: translateX(-50%);
+  width: 100%; height: 86%; transform-origin: 50% 100%;
+  transition: transform .42s cubic-bezier(.34,1.56,.64,1);
+}
+.alavanca.puxando .haste-caixa { transition: none; }
+.haste {
+  position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: clamp(9px, 2vmin, 13px); height: 100%; border-radius: 8px;
+  background: linear-gradient(90deg, #6b7280 0%, #e5e7eb 32%, #f9fafb 46%, #9ca3af 72%, #4b5563 100%);
+  box-shadow: 0 3px 12px rgba(0,0,0,.45);
+}
+.bola {
+  position: absolute; top: 0; left: 50%;
+  width: clamp(34px, 7.6vmin, 50px); height: clamp(34px, 7.6vmin, 50px);
+  margin-left: calc(clamp(34px, 7.6vmin, 50px) / -2);
+  margin-top: calc(clamp(34px, 7.6vmin, 50px) / -2.6);
+  border-radius: 50%;
+  background: radial-gradient(circle at 33% 28%, #fff 0%, #fda4af 20%, #ec4899 56%, #9d174d 100%);
+  box-shadow: 0 0 20px rgba(236,72,153,.78), 0 8px 22px rgba(0,0,0,.5), inset 0 -3px 9px rgba(136,19,55,.7);
+}
+.alavanca.pronta .bola { animation: chama 2.3s ease-in-out infinite; }
+@keyframes chama {
+  0%,100% { box-shadow: 0 0 20px rgba(236,72,153,.78), 0 8px 22px rgba(0,0,0,.5), inset 0 -3px 9px rgba(136,19,55,.7); }
+  50%     { box-shadow: 0 0 36px rgba(236,72,153,1), 0 8px 22px rgba(0,0,0,.5), inset 0 -3px 9px rgba(136,19,55,.7); }
+}
+.alavanca.pronta .haste-caixa { animation: acena 3.4s ease-in-out infinite; }
+@keyframes acena {
+  0%, 82%, 100% { transform: translateX(-50%) rotate(0deg); }
+  88%           { transform: translateX(-50%) rotate(2.6deg); }
+  94%           { transform: translateX(-50%) rotate(-1.2deg); }
+}
+.dica-puxa {
+  position: absolute; bottom: -26px; left: 50%; transform: translateX(-50%);
+  font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--tinta-3); white-space: nowrap; font-weight: 700;
+}
+
+/* ---------------- cartão do nome ---------------- */
+.cartao {
+  width: 100%; max-width: 430px; margin: clamp(22px, 4vh, 34px) auto 0;
+  background: var(--vidro); border: 1px solid var(--borda);
+  border-radius: 20px; padding: 22px 22px 20px;
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 18px 50px rgba(0,0,0,.4);
+}
+.cartao h2 { margin: 0 0 4px; font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
+.cartao p  { margin: 0 0 15px; font-size: 13.5px; color: var(--tinta-2); line-height: 1.5; }
+
+input[type=text] {
+  width: 100%; font-family: var(--fonte); font-size: 16px; color: #fff;
+  background: rgba(11,6,22,.55); border: 1.5px solid var(--borda);
+  border-radius: 14px; padding: 14px 16px; outline: none;
+  transition: border-color .18s, box-shadow .18s;
+}
+input[type=text]::placeholder { color: rgba(196,181,253,.42); }
+input[type=text]:focus { border-color: var(--borda-viva); box-shadow: 0 0 0 4px rgba(167,139,250,.16); }
+input[type=text].ruim { border-color: #fb7185; box-shadow: 0 0 0 4px rgba(251,113,133,.16); }
+
+.botao {
+  width: 100%; margin-top: 12px; font-family: var(--fonte);
+  font-size: 15px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+  color: #fff; border: none; border-radius: 14px; padding: 15px 18px; cursor: pointer;
+  background: linear-gradient(100deg, #7c3aed 0%, #a855f7 48%, #ec4899 100%);
+  box-shadow: 0 10px 28px rgba(124,58,237,.46), inset 0 1px 0 rgba(255,255,255,.26);
+  transition: transform .14s cubic-bezier(.34,1.56,.64,1), box-shadow .18s, filter .18s;
+}
+.botao:hover  { transform: translateY(-2px); box-shadow: 0 14px 36px rgba(124,58,237,.58), inset 0 1px 0 rgba(255,255,255,.26); }
+.botao:active { transform: translateY(0) scale(.985); }
+.botao[disabled] { filter: grayscale(.5) brightness(.75); cursor: default; transform: none; }
+.botao.fantasma {
+  background: transparent; border: 1.5px solid var(--borda-viva); box-shadow: none;
+  color: var(--lilas); letter-spacing: .1em;
+}
+
+.jogador {
+  display: none; align-items: center; justify-content: center; gap: 10px;
+  margin: clamp(20px, 4vh, 30px) auto 0; padding: 10px 18px 10px 11px;
+  background: var(--vidro); border: 1px solid var(--borda); border-radius: 999px;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); width: fit-content;
+}
+.jogador.on { display: flex; }
+.jogador .bolinha {
+  width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+  background: linear-gradient(140deg, #a78bfa, #ec4899);
+  font-size: 13px; font-weight: 800; color: #fff;
+}
+.jogador b { font-size: 14.5px; font-weight: 700; letter-spacing: -.01em; }
+.jogador .trocar {
+  background: none; border: none; color: var(--tinta-3); font-family: var(--fonte);
+  font-size: 12px; cursor: pointer; padding: 4px 2px; text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.recado {
+  margin: 14px auto 0; max-width: 430px; text-align: center;
+  font-size: 13.5px; color: #fda4af; min-height: 19px; line-height: 1.5;
+}
+
+/* ---------------- som ---------------- */
+.som {
+  position: fixed; top: 18px; right: 18px; z-index: 6;
+  width: 42px; height: 42px; border-radius: 50%; cursor: pointer;
+  background: var(--vidro); border: 1px solid var(--borda); color: var(--lilas);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  display: grid; place-items: center; transition: border-color .18s, color .18s;
+}
+.som:hover { border-color: var(--borda-viva); color: #fff; }
+
+/* ---------------- a janela do prêmio ---------------- */
+.veu {
+  position: fixed; inset: 0; z-index: 20; display: none;
+  align-items: center; justify-content: center; padding: 22px;
+  background: rgba(7,3,16,.74);
+  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+}
+.veu.on { display: flex; animation: aparece .3s ease both; }
+@keyframes aparece { from { opacity: 0; } to { opacity: 1; } }
+
+.premio-caixa {
+  position: relative; width: 100%; max-width: 420px; text-align: center;
+  border-radius: 28px; padding: 38px 28px 28px;
+  background: linear-gradient(170deg, rgba(76,29,149,.96) 0%, rgba(30,16,66,.98) 62%, rgba(13,7,28,.99) 100%);
+  border: 1px solid var(--borda-viva);
+  box-shadow: 0 0 60px rgba(167,139,250,.30), 0 30px 90px rgba(0,0,0,.66);
+  animation: sobe .52s cubic-bezier(.22,1.2,.36,1) both;
+  overflow: hidden;
+}
+@keyframes sobe {
+  from { opacity: 0; transform: translateY(26px) scale(.9); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.premio-caixa::before {
+  content: ''; position: absolute; top: -70px; left: 50%; transform: translateX(-50%);
+  width: 240px; height: 240px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(236,72,153,.42), transparent 66%);
+  pointer-events: none;
+}
+.festa-emoji { font-size: 44px; line-height: 1; animation: saltita .9s ease-out both; }
+@keyframes saltita {
+  0% { transform: scale(0) rotate(-24deg); } 62% { transform: scale(1.26) rotate(8deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+.parabens {
+  margin: 14px 0 2px; font-size: clamp(19px, 5vw, 24px); font-weight: 800; letter-spacing: -.028em;
+  position: relative;
+}
+.ganhou { margin: 0 0 16px; font-size: 13px; color: var(--tinta-3);
+          letter-spacing: .14em; text-transform: uppercase; font-weight: 700; position: relative; }
+.premio-nome {
+  position: relative; margin: 0 auto; padding: 18px 20px; border-radius: 18px;
+  font-size: clamp(23px, 6.2vw, 33px); font-weight: 800; letter-spacing: -.03em; line-height: 1.12;
+  background: rgba(11,6,22,.46); border: 1px solid var(--borda);
+  animation: entraPremio .5s .16s cubic-bezier(.22,1.2,.36,1) both;
+}
+@keyframes entraPremio {
+  from { opacity: 0; transform: translateY(14px) scale(.93); filter: blur(5px); }
+  to   { opacity: 1; transform: none; filter: blur(0); }
+}
+.premio-desc { margin: 12px 0 0; font-size: 14px; color: var(--tinta-2); line-height: 1.5; position: relative; }
+.premio-pe   { margin: 18px 0 0; font-size: 11.5px; color: var(--tinta-3); position: relative; }
+.premio-caixa .botao { margin-top: 20px; position: relative; }
+#ceu { position: fixed; inset: 0; z-index: 21; pointer-events: none; }
+
+/* ---------------- entrada da página ---------------- */
+.entra { opacity: 0; transform: translateY(14px); }
+.entra.veio { animation: entraSuave .62s cubic-bezier(.22,1,.36,1) both; }
+@keyframes entraSuave { to { opacity: 1; transform: none; } }
+
+/* ---------------- celular ----------------
+   Não é a tela do computador encolhida: a roda sobe, a alavanca
+   deita do lado direito e o polegar alcança tudo sem esticar. */
+@media (max-width: 700px) {
+  .folha { padding: 18px 16px 40px; }
+  .mesa { gap: 6px; }
+  .alavanca { height: clamp(150px, 34vmin, 200px); width: clamp(44px, 11vmin, 60px); align-self: center; }
+  .dica-puxa { bottom: -22px; font-size: 9.5px; }
+  .cartao { max-width: 100%; }
+}
+@media (max-width: 380px) {
+  .mesa { flex-direction: column; gap: 18px; }
+  .alavanca { height: 120px; width: 180px; }
+  .alavanca .base { width: 78px; height: 30%; }
+  .dica-puxa { bottom: -20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .palco::before, .palco::after, .ponto, .alavanca.pronta .bola,
+  .alavanca.pronta .haste-caixa { animation: none !important; }
+  .entra { opacity: 1; transform: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="palco"></div>
+<canvas id="poeira"></canvas>
+
+<button class="som" id="som" type="button" aria-label="Ligar ou desligar o som" title="Som"></button>
+
+<div class="folha">
+
+  <div class="marca entra" id="e-marca">
+    <img src="/favicon-32.png" alt="">
+    <span>StartDigital</span>
+  </div>
+
+  <div class="cabeca entra" id="e-cabeca">
+    <h1 class="titulo">
+      <span class="start">START</span><span class="play">PLAY</span><i class="ponto"></i>
+    </h1>
+    <p class="assinatura">Performance deserves a reward.</p>
+  </div>
+
+  <div class="mesa entra" id="e-mesa">
+    <div class="roda-area">
+      <div class="aro" id="aro">
+        <svg class="roda" id="roda" viewBox="0 0 200 200" aria-hidden="true"></svg>
+        <div class="miolo"><b>Start</b></div>
+      </div>
+      <svg class="ponteiro" id="ponteiro" viewBox="0 0 40 52" aria-hidden="true">
+        <defs>
+          <linearGradient id="gp" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#ffffff"/><stop offset="38%" stop-color="#fde68a"/>
+            <stop offset="100%" stop-color="#f59e0b"/>
+          </linearGradient>
+        </defs>
+        <circle cx="20" cy="11" r="10.5" fill="url(#gp)" stroke="rgba(120,53,15,.5)" stroke-width="1"/>
+        <path d="M9.6 16.5 20 50 30.4 16.5Z" fill="url(#gp)" stroke="rgba(120,53,15,.42)" stroke-width="1" stroke-linejoin="round"/>
+        <circle cx="20" cy="11" r="3.6" fill="#b45309" opacity=".55"/>
+      </svg>
+    </div>
+
+    <div class="alavanca" id="alavanca" role="button" tabindex="0"
+         aria-label="Puxar a alavanca para girar" aria-disabled="true">
+      <div class="haste-caixa" id="haste-caixa">
+        <div class="haste"></div>
+        <div class="bola"></div>
+      </div>
+      <div class="base"></div>
+      <div class="dica-puxa" id="dica-puxa">puxe</div>
+    </div>
+  </div>
+
+  <!-- quem está jogando -->
+  <div class="cartao entra" id="cartao-nome">
+    <h2>Qual é o seu nome?</h2>
+    <p>É assim que o seu prêmio vai ficar registrado.</p>
+    <input type="text" id="nome" placeholder="Digite seu nome" maxlength="60"
+           autocomplete="name" enterkeyhint="go">
+    <button class="botao" id="btn-play" type="button">LET'S PLAY</button>
+  </div>
+
+  <div class="jogador" id="jogador">
+    <span class="bolinha" id="inicial">?</span>
+    <b id="jogador-nome">—</b>
+    <button class="trocar" id="trocar" type="button">trocar</button>
+  </div>
+
+  <div class="recado" id="recado"></div>
+</div>
+
+<!-- a janela do prêmio -->
+<div class="veu" id="veu">
+  <div class="premio-caixa">
+    <div class="festa-emoji">🎉</div>
+    <h2 class="parabens" id="parabens">Parabéns!</h2>
+    <p class="ganhou">Você ganhou</p>
+    <div class="premio-nome" id="premio-nome">—</div>
+    <p class="premio-desc" id="premio-desc"></p>
+    <p class="premio-pe" id="premio-pe"></p>
+    <button class="botao" id="btn-fechar" type="button">FECHAR</button>
+    <button class="botao fantasma" id="btn-denovo" type="button" style="display:none">JOGAR NOVAMENTE</button>
+  </div>
+</div>
+<canvas id="ceu"></canvas>
+
+<script src="/js/play.js"></script>
+</body>
+</html>

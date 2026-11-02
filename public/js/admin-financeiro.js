@@ -1085,6 +1085,12 @@ async function escondeFinanceiroSeNaoPode() {
       if (auto) auto.style.display = 'none';
     }
 
+    // START PLAY: quem nao cuida do time nao precisa ver a roleta
+    if (Array.isArray(r.menu) && r.menu.indexOf('play') < 0) {
+      const bp = document.querySelector('#abas button[data-aba="play"]');
+      if (bp) bp.style.display = 'none';
+    }
+
     if (!Array.isArray(r.menu) || r.menu.indexOf('financeiro') >= 0) return;
     const grupo = document.querySelector('#abas .nav-grupo[data-grupo="financeiro"]');
     if (grupo) grupo.style.display = 'none';

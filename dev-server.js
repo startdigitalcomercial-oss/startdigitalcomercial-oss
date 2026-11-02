@@ -50,7 +50,9 @@ const ROTAS = {
   '/criar-senha-painel': '/criar-senha-painel.html',
   '/equipe': '/equipe.html',
   '/time': '/equipe.html',
-  '/colaborador': '/equipe.html'
+  '/colaborador': '/equipe.html',
+  '/play': '/play.html',
+  '/startplay': '/play.html'
 };
 
 // Os icones sao gerados por codigo. Na Vercel isso e um rewrite no

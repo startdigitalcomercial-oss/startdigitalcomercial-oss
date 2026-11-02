@@ -522,6 +522,30 @@
                      font-size: 13.5px; font-weight: 600; color: var(--label); cursor: pointer;
                      height: auto; padding: 2px 20px 2px 0; margin: 0; box-shadow: none; min-width: 0; }
 
+  /* ---- START PLAY ---- */
+  .pl-item { display: flex; align-items: center; gap: 12px; padding: 12px 4px;
+    border-bottom: 1px solid var(--hairline); background: var(--card); }
+  .pl-item:last-child { border-bottom: none; }
+  .pl-item[data-off="1"] .pl-nome { opacity: .5; }
+  .pl-item.arrastando { opacity: .4; }
+  .pl-item.alvo { background: var(--fill-1); }
+  .pl-pega { cursor: grab; color: var(--label-3); display: flex; padding: 4px; }
+  .pl-pega:active { cursor: grabbing; }
+  .pl-cor { width: 14px; height: 14px; border-radius: 5px; display: inline-block; flex: 0 0 auto;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); }
+  .pl-nome { flex: 1; font-weight: 600; font-size: 14.5px; min-width: 0; }
+  .pl-desc { display: block; font-weight: 400; font-size: 12.5px; color: var(--label-3); margin-top: 1px; }
+  .pl-saiu { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pl-cores { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+  .pl-opt-cor { width: 32px; height: 32px; border-radius: 10px; border: 2px solid transparent;
+    cursor: pointer; padding: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); }
+  .pl-opt-cor.on { border-color: var(--label); transform: scale(1.08); }
+  .pl-icos { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 6px; }
+  .pl-opt-ico { font-family: inherit; font-size: 12.5px; padding: 7px 11px; cursor: pointer;
+    border-radius: var(--r-chip); border: 1.5px solid var(--hairline-strong);
+    background: var(--surface); color: var(--label); }
+  .pl-opt-ico.on { border-color: var(--accent); background: var(--accent-tint); color: var(--accent); font-weight: 600; }
+
   /* ---- ficha do cliente ---- */
   .fc-dados { display: flex; gap: 20px; flex-wrap: wrap; font-size: 14px; color: var(--label-2); }
   .fc-dados b { font-weight: 600; color: var(--label-3); font-weight: 500; }
@@ -615,6 +639,7 @@
       <button data-aba="colaboradores"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><circle cx="12" cy="7.6" r="3.3"/><path d="M5.6 19.8c.6-3.4 3.3-5.2 6.4-5.2s5.8 1.8 6.4 5.2"/><path d="M18.4 4.4a2.4 2.4 0 0 1 0 4.5"/><path d="M5.6 4.4a2.4 2.4 0 0 0 0 4.5"/></svg><span>Colaboradores</span></button>
       <button data-aba="avisos"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M5.4 9.6a6.6 6.6 0 0 1 13.2 0c0 4.2 1.4 5.6 1.4 5.6H4s1.4-1.4 1.4-5.6z"/><path d="M10.3 18.6a2 2 0 0 0 3.4 0"/></svg><span>Avisos</span></button>
       <button data-aba="space"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3.2" y="7.4" width="17.6" height="12.4" rx="2"/><path d="M3.2 11.6h17.6"/><path d="M12 7.4V4.6M12 4.6c-1.6-1.6-4.2-.4-3.4 1.5.5 1.2 2.2 1.3 3.4 1.3m0-2.8c1.6-1.6 4.2-.4 3.4 1.5-.5 1.2-2.2 1.3-3.4 1.3"/></svg><span>Benefícios</span></button>
+      <button data-aba="play"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><circle cx="12" cy="12" r="2.4"/><path d="M12 3.4v6.2M12 14.4v6.2M20.6 12h-6.2M9.6 12H3.4"/></svg><span>START PLAY</span></button>
 </div></div></div>
       <div class="nav-grupo" data-grupo="conteudo">
       <button type="button" class="nav-cab">Start Academy<svg class="seta" width="12" height="12" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
@@ -778,6 +803,11 @@
       <div style="padding:22px 0 40px" id="painel-space"></div>
     </section>
 
+    <!-- ---------- START PLAY ---------- -->
+    <section data-painel="play" style="display:none">
+      <div style="padding:22px 0 40px" id="painel-play"></div>
+    </section>
+
     <!-- ---------- FINANCEIRO: a planilha ---------- -->
     <section data-painel="financeiro" style="display:none">
       <div style="padding:22px 0 40px" id="painel-financeiro"></div>
@@ -839,6 +869,7 @@
 <script src="/js/admin-whatsapp.js"></script>
 <script src="/js/admin-space.js"></script>
 <script src="/js/admin-financeiro.js"></script>
+<script src="/js/admin-play.js"></script>
 <script src="/js/admin-inicio.js"></script>
 </body>
 </html>
