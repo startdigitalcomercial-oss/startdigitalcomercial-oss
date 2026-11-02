@@ -95,6 +95,14 @@
     {
       "source": "/colaborador",
       "destination": "/equipe.html"
+    },
+    {
+      "source": "/play",
+      "destination": "/play.html"
+    },
+    {
+      "source": "/startplay",
+      "destination": "/play.html"
     }
   ],
   "headers": [
