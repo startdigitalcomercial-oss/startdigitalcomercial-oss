@@ -152,7 +152,8 @@ const TITULOS = {
   colaboradores: 'Colaboradores', avisos: 'Avisos para o time', usuarios: 'Usuários do painel',
   mensagens: 'Modelos de mensagem', ajustes: 'Ajustes',
   financeiro: 'Cobranças', findash: 'Dashboard financeiro', fingastos: 'Despesas', findre: 'DRE', finclientes: 'Clientes',
-  space: 'Benefícios', play: 'START PLAY'
+  space: 'Benefícios', play: 'START PLAY',
+  opdash: 'Dashboard Operacional', opgestores: 'Gestores'
 };
 /* ---------------------------------------------- sanfona do menu
    Um grupo aberto por vez. O grupo da página em que você está abre
@@ -217,7 +218,9 @@ document.getElementById('abas').addEventListener('click', function (ev) {
     // morrer por causa disso. Nome que falta = aba que nao carrega, so.
     finclientes: (typeof carregaFinClientes === 'function' ? carregaFinClientes : null),
     space: carregaSpace,
-    play: (typeof carregaPlay === 'function' ? carregaPlay : null)
+    play: (typeof carregaPlay === 'function' ? carregaPlay : null),
+    opdash: (typeof carregaOpDash === 'function' ? carregaOpDash : null),
+    opgestores: (typeof carregaOpGestores === 'function' ? carregaOpGestores : null)
   };
   marcaGrupoAtivo();
   if (carregar[b.dataset.aba]) carregar[b.dataset.aba]();
