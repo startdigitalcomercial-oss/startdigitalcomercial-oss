@@ -233,6 +233,19 @@ const DB = {
   ],
 
   // ---- START PLAY: os 7 premios da roleta ----
+  op_gestores: [
+    ['Rafael', 'azul'], ['Bruno', 'laranja'], ['Júnior', 'verdeagua'], ['Renan', 'amarelo'],
+    ['Igor', 'magenta'], ['William', 'verde'], ['Gabriel', 'violeta']
+  ].map(function (r, i) {
+    return {
+      id: 'bbbb000' + (i + 1) + '-000' + (i + 1) + '-400' + (i + 1) + '-800' + (i + 1) + '-00000000000' + (i + 1),
+      nome: r[0], collaborator_id: null, cor: r[1], ativo: true, position: i + 1,
+      created_at: agora(), updated_at: agora()
+    };
+  }),
+  op_clientes: [],
+  op_eventos: [],
+
   play_prizes: [
     ['PIX R$ 100', 'Cai na sua chave Pix', 100, 'dinheiro', 'roxo'],
     ['Vale Outback', 'Jantar por nossa conta', null, 'comida', 'rosa'],
@@ -282,6 +295,9 @@ const DEFAULTS = {
   stage_history: function () { return { id: seq('stage_history'), created_at: agora(), note: null, from_stage: null, to_stage: null }; },
   benefit_vouchers: function () { return { id: uuid(), valor: 0, descricao: null, ativo: true, position: 1, created_at: agora(), updated_at: agora() }; },
   benefit_releases: function () { return { id: uuid(), status: 'liberado', voucher_id: null, liberado_por: null, liberado_em: agora(), pix_chave: null, pix_tipo: null, asaas_id: null, asaas_status: null, comprovante_url: null, falha_motivo: null, solicitado_em: null, pago_em: null, created_at: agora(), updated_at: agora() }; },
+  op_gestores: function () { return { id: uuid(), collaborator_id: null, cor: 'azul', ativo: true, position: 1, created_at: agora(), updated_at: agora() }; },
+  op_clientes: function () { return { id: uuid(), customer_id: null, gestor_id: null, categoria: null, satisfacao: null, fase: 'onboarding', status: 'ativo', entrou_em: agora().slice(0, 10), excluido_em: null, created_at: agora(), updated_at: agora() }; },
+  op_eventos: function () { return { id: uuid(), de: null, para: null, quem: null, observacao: null, quando: agora() }; },
   play_prizes: function () { return { id: uuid(), descricao: null, valor: null, icone: 'presente', cor: 'roxo', ativo: true, position: 1, created_at: agora(), updated_at: agora() }; },
   play_spins: function () { return { id: uuid(), prize_id: null, prize_descricao: null, prize_cor: 'roxo', client_token: null, criado_em: agora() }; },
     finance_customers: function () { return { id: uuid(), telefone: null, responsavel: null, observacoes: null, ativo: true, created_at: agora(), updated_at: agora() }; },
@@ -501,6 +517,12 @@ const server = http.createServer(function (req, res) {
         finance_customers: function (r) { return 'cli|' + String(r.chave || ''); },
         // START PLAY: uma etiqueta de giro so pode existir uma vez
         play_spins: function (r) { return r.client_token ? 'giro|' + r.client_token : null; },
+        // um gestor por nome; um cliente do Financeiro em uma carteira so
+        op_gestores: function (r) { return 'gestor|' + String(r.nome || '').trim().toLowerCase(); },
+        op_clientes: function (r) {
+          if (r.excluido_em || !r.customer_id) return null;
+          return 'opcli|' + r.customer_id;
+        },
         // um beneficio em aberto por colaborador
         benefit_releases: function (r) {
           if (['liberado', 'processando'].indexOf(String(r.status)) < 0) return null;
