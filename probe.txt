@@ -1,5 +1,3 @@
-A:\u2192
-B:\\u2192
-C:\u005cu2192
-D:→
-E:\u005c\u005c
+F:\u2192
+G:'\n0 passaram \u00b7 1 falharam'
+H:ok + ' passaram \u00b7 ' + falhas
