@@ -1653,68 +1653,129 @@ module.exports = async function handler(req, res) {
       const porCanal = {};
       modelos.forEach(function (m) { porCanal[m.channel] = m; });
 
-      let enviados = 0, falhas = 0;
-      const detalhe = [];
+      // ------------------------------------------------------------
+      // O DISPARO
+      //
+      // Antes era um `for` com `await` dentro: mandava, esperava,
+      // mandava a proxima. 50 pessoas x 3 canais = 150 esperas em
+      // fila, e a funcao morria no limite de 60 segundos da Vercel.
+      //
+      // Agora cada canal anda no ritmo que aguenta:
+      //   e-mail e SMS  — varios ao mesmo tempo. Sao provedores de
+      //                   envio em massa, aguentam bem.
+      //   WhatsApp      — UM DE CADA VEZ, sempre. Disparar 50
+      //                   mensagens em rajada de um mesmo numero e o
+      //                   jeito mais rapido de esse numero ser
+      //                   bloqueado pelo WhatsApp. Ir mais rapido
+      //                   aqui seria trocar um problema por outro
+      //                   bem pior.
+      //
+      // Quem resolve o tamanho do disparo e a tela: ela manda o time
+      // em blocos, e cada bloco e uma chamada curta. Assim nunca ha
+      // uma requisicao de 2 minutos, com 50 ou com 500 pessoas.
+      // ------------------------------------------------------------
+      const RITMO = { email: 5, sms: 5, whatsapp: 1 };
 
-      for (const pessoa of time) {
+      function montaEnvio(pessoa, canal) {
         const vars = {
           nome: pessoa.name,
           primeiro_nome: pessoa.nickname || u.firstName(pessoa.name),
           email: pessoa.email, telefone: pessoa.phone || '',
           cargo: pessoa.role_title || '', area: pessoa.area || '', cidade: pessoa.city || ''
         };
-        for (const canal of canais) {
-          const modelo = porCanal[canal];
-          if (!modelo) continue;
-          const corpo = u.renderTemplate(modelo.body, vars);
-          const assunto = modelo.subject ? u.renderTemplate(modelo.subject, vars) : null;
-
-          let r;
-          if (canal === 'email') {
-            if (!pessoa.email) { r = { status: 'erro', provider: 'nenhum', error: 'sem e-mail cadastrado' }; }
-            else {
-              // com imagem, o e-mail sai com a foto no corpo, acima do texto
-              const html = imagem
-                ? '<img src="' + imagem + '" alt="" style="max-width:100%;border-radius:12px;margin-bottom:16px">' +
-                  u.textToEmailHtml(corpo, assunto)
-                : undefined;
-              r = await send.sendEmail({ to: pessoa.email, subject: assunto, text: corpo, html: html });
-            }
-          } else if (canal === 'whatsapp') {
-            if (!pessoa.phone) { r = { status: 'erro', provider: 'nenhum', error: 'sem telefone cadastrado' }; }
-            else if (imagem) {
-              // a foto com o aviso inteiro de legenda — uma mensagem so
-              r = await send.sendWhatsAppImagem({ to: pessoa.phone, url: imagem, caption: corpo, instance: waInstance });
-            }
-            else r = await send.sendWhatsApp({ to: pessoa.phone, text: corpo, instance: waInstance });
-          } else {
-            if (!pessoa.phone) { r = { status: 'erro', provider: 'nenhum', error: 'sem telefone cadastrado' }; }
-            else r = await send.sendSms({ to: pessoa.phone, text: corpo });
-          }
-
-          if (r.status === 'enviado') enviados++; else falhas++;
-          detalhe.push({
-            pessoa: pessoa.nickname || pessoa.name, canal: canal,
-            status: r.status, erro: r.error || null
-          });
-
-          await db.insert('message_logs', {
-            candidate_id: null, channel: canal,
-            to_address: canal === 'email' ? pessoa.email : pessoa.phone,
-            subject: assunto, body: corpo,
-            status: r.status, provider: r.provider, error: r.error || null
-          });
-        }
+        const modelo = porCanal[canal];
+        if (!modelo) return null;
+        return {
+          pessoa: pessoa, canal: canal,
+          corpo: u.renderTemplate(modelo.body, vars),
+          assunto: modelo.subject ? u.renderTemplate(modelo.subject, vars) : null
+        };
       }
 
-      const registro = await db.insert('broadcasts', {
-        title: titulo, body: texto, channels: canais,
-        total: time.length, sent: enviados, failed: falhas,
-        detail: { itens: detalhe.slice(0, 400), imagem: imagem || null }
-      });
+      async function despacha(t) {
+        const pessoa = t.pessoa;
+        if (t.canal === 'email') {
+          if (!pessoa.email) return { status: 'erro', provider: 'nenhum', error: 'sem e-mail cadastrado' };
+          // com imagem, o e-mail sai com a foto no corpo, acima do texto
+          const html = imagem
+            ? '<img src="' + imagem + '" alt="" style="max-width:100%;border-radius:12px;margin-bottom:16px">' +
+              u.textToEmailHtml(t.corpo, t.assunto)
+            : undefined;
+          return await send.sendEmail({ to: pessoa.email, subject: t.assunto, text: t.corpo, html: html });
+        }
+        if (t.canal === 'whatsapp') {
+          if (!pessoa.phone) return { status: 'erro', provider: 'nenhum', error: 'sem telefone cadastrado' };
+          if (imagem) {
+            // a foto com o aviso inteiro de legenda — uma mensagem so
+            return await send.sendWhatsAppImagem({ to: pessoa.phone, url: imagem, caption: t.corpo, instance: waInstance });
+          }
+          return await send.sendWhatsApp({ to: pessoa.phone, text: t.corpo, instance: waInstance });
+        }
+        if (!pessoa.phone) return { status: 'erro', provider: 'nenhum', error: 'sem telefone cadastrado' };
+        return await send.sendSms({ to: pessoa.phone, text: t.corpo });
+      }
+
+      let enviados = 0, falhas = 0;
+      const detalhe = [];
+      const feitos = [];
+
+      for (const canal of canais) {
+        const tarefas = time.map(function (p) { return montaEnvio(p, canal); })
+          .filter(Boolean);
+        if (!tarefas.length) continue;
+
+        const saidas = await u.emParalelo(tarefas, RITMO[canal] || 1, despacha);
+        tarefas.forEach(function (t, i) {
+          const r = saidas[i] && saidas[i].falhou
+            ? { status: 'erro', provider: 'nenhum', error: String(saidas[i].erro && saidas[i].erro.message || 'falhou') }
+            : saidas[i];
+          if (r.status === 'enviado') enviados++; else falhas++;
+          detalhe.push({
+            pessoa: t.pessoa.nickname || t.pessoa.name, canal: canal,
+            status: r.status, erro: r.error || null
+          });
+          feitos.push({
+            candidate_id: null, channel: canal,
+            to_address: canal === 'email' ? t.pessoa.email : t.pessoa.phone,
+            subject: t.assunto, body: t.corpo,
+            status: r.status, provider: r.provider, error: r.error || null
+          });
+        });
+      }
+
+      // O caderno de envios vai em UMA gravada so, nao uma por
+      // mensagem: 150 idas ao banco viravam quase um minuto sozinhas.
+      if (feitos.length) {
+        try { await db.insert('message_logs', feitos); }
+        catch (e) { console.error('[broadcast] nao deu para registrar os envios:', e.message); }
+      }
+
+      // O aviso vira UM registro no historico, mesmo tendo sido
+      // disparado em varios blocos. O primeiro bloco cria a linha; os
+      // seguintes somam nela, mandando de volta o mesmo broadcast_id.
+      let registro;
+      const continuando = String(body.broadcast_id || '').trim();
+
+      if (continuando) {
+        const antes = await db.selectOne('broadcasts', { id: 'eq.' + continuando, select: '*' });
+        if (!antes) return u.fail(res, 404, 'Esse aviso não está mais no histórico.');
+        const itensAntes = (antes.detail && antes.detail.itens) || [];
+        registro = await db.update('broadcasts', {
+          total: Number(antes.total || 0) + time.length,
+          sent: Number(antes.sent || 0) + enviados,
+          failed: Number(antes.failed || 0) + falhas,
+          detail: { itens: itensAntes.concat(detalhe).slice(0, 400), imagem: imagem || null }
+        }, { id: 'eq.' + continuando });
+      } else {
+        registro = await db.insert('broadcasts', {
+          title: titulo, body: texto, channels: canais,
+          total: time.length, sent: enviados, failed: falhas,
+          detail: { itens: detalhe.slice(0, 400), imagem: imagem || null }
+        });
+      }
 
       return u.ok(res, {
-        id: registro && registro.id, pessoas: time.length,
+        id: (registro && registro.id) || continuando, pessoas: time.length,
         enviados: enviados, falhas: falhas, detalhe: detalhe
       });
     }

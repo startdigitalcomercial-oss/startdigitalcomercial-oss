@@ -512,60 +512,104 @@ module.exports = async function handler(req, res) {
       const inst = vaiAvisar ? await instanciaZap() : '';
       let avisos = 0;
 
-      for (const cid of ids) {
-        if (!cid) continue;
-        const p = await db.selectOne('collaborators', { id: 'eq.' + cid, select: 'id,name,active,phone,email,token' });
+      // ------------------------------------------------------------
+      // Em duas etapas, de proposito.
+      //
+      // Antes era um laco so: para cada pessoa, duas consultas, uma
+      // gravacao e ate tres mensagens — tudo esperando a anterior.
+      // Com 50 pessoas isso passava de dois minutos e a funcao morria
+      // no limite da Vercel, deixando metade do time liberado.
+      //
+      //   ETAPA 1 — o DINHEIRO: quem pode receber e a gravacao da
+      //             liberacao. E rapido e nao pode falhar.
+      //   ETAPA 2 — os AVISOS: lentos, e se falharem nao desfazem
+      //             nada. E-mail e SMS varios ao mesmo tempo; o
+      //             WhatsApp um de cada vez, sempre, para o numero
+      //             nao ser bloqueado por disparo em rajada.
+      // ------------------------------------------------------------
+      const limpos = ids.filter(Boolean);
+
+      // as duas consultas de antes viram duas, para o time inteiro
+      const pessoas = limpos.length
+        ? await db.select('collaborators', {
+            id: 'in.(' + limpos.join(',') + ')', select: 'id,name,active,phone,email,token'
+          })
+        : [];
+      const porId = {};
+      pessoas.forEach(function (p) { porId[p.id] = p; });
+
+      const abertas = limpos.length
+        ? await db.select('benefit_releases', {
+            collaborator_id: 'in.(' + limpos.join(',') + ')',
+            status: 'in.(liberado,processando)', select: 'collaborator_id'
+          })
+        : [];
+      const temAberta = {};
+      abertas.forEach(function (a) { temAberta[a.collaborator_id] = true; });
+
+      const liberar = [];
+      for (const cid of limpos) {
+        const p = porId[cid];
         if (!p || p.active === false) { pulados.push({ id: cid, motivo: 'colaborador inativo' }); continue; }
+        // Ja tem uma em aberto? Nao empilha. O indice unico do banco
+        // tambem barra — checar aqui so da uma mensagem decente.
+        if (temAberta[cid]) { pulados.push({ nome: p.name, motivo: 'já tem um benefício em aberto' }); continue; }
+        liberar.push(p);
+      }
 
-        // Já tem uma em aberto? Não empilha. O banco também barra
-        // (índice único), mas checar aqui dá uma mensagem decente.
-        const aberta = await db.selectOne('benefit_releases', {
-          collaborator_id: 'eq.' + cid, status: 'in.(liberado,processando)', select: 'id,status'
+      // ---- ETAPA 1: gravar as liberacoes ----
+      const gravadas = await u.emParalelo(liberar, 4, async function (p) {
+        return await db.insert('benefit_releases', {
+          collaborator_id: p.id,
+          voucher_id: voucher.id,
+          nome_voucher: voucher.nome,
+          valor: Number(voucher.valor),
+          status: 'liberado',
+          liberado_por: entrada.session.nome || entrada.papel,
+          liberado_em: new Date().toISOString()
         });
-        if (aberta) { pulados.push({ nome: p.name, motivo: 'já tem um benefício em aberto' }); continue; }
+      });
 
-        try {
-          const nova = await db.insert('benefit_releases', {
-            collaborator_id: cid,
-            voucher_id: voucher.id,
-            nome_voucher: voucher.nome,
-            valor: Number(voucher.valor),
-            status: 'liberado',
-            liberado_por: entrada.session.nome || entrada.papel,
-            liberado_em: new Date().toISOString()
-          });
-          feitos.push({ nome: p.name, id: nova.id });
+      const avisarEstes = [];
+      liberar.forEach(function (p, i) {
+        const r = gravadas[i];
+        // o indice unico barrou: alguem liberou para essa pessoa agora
+        if (!r || r.falhou || !r.id) { pulados.push({ nome: p.name, motivo: 'já tem um benefício em aberto' }); return; }
+        feitos.push({ nome: p.name, id: r.id });
+        avisarEstes.push(p);
+      });
 
-          // ---- avisa a pessoa pelos canais escolhidos ----
-          // Aviso que falha não desfaz a liberação: o benefício está lá,
-          // o link continua valendo, e o painel mostra quem foi avisado.
-          if (vaiAvisar) {
-            const link = u.appUrl() + '/space?t=' + p.token;
-            const valorBr = 'R$ ' + Number(voucher.valor).toFixed(2).replace('.', ',');
-            const texto = 'Oi ' + u.firstName(p.name) + '! Você recebeu um benefício da StartDigital: ' +
-              voucher.nome + ' de ' + valorBr + '. Resgate por Pix aqui: ' + link;
+      // ---- ETAPA 2: avisar quem foi liberado ----
+      if (vaiAvisar && avisarEstes.length) {
+        const recado = function (p) {
+          const link = u.appUrl() + '/space?t=' + p.token;
+          const valorBr = 'R$ ' + Number(voucher.valor).toFixed(2).replace('.', ',');
+          return 'Oi ' + u.firstName(p.name) + '! Você recebeu um benefício da StartDigital: ' +
+            voucher.nome + ' de ' + valorBr + '. Resgate por Pix aqui: ' + link;
+        };
+        const conta = function (lista) {
+          lista.forEach(function (r) { if (r && !r.falhou && r.status === 'enviado') avisos++; });
+        };
 
-            if (avisar.whatsapp && p.phone) {
-              const r1 = await send.sendWhatsApp({ to: p.phone, text: texto, instance: inst })
-                .catch(function () { return { status: 'erro' }; });
-              if (r1.status === 'enviado') avisos++;
-            }
-            if (avisar.sms && p.phone) {
-              const r2 = await send.sendSms({ to: p.phone, text: texto })
-                .catch(function () { return { status: 'erro' }; });
-              if (r2.status === 'enviado') avisos++;
-            }
-            if (avisar.email && p.email) {
-              const r3 = await send.sendEmail({
-                to: p.email,
-                subject: 'Você recebeu um benefício da StartDigital 🎁',
-                text: texto + '\n\nQualquer dúvida, fale com o time da Start.\n\nEquipe StartDigital'
-              }).catch(function () { return { status: 'erro' }; });
-              if (r3.status === 'enviado') avisos++;
-            }
-          }
-        } catch (e) {
-          pulados.push({ nome: p.name, motivo: 'já tem um benefício em aberto' });
+        if (avisar.email) {
+          conta(await u.emParalelo(avisarEstes.filter(function (p) { return p.email; }), 5, function (p) {
+            return send.sendEmail({
+              to: p.email,
+              subject: 'Você recebeu um benefício da StartDigital 🎁',
+              text: recado(p) + '\n\nQualquer dúvida, fale com o time da Start.\n\nEquipe StartDigital'
+            });
+          }));
+        }
+        if (avisar.sms) {
+          conta(await u.emParalelo(avisarEstes.filter(function (p) { return p.phone; }), 5, function (p) {
+            return send.sendSms({ to: p.phone, text: recado(p) });
+          }));
+        }
+        if (avisar.whatsapp) {
+          // limite 1: rajada de WhatsApp de um mesmo numero e bloqueio na certa
+          conta(await u.emParalelo(avisarEstes.filter(function (p) { return p.phone; }), 1, function (p) {
+            return send.sendWhatsApp({ to: p.phone, text: recado(p), instance: inst });
+          }));
         }
       }
 

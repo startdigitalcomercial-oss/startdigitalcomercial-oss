@@ -354,13 +354,46 @@ function ligaAvisos(d) {
         urlImagem = await sobeImagemDoAviso();
         this.innerHTML = '<span class="spinner"></span> Enviando…';
       }
-      const r = await api('broadcast_send', {
-        body: {
-          title: titulo, message: b('av-msg').value, channels: canais,
-          ids: escolhidas.map(function (p) { return p.id; }),
-          image_url: urlImagem || undefined
-        }
-      });
+      // ----------------------------------------------------------
+      // Manda em BLOCOS, nao tudo de uma vez.
+      //
+      // Cada chamada ao servidor tem 60 segundos de vida. Um aviso
+      // para 50 pessoas nos tres canais nao cabe nesse tempo — e o
+      // WhatsApp, que vai um de cada vez de proposito, e o que mais
+      // demora. Entao a tela parte o time em pedacos e chama o
+      // servidor varias vezes, mostrando o andamento.
+      //
+      // O primeiro bloco cria o registro no historico; os seguintes
+      // somam no mesmo, por isso o broadcast_id volta e vai junto.
+      // ----------------------------------------------------------
+      const POR_BLOCO = 8;
+      const blocos = [];
+      for (let i = 0; i < escolhidas.length; i += POR_BLOCO) {
+        blocos.push(escolhidas.slice(i, i + POR_BLOCO));
+      }
+
+      const r = { enviados: 0, falhas: 0, pessoas: 0, detalhe: [], id: null };
+      let feitas = 0;
+
+      for (const bloco of blocos) {
+        this.innerHTML = '<span class="spinner"></span> Enviando… ' +
+          feitas + ' de ' + escolhidas.length;
+        const parte = await api('broadcast_send', {
+          body: {
+            title: titulo, message: b('av-msg').value, channels: canais,
+            ids: bloco.map(function (p) { return p.id; }),
+            image_url: urlImagem || undefined,
+            broadcast_id: r.id || undefined
+          }
+        });
+        r.id = r.id || parte.id;
+        r.enviados += parte.enviados;
+        r.falhas += parte.falhas;
+        r.pessoas += parte.pessoas;
+        r.detalhe = r.detalhe.concat(parte.detalhe || []);
+        feitas += bloco.length;
+      }
+
       b('av-saida').innerHTML =
         '<div class="alert ' + (r.falhas ? 'alert-aviso' : 'alert-ok') + '" style="margin-top:18px">' +
         '<strong>' + r.enviados + ' mensagem(ns) enviada(s)</strong> para ' + r.pessoas + ' pessoa(s).' +

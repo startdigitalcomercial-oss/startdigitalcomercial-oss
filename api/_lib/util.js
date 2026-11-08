@@ -435,8 +435,41 @@ function isEmail(v) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(v || '').trim());
 }
 
+// ---------- Fazer varias coisas ao mesmo tempo, com limite ----------
+//
+// Um `for` com `await` dentro manda um pedido, ESPERA, manda o
+// proximo. Com 50 pessoas e 3 canais isso vira 150 esperas em fila e
+// a funcao da Vercel morre no limite de 60 segundos.
+//
+// Aqui N tarefas andam juntas. O limite existe de proposito: sem ele
+// a gente trocaria um problema (demora) por outro (o provedor
+// recusando por excesso). Os resultados voltam na MESMA ordem da
+// lista, independente de quem terminou primeiro.
+async function emParalelo(itens, limite, tarefa) {
+  const lista = Array.isArray(itens) ? itens : [];
+  const saida = new Array(lista.length);
+  const quantos = Math.max(1, Math.min(Number(limite) || 1, lista.length));
+  let proximo = 0;
+
+  async function trabalhador() {
+    while (true) {
+      const i = proximo++;
+      if (i >= lista.length) return;
+      // Uma tarefa que explode nao pode derrubar as outras: o erro
+      // vira o resultado daquela posicao e a fila segue.
+      try { saida[i] = await tarefa(lista[i], i); }
+      catch (e) { saida[i] = { erro: e, falhou: true }; }
+    }
+  }
+
+  const equipe = [];
+  for (let k = 0; k < quantos; k++) equipe.push(trabalhador());
+  await Promise.all(equipe);
+  return saida;
+}
+
 module.exports = {
-  json, ok, fail, readBody,
+  json, ok, fail, readBody, emParalelo,
   signSession, verifySession, requireAdmin, candidateToken, safeEqual,
   firstName, appUrl, setBaseFromReq, candidateLinks, renderTemplate, templateVars,
   hashPassword, checkPassword, signCandidateSession, candidateFromRequest, phoneTail,

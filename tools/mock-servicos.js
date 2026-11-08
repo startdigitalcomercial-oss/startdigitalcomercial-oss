@@ -13,9 +13,18 @@ function ler(req) {
   });
 }
 
+// Os provedores de verdade demoram. Com DEMORA_MS o espelho demora
+// igual, e da para MEDIR se um disparo para o time inteiro cabe no
+// limite de 60 segundos da Vercel — em vez de achar que cabe.
+const DEMORA_MS = Number(process.env.DEMORA_MS || 0);
+const cochila = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+
 const server = http.createServer(async function (req, res) {
   const url = new URL(req.url, 'http://x');
   const body = await ler(req);
+  if (DEMORA_MS > 0 && /\/(message|emails|messages)\//.test(url.pathname + '/')) {
+    await cochila(DEMORA_MS);
+  }
   // Segundo argumento e o codigo HTTP. Sem ele o padrao continua 200 —
   // mas quem passa 400 tem que ver 400 chegar do outro lado, senao o
   // espelho mente sobre como o servico de verdade se comporta.
