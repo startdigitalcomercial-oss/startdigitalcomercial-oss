@@ -793,7 +793,78 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
       image_url: 'https://site-estranho.com/foto.png'
     })).ok);
 
+  // ---- DISPARO EM BLOCOS: um aviso so, varias chamadas ----
+  // A tela parte o time em pedacos para nenhuma chamada passar dos 60
+  // segundos da Vercel. O historico, porem, tem que mostrar UM aviso.
+  {
+    const ri = await adm('broadcast_info'); const antesHist = (ri.data || ri).historico || [];
+    const p1 = await adm('broadcast_send', {
+      title: 'Aviso em blocos', message: 'parte 1', channels: ['sms'], ids: [eu.id]
+    });
+    check('o primeiro bloco cria o registro', p1.ok && !!p1.id, p1.error);
+
+    const p2 = await adm('broadcast_send', {
+      title: 'Aviso em blocos', message: 'parte 1', channels: ['sms'],
+      ids: [eu.id], broadcast_id: p1.id
+    });
+    check('o segundo bloco entra no MESMO registro', p2.ok && p2.id === p1.id, { p1: p1.id, p2: p2.id });
+
+    const rh = await adm('broadcast_info'); const hist = (rh.data || rh).historico || [];
+    const meu = hist.filter(function (h) { return h.id === p1.id; });
+    check('o historico mostra UM aviso, nao dois', meu.length === 1, meu.length);
+    check('e com a soma dos dois blocos',
+      meu[0] && Number(meu[0].total) === 2 && Number(meu[0].sent) === 2,
+      meu[0] && { total: meu[0].total, enviados: meu[0].sent });
+    check('bloco com id de aviso que nao existe e recusado',
+      !(await adm('broadcast_send', {
+        title: 'x', message: 'y', channels: ['sms'], ids: [eu.id],
+        broadcast_id: '00000000-0000-4000-8000-000000000000'
+      })).ok);
+  }
+
+  // ---- cada envio vira uma linha no caderno ----
+  // Os envios passaram a ser gravados de uma vez so no fim (150 idas
+  // ao banco viravam quase um minuto). Aqui a conferencia e que
+  // nenhuma linha se perdeu nessa troca.
+  {
+    const marca = 'CADERNO ' + SUF;
+    await adm('broadcast_send', {
+      title: 'Conta os logs', message: marca, channels: ['sms', 'email'], ids: [eu.id]
+    });
+    const rl = await adm('logs');
+    const logs = (rl.data || rl).logs || [];
+    const meus = logs.filter(function (l) { return String(l.body || '').indexOf(marca) >= 0; });
+    check('2 canais para 1 pessoa = 2 linhas no caderno de envios', meus.length === 2, meus.length);
+    check('e cada linha sabe por qual canal saiu',
+      meus.map(function (l) { return l.channel; }).sort().join(',') === 'email,sms',
+      meus.map(function (l) { return l.channel; }));
+  }
+
   check('exclui colaborador', (await adm('team_delete', { id: eu.id })).ok);
+
+  // ---- o ajudante que faz varias coisas ao mesmo tempo ----
+  {
+    const uu = require('../api/_lib/util.js');
+    const t0 = Date.now();
+    const r = await uu.emParalelo([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 5, async function (n) {
+      await new Promise(function (x) { setTimeout(x, 80); });
+      return n * 2;
+    });
+    const gasto = Date.now() - t0;
+    check('emParalelo devolve na ORDEM da lista', r.join(',') === '2,4,6,8,10,12,14,16,18,20', r.join(','));
+    check('emParalelo roda junto (10 x 80ms com limite 5 < 400ms)', gasto < 400, gasto + 'ms');
+    check('emParalelo respeita o limite (nao foi tudo de uma vez)', gasto >= 150, gasto + 'ms');
+
+    const comErro = await uu.emParalelo([1, 2, 3], 2, async function (n) {
+      if (n === 2) throw new Error('quebrei');
+      return n;
+    });
+    check('uma tarefa que falha nao derruba as outras',
+      comErro[0] === 1 && comErro[1].falhou === true && comErro[2] === 3, comErro);
+
+    const vazio = await uu.emParalelo([], 5, async function () { return 1; });
+    check('lista vazia nao trava', Array.isArray(vazio) && vazio.length === 0);
+  }
 
   console.log('\n5b) SMS — Comtele (API v4 do painel novo)');
   const smsCand = await pub('apply', {
