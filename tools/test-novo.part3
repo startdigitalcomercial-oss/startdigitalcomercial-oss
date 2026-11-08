@@ -1,0 +1,31 @@
+    !(await adm('usuario_salvar', { name: 'Outra', email: 'marina.' + SUF + '@ex.com', role: 'rh' })).ok);
+  check('recusa papel inventado',
+    !(await adm('usuario_salvar', { name: 'X Y', email: 'xy.' + SUF + '@ex.com', role: 'chefe' })).ok);
+
+  // ---- a pessoa abre o link e escolhe a senha ----
+  const tRh = tokenDoConvite(drh.convite);
+  const infoRh = await vejaConvite(tRh);
+  check('o link mostra de quem e o acesso', infoRh.ok && infoRh.email === 'marina.' + SUF + '@ex.com', infoRh.error);
+  check('o link diz o nivel de acesso', infoRh.papel_nome === 'RH', infoRh.papel_nome);
+  check('link torto nao abre', !(await vejaConvite(tRh.slice(0, -3) + 'xxx')).ok);
+  check('enquanto nao criar a senha, ninguem entra na conta',
+    !(await entra('marina.' + SUF + '@ex.com', 'qualquer-coisa')).ok);
+
+  check('recusa senha curta', !(await criaSenha(tRh, 'abc12')).ok);
+  check('recusa senha so de numeros', !(await criaSenha(tRh, '12345678')).ok);
+
+  const feitaRh = await criaSenha(tRh, 'MarinaRH2026');
+  check('cria a senha e ja entra', feitaRh.ok && !!feitaRh.token, feitaRh.error);
+  check('o link so funciona uma vez', !(await criaSenha(tRh, 'OutraSenha99')).ok);
+
+  const loginRh = await entra('marina.' + SUF + '@ex.com', 'MarinaRH2026');
+  check('RH entra com o proprio e-mail', loginRh.ok && !!loginRh.token, loginRh.error);
+  check('nao pede mais para trocar a senha', loginRh.trocar_senha === false, loginRh.trocar_senha);
+  check('senha errada nao entra', !(await entra('marina.' + SUF + '@ex.com', 'chute')).ok);
+
+  await criaSenha(tokenDoConvite(dav.convite), 'PedroAval2026');
+  await criaSenha(tokenDoConvite(dle.convite), 'AnaLeitura2026');
+  const loginAval = await entra('pedro.' + SUF + '@ex.com', 'PedroAval2026');
+  const loginLeit = await entra('ana.' + SUF + '@ex.com', 'AnaLeitura2026');
+  check('avaliador entra', loginAval.ok);
+  check('leitura entra', loginLeit.ok);
