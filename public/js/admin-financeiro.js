@@ -1085,6 +1085,12 @@ async function escondeFinanceiroSeNaoPode() {
       if (auto) auto.style.display = 'none';
     }
 
+    // Operação: some o grupo inteiro para quem não tem acesso
+    if (Array.isArray(r.menu) && r.menu.indexOf('opdash') < 0) {
+      const op = document.querySelector('#abas .nav-grupo[data-grupo="operacao"]');
+      if (op) op.style.display = 'none';
+    }
+
     // START PLAY: quem nao cuida do time nao precisa ver a roleta
     if (Array.isArray(r.menu) && r.menu.indexOf('play') < 0) {
       const bp = document.querySelector('#abas button[data-aba="play"]');
