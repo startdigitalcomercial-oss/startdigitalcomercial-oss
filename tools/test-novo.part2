@@ -1,0 +1,320 @@
+  check('guardou o CPF formatado', fichaExtras.cpf === '529.982.247-25', fichaExtras.cpf);
+  check('guardou a cidade', fichaExtras.city === 'Praia Grande', fichaExtras.city);
+  check('guardou quem indicou', fichaExtras.indicacao === 'Jhow do time', fichaExtras.indicacao);
+
+  // ---- currículo ----
+  const pdfFalso = Buffer.from('%PDF-1.4 teste de curriculo').toString('base64');
+  const semToken = await pub('curriculo', { t: 'token-que-nao-existe', nome: 'cv.pdf', tipo: 'application/pdf', arquivo: pdfFalso });
+  check('curriculo exige token valido', !semToken.ok, semToken.error);
+  const tipoRuim = await pub('curriculo', { t: cad.token, nome: 'cv.exe', tipo: 'application/x-msdownload', arquivo: pdfFalso });
+  check('recusa formato que nao aceitamos', !tipoRuim.ok, tipoRuim.error);
+  const subiu = await pub('curriculo', { t: cad.token, nome: 'curriculo-rafaela.pdf', tipo: 'application/pdf', arquivo: pdfFalso });
+  check('curriculo aceito', subiu.ok, subiu.error);
+
+  const guardados = await (await fetch('http://127.0.0.1:54321/__arquivos')).json();
+  const chaves = Object.keys(guardados).filter(function (k) { return k.indexOf('curriculos/' + leadR.id) === 0; });
+  check('o arquivo foi mesmo guardado', chaves.length === 1, Object.keys(guardados));
+  check('e chegou inteiro', guardados[chaves[0]].bytes === Buffer.from(pdfFalso, 'base64').length,
+    guardados[chaves[0]]);
+
+  const fichaCv = (await adm('candidate', null, { id: leadR.id })).candidate;
+  check('a ficha mostra o nome do arquivo', fichaCv.curriculo_nome === 'curriculo-rafaela.pdf', fichaCv.curriculo_nome);
+  check('e nao guarda endereco publico', !/^https?:/.test(fichaCv.curriculo_url || ''), fichaCv.curriculo_url);
+  const linkCv = await adm('curriculo_link', null, { id: leadR.id });
+  check('o painel gera um link temporario', linkCv.ok && /object\/sign\//.test(linkCv.link || ''), linkCv.error);
+  check('quem nao anexou nao tem link',
+    !(await adm('curriculo_link', null, { id: 'nao-existe' })).ok);
+
+  // ---- 2) ela chama no WhatsApp: saudacao + perguntas da vaga, video, cadastro ----
+  const seq = await webhook(digL, cad.mensagem, NOME_RAFA);
+  check('a sequencia de chegada dispara', seq.resultado && seq.resultado.sequencia === true, seq.resultado);
+  check('sao 3 mensagens', seq.resultado && seq.resultado.mensagens === 3, seq.resultado);
+
+  function logsDela() {
+    return adm('logs', null, { limit: 60 }).then(function (l) {
+      return (l.logs || []).filter(function (x) { return x.candidate_name === NOME_RAFA; });
+    });
+  }
+  let enviadas = await logsDela();
+  let corpos = enviadas.map(function (l) { return l.body; }).join('\n---\n');
+  check('a saudacao chama pelo nome', /Oi Rafaela, tudo bem\?/.test(corpos), corpos.slice(0, 80));
+  check('e vem com as perguntas desta vaga',
+    /Meta Ads e Google Ads/.test(corpos) && /rodou quanto em Ads/.test(corpos) &&
+    /curso você já fez de tráfego pago/.test(corpos), corpos.slice(0, 300));
+  check('e com as duas perguntas padrao, que valem para toda vaga',
+    /música favorita/.test(corpos) && /preço do combustível/.test(corpos), corpos.slice(0, 400));
+  check('nada de trabalho remoto em lugar nenhum',
+    !/remoto|remota|home office|híbrid/i.test(corpos), corpos.slice(0, 200));
+  check('pede o video citando a vaga',
+    /vídeo de até 1 minuto/.test(corpos) && /Gestor de Tráfego Pleno/.test(corpos));
+  check('avisa que o video nao e divulgado', /não vai ser divulgado/.test(corpos));
+  check('manda o link do cadastro com o token da pessoa',
+    /\/vaga\?t=[a-zA-Z0-9]+&v=gestor-de-trafego-pleno/.test(corpos), corpos.slice(-160));
+  check('NAO agradece ainda', !/Recebido, Rafaela/.test(corpos));
+  check('NAO manda as redes ainda', !/somossangueroxo/.test(corpos));
+  check('nenhuma mensagem tem travessao', corpos.indexOf('—') < 0 && corpos.indexOf('–') < 0);
+
+  // ---- 3) "digitando..." antes de cada mensagem ----
+  const presencas = await (await fetch('http://127.0.0.1:54322/__presencas')).json();
+  const minhas = presencas.filter(function (p) { return String(p.number).indexOf(digL.slice(-8)) >= 0; });
+  check('mostrou "digitando" antes de cada mensagem', minhas.length >= 3, minhas.length);
+  check('e o aviso e de digitacao', minhas.every(function (p) { return p.presence === 'composing'; }));
+  check('a primeira espera mais que as outras', Number(minhas[0].delay) === 900, minhas.map(function (p) { return p.delay; }));
+  check('e o valor configurado e o que vai para a Evolution',
+    minhas.slice(1).every(function (p) { return Number(p.delay) === 300; }),
+    minhas.map(function (p) { return p.delay; }));
+
+  // ---- 4) ela tira uma duvida antes de responder ----
+  const duvida = await webhook(digL, 'Qual o salário mesmo?');
+  check('a Aurea continua conversando', duvida.resultado && duvida.resultado.ok === true, duvida.resultado);
+  check('esta esperando as tres coisas',
+    duvida.resultado && duvida.resultado.aguardando &&
+    duvida.resultado.aguardando.respostas === true &&
+    duvida.resultado.aguardando.video === true &&
+    duvida.resultado.aguardando.cadastro === true,
+    duvida.resultado);
+
+  // ---- o que a Aurea sabe sobre a empresa foi junto no prompt ----
+  const cn = (await adm('settings')).conhecimento || {};
+  check('a base de conhecimento existe', !!cn.texto, cn);
+  check('e traz os beneficios', /TotalPass/.test(cn.texto) && /Spotify/.test(cn.texto));
+  const prompt = await (await fetch('http://127.0.0.1:54322/__ultimo-prompt')).json();
+  check('a IA foi consultada para a duvida', prompt.ferramenta === 'acompanhar_candidato', prompt.ferramenta);
+  check('e recebeu a base da empresa junto', /TotalPass/.test(prompt.system || ''));
+  check('e a ficha da vaga junto', /R\$ 2\.200/.test(prompt.system || ''));
+  check('e as perguntas desta vaga', /curso você já fez de tráfego pago/.test(prompt.system || ''));
+  check('sabe o que ainda falta', /Cadastro preenchido: AINDA NÃO/.test(prompt.system || ''));
+  check('e proibe o travessao', /NUNCA use travessão/.test(prompt.system || ''));
+
+  // ---- 5) responde tudo: ainda falta video e cadastro ----
+  const respondeu = await webhook(digL, '4 anos com Meta Ads e Google Ads, ja rodei 3 milhoes, fiz o curso do Pedro Sobral');
+  check('respostas completas nao fecham sozinhas',
+    respondeu.resultado && respondeu.resultado.aguardando &&
+    respondeu.resultado.aguardando.respostas === false &&
+    respondeu.resultado.aguardando.video === true, respondeu.resultado);
+
+  // ---- 6) manda o video: ainda falta o cadastro ----
+  const comVideo = await webhookVideo(digL);
+  check('so com o video ainda nao conclui',
+    comVideo.resultado && comVideo.resultado.concluiu !== true &&
+    comVideo.resultado.aguardando && comVideo.resultado.aguardando.cadastro === true, comVideo.resultado);
+
+  // ---- 7) preenche o cadastro pelo link: agora sim fecha ----
+  const fichaL = await adm('candidate', null, { id: leadR.id });
+  const preencheu = await pub('apply', {
+    t: fichaL.candidate.token, vaga: 'gestor-de-trafego-pleno',
+    name: NOME_RAFA, email: 'rafa.form.' + SUF + '@exemplo.com', phone: foneL,
+    experience: 'Quatro anos de agencia.', why_start: 'Quero crescer.'
+  });
+  check('cadastro completo aceito', preencheu.ok, preencheu.error);
+  const todasRafa = (await adm('board')).candidates.filter(function (c) { return c.name === NOME_RAFA; });
+  check('o cadastro completou a mesma pessoa, sem duplicar', todasRafa.length === 1, todasRafa.length);
+  check('e ela continua no funil da landing', todasRafa[0] && todasRafa[0].source === 'landing',
+    todasRafa[0] && todasRafa[0].source);
+
+  const fechou = await webhook(digL, 'pronto, preenchi!');
+  check('com as tres coisas, o processo conclui',
+    fechou.resultado && fechou.resultado.concluiu === true, fechou.resultado);
+  corpos = (await logsDela()).map(function (l) { return l.body; }).join('\n---\n');
+  check('agora sim agradece', /Recebido, Rafaela/.test(corpos) && /Obrigada por participar/.test(corpos));
+  check('e manda as duas redes',
+    /startdigital_oficial/.test(corpos) && /somossangueroxo/.test(corpos));
+
+  // ---- 7) depois de concluir, nao repete ----
+  const depois = await webhook(digL, 'oi de novo');
+  check('processo concluido nao reabre', depois.resultado && depois.resultado.ignorado === true, depois.resultado);
+
+  // ---- 5) trocou de vaga? a sequencia pode ir de novo ----
+  const trocou = await pub('candidatar', {
+    vaga: 'gestor-de-trafego-jr', name: NOME_RAFA,
+    phone: foneL, email: 'rafaela.' + SUF + '@exemplo.com'
+  });
+  check('deixa se candidatar a outra vaga', trocou.ok, trocou.error);
+  const seq2 = await webhook(digL, trocou.mensagem);
+  check('e a sequencia de chegada roda de novo para a vaga nova',
+    seq2.resultado && seq2.resultado.sequencia === true, seq2.resultado);
+
+  await adm('aurea_config_save', { value: { pausa_primeira: 10000, pausa_entre_mensagens: 4000 } });
+
+  console.log('\n5) WEBHOOK — casos que deve ignorar');
+  const k = a2.webhook_url.split('k=')[1];
+  const semChave = await (await fetch(BASE + '/api/webhook?k=errada', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+  })).json();
+  check('recusa chave errada', semChave.ok === false);
+  const grupo2 = await (await fetch(BASE + '/api/webhook?k=' + k, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ event: 'messages.upsert', data: { key: { remoteJid: '123@g.us' }, message: { conversation: 'oi' } } })
+  })).json();
+  check('ignora mensagem de grupo', grupo2.ignorado === 'mensagem de grupo', grupo2);
+  const nossa = await (await fetch(BASE + '/api/webhook?k=' + k, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ event: 'messages.upsert', data: { key: { remoteJid: '5511999@s.whatsapp.net', fromMe: true }, message: { conversation: 'oi' } } })
+  })).json();
+  check('ignora mensagem nossa', nossa.ignorado === 'mensagem nossa', nossa);
+  // Quem nunca preencheu o formulario da landing nao recebe nada: a
+  // Aurea so fala com quem se cadastrou. Fica registrado no diario.
+  const foneSolto = '5511' + String(Date.now() + 101).slice(-9);
+  const solto = await webhook(foneSolto, 'oi, tudo bem?');
+  check('numero sem cadastro nao recebe nada',
+    solto.ignorado === 'sem cadastro na landing', solto);
+  const diarioSolto = (await adm('wa_status')).batidas || [];
+  check('mas fica registrado para o time olhar',
+    diarioSolto.some(function (x) { return x.decisao === 'sem cadastro na landing'; }), diarioSolto[0]);
+
+  // ---- diario do webhook: precisa registrar ate o que descarta ----
+  const diario = await adm('wa_status');
+  const bat = diario.batidas || [];
+  check('o painel guarda as chamadas do webhook', bat.length > 0, bat.length);
+  check('registra o que foi entregue',
+    bat.some(function (x) { return String(x.decisao).indexOf('entregue') === 0; }), bat.slice(0, 3));
+  check('registra tambem o que foi descartado',
+    bat.some(function (x) { return String(x.decisao).indexOf('entregue') !== 0; }), bat.slice(0, 3));
+  check('anota mensagem propria como descartada',
+    bat.some(function (x) { return x.decisao === 'mensagem nossa'; }), bat.slice(0, 6));
+  check('guarda de qual numero veio',
+    bat.some(function (x) { return !!x.de; }));
+
+  console.log('\n6) IMPORTAR LISTA');
+  const imp = await adm('import_candidates', {
+    source: 'Indeed', role: 'Social Media', iniciar_aurea: true, forcar: true,
+    rows: [
+      { name: 'Ana Paula Ribeiro ' + SUF, phone: '11 91111' + String(Date.now()).slice(-4), email: 'ana.' + SUF + '@ex.com' },
+      { name: 'Bruno Costa ' + SUF, phone: '11 92222' + String(Date.now()).slice(-4) },
+      { name: 'Xy', phone: '11 93333' + String(Date.now()).slice(-4) },
+      { name: 'Telefone Ruim ' + SUF, phone: '123' }
+    ]
+  });
+  check('importa os validos', imp.ok && imp.criados.length === 2, imp.criados && imp.criados.length);
+  check('pula nome curto e telefone ruim', imp.pulados.length === 2, imp.pulados);
+  check('aurea chamou os importados', imp.disparos.length === 2 && imp.disparos.every(function (d) { return d.ok; }), imp.disparos);
+
+  const boardI = await adm('board');
+  const importado = boardI.candidates.find(function (c) { return c.name.indexOf('Ana Paula') === 0; });
+  check('importado entra em triagem', !!importado && importado.stage_key === 'triagem', importado && importado.stage_key);
+  const fichaI = await adm('candidate', null, { id: importado.id });
+  check('guarda a origem', fichaI.candidate.source_detail === 'Indeed', fichaI.candidate.source_detail);
+
+  const dupImp = await adm('import_candidates', {
+    source: 'Catho', rows: [{ name: 'Ana Paula Ribeiro ' + SUF, phone: '11 94444' + String(Date.now()).slice(-4), email: 'ana.' + SUF + '@ex.com' }]
+  });
+  check('nao duplica por e-mail', dupImp.criados.length === 0 && dupImp.pulados.length === 1, dupImp);
+
+  console.log('\n7) LOGIN DO CANDIDATO');
+  const emailLogin = 'login.' + SUF + '@exemplo.com';
+  const c2 = await pub('apply', {
+    name: 'Julia Ramos Login', email: emailLogin, phone: '11 95555' + String(Date.now()).slice(-4),
+    role_applied: 'Designer', experience: 'x', why_start: 'y'
+  });
+  const f2 = await adm('candidate', null, { id: c2.id });
+  const tk2 = f2.links.link_senha.split('t=')[1];
+
+  const antes = await pub('conta_info', null, { t: tk2 });
+  check('bloqueia criar senha antes de liberar', !antes.ok, antes.error);
+
+  await adm('update_candidate', { id: c2.id, member_access: true });
+  const info = await pub('conta_info', null, { t: tk2 });
+  check('conta_info libera apos aprovacao', info.ok && info.email === emailLogin, info);
+  check('marca que ainda nao tem senha', info.ja_tem_senha === false);
+
+  const curta = await pub('conta_criar_senha', { t: tk2, password: '123' });
+  check('recusa senha curta', !curta.ok, curta.error);
+
+  const criada = await pub('conta_criar_senha', { t: tk2, password: 'minhasenha123' });
+  check('cria a senha e devolve sessao', criada.ok && !!criada.token, criada.error);
+
+  const errada = await pub('entrar', { email: emailLogin, password: 'errada' });
+  check('login com senha errada falha', !errada.ok && errada.error.indexOf('incorretos') >= 0, errada.error);
+  const certa = await pub('entrar', { email: emailLogin, password: 'minhasenha123' });
+  check('login com senha certa funciona', certa.ok && !!certa.token, certa.error);
+
+  const portalSessao = await comoCandidato('portal', certa.token);
+  check('portal abre com a sessao, sem link', portalSessao.ok && portalSessao.modules.length >= 1, portalSessao.error);
+  const portalSem = await pub('portal', null, {});
+  check('portal fechado sem credencial', !portalSem.ok, portalSem.error);
+  const portalToken = await pub('portal', null, { t: tk2 });
+  check('link pessoal continua funcionando', portalToken.ok);
+
+  const aula = portalSessao.modules[0].lessons[0];
+  const marcou = await comoCandidato('lesson_done', certa.token, { lesson_id: aula.id, completed: true });
+  check('marca aula pela sessao', marcou.ok, marcou.error);
+
+  const info2 = await pub('conta_info', null, { t: tk2 });
+  check('agora consta que tem senha', info2.ja_tem_senha === true);
+
+  console.log('\n8) WHATSAPP — conexao por QR code');
+  const st1 = await adm('wa_status');
+  check('status do whatsapp responde', st1.ok && st1.configurada === true, st1.error);
+  check('mostra o endereco do webhook', /\/api\/webhook\?k=/.test(st1.webhook_url || ''));
+
+  const conn = await adm('wa_conectar', { instance: 'start-teste' });
+  check('gera o QR code', conn.ok && !!conn.base64, conn.error);
+  check('devolve codigo de pareamento', !!conn.pairingCode, conn.pairingCode);
+  check('configura o webhook sozinho', conn.webhook_ok === true, conn.webhook_erro);
+
+  const st2 = await adm('wa_status');
+  check('guarda a instancia escolhida', st2.escolhida === 'start-teste', st2.escolhida);
+
+  const e1 = await adm('wa_estado', null, { instance: 'start-teste' });
+  check('le o estado da conexao', e1.ok && !!e1.estado, e1);
+  const e2 = await adm('wa_estado', null, { instance: 'start-teste' });
+  check('detecta quando conecta', e2.conectada === true, e2.estado);
+
+  const nomeRuim = await adm('wa_conectar', { instance: 'nome invalido!' });
+  check('recusa nome invalido', !nomeRuim.ok, nomeRuim.error);
+
+  const testeWa = await adm('wa_teste', { phone: '11 98877-6655' });
+  check('envia mensagem de teste', testeWa.ok, testeWa.error);
+  const diag = await adm('wa_diagnostico', { phone: '13 99600-3897' });
+  check('diagnostico roda', diag.ok, diag.error);
+  const passos = (diag.data && diag.data.passos) || (diag.passos) || [];
+  check('diagnostico tem 7 passos', passos.length === 7, 'passos: ' + passos.length);
+  const pNum = passos.filter(function (p) { return p.passo === 'Número montado'; })[0];
+  check('diagnostico monta 5513996003897', !!pNum && /5513996003897/.test(String(pNum.detalhe)), pNum && pNum.detalhe);
+  const pLink = passos.filter(function (p) { return p.passo === 'Envio com link'; })[0];
+  check('diagnostico envia com link', !!pLink && pLink.ok === true, pLink && pLink.detalhe);
+
+  // Nono digito: numero antigo cadastrado no WhatsApp SEM o 9.
+  // O sistema tem que perceber e mandar para o endereco certo.
+  const diag9 = await adm('wa_diagnostico', { phone: '13 98855-9994' });
+  const p9 = (diag9.data && diag9.data.passos) || diag9.passos || [];
+  const pReal = p9.filter(function (p) { return p.passo === 'Endereço real no WhatsApp'; })[0];
+  check('detecta endereco diferente do montado',
+    !!pReal && /551388559994/.test(String(pReal.detalhe)) && /DIFERENTE/.test(String(pReal.detalhe)),
+    pReal && pReal.detalhe);
+  const pEnv = p9.filter(function (p) { return p.passo === 'Envio sem link'; })[0];
+  check('envia para o endereco corrigido',
+    !!pEnv && /551388559994/.test(String(pEnv.detalhe)),
+    pEnv && pEnv.detalhe);
+  const pEu = p9.filter(function (p) { return p.passo === 'Não é envio para si mesmo'; })[0];
+  check('avisa se for envio para si mesmo', !!pEu && pEu.ok === true, pEu && pEu.detalhe);
+
+  console.log('\n5a) COLABORADORES — cadastro do time');
+  async function eqp(action, body) {
+    return (await fetch(BASE + '/api/equipe?action=' + action, {
+      method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined
+    })).json();
+  }
+
+  const cfgEq = await eqp('config');
+  check('formulario do time carrega', cfgEq.ok && cfgEq.areas.length > 0, cfgEq.error);
+  check('oferece os tamanhos de camisa', cfgEq.camisas.indexOf('GG') >= 0, cfgEq.camisas);
+
+  const base = {
+    name: 'Joana Ribeiro Alves', nickname: 'Jo', birth_date: '1994-03-12',
+    email: 'jo.' + SUF + '@exemplo.com', phone: '(13) 99600-3897',
+    cpf: '529.982.247-25', area: 'Design', role_title: 'Designer',
+    cep: '11015001', street: 'Rua Amador Bueno', number: '120',
+    district: 'Centro', city: 'Santos', state: 'SP',
+    shirt_size: 'M', shoe_size: '37', work_mode: 'remoto'
+  };
+  const novoColab = await eqp('cadastrar', base);
+  check('cadastra colaborador', novoColab.ok, novoColab.error);
+  check('trata pelo apelido', novoColab.nome === 'Jo', novoColab.nome);
+  check('dispara os 3 canais', (novoColab.envios || []).length === 3, novoColab.envios);
+
+  check('recusa CPF invalido',
+    !(await eqp('cadastrar', Object.assign({}, base, { email: 'x1.' + SUF + '@ex.com', cpf: '111.111.111-11' }))).ok);
+  check('recusa e-mail torto',
+    !(await eqp('cadastrar', Object.assign({}, base, { email: 'nao-e-email' }))).ok);
