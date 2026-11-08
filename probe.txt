@@ -1,3 +1,0 @@
-F:\u2192
-G:'\n0 passaram \u00b7 1 falharam'
-H:ok + ' passaram \u00b7 ' + falhas
