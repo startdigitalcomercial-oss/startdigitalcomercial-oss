@@ -24,19 +24,19 @@ function check(nome, cond, extra) {
   if (cond) { ok++; console.log('  ok   ' + nome); }
   else {
     falhas++;
-    console.log('  FALHA ' + nome + (extra !== undefined ? '  \\u2192 ' + JSON.stringify(extra) : ''));
+    console.log('  FALHA ' + nome + (extra !== undefined ? '  \u2192 ' + JSON.stringify(extra) : ''));
   }
 }
 
 (async function () {
-  console.log('\\nOPERACAO — carteira por gestor e dashboard');
+  console.log('\nOPERACAO — carteira por gestor e dashboard');
 
   T = (await (await fetch(BASE + '/api/admin?action=login', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ password: SENHA })
   })).json()).token;
   check('entrou no painel', !!T);
-  if (!T) { console.log('\\n0 passaram \\u00b7 1 falharam'); process.exit(1); }
+  if (!T) { console.log('\n0 passaram \u00b7 1 falharam'); process.exit(1); }
 
   async function op(action, body, query) {
     const qs = new URLSearchParams(Object.assign({ action: action }, query || {}));
@@ -272,7 +272,7 @@ function check(nome, cond, extra) {
     check('evento ANTES da data pedida vale', comEvento2.status === 'suspenso', comEvento2);
   }
 
-  console.log('\\n----------------------------------------');
-  console.log(ok + ' passaram \\u00b7 ' + falhas + ' falharam');
+  console.log('\n----------------------------------------');
+  console.log(ok + ' passaram \u00b7 ' + falhas + ' falharam');
   process.exit(falhas ? 1 : 0);
 })().catch(function (e) { console.error('EXPLODIU:', e); process.exit(1); });
