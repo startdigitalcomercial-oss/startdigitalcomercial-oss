@@ -522,6 +522,133 @@
                      font-size: 13.5px; font-weight: 600; color: var(--label); cursor: pointer;
                      height: auto; padding: 2px 20px 2px 0; margin: 0; box-shadow: none; min-width: 0; }
 
+  /* ============================================================
+     OPERAÇÃO — dashboard e carteira.
+     Paleta dos gestores validada para daltonismo nos dois modos
+     (claro e escuro). A cor nunca carrega a informação sozinha:
+     toda fatia tem nome e número ao lado, na legenda.
+     ============================================================ */
+  .op {
+    --g-azul: #2a78d6; --g-laranja: #eb6834; --g-verdeagua: #1baf7a;
+    --g-amarelo: #eda100; --g-magenta: #e87ba4; --g-verde: #008300;
+    --g-violeta: #6250d6; --g-outros: #8e8e93;
+    /* as fases são uma escada: uma cor só, clareando para escuro */
+    --f1: #cbc4f2; --f2: #a99ee8; --f3: #8578dd; --f4: #6250d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .op {
+      --g-azul: #3987e5; --g-laranja: #d95926; --g-verdeagua: #199e70;
+      --g-amarelo: #c98500; --g-magenta: #d55181; --g-verde: #008300;
+      --g-violeta: #9085e9; --g-outros: #8e8e93;
+      --f1: #4b4080; --f2: #6153a8; --f3: #7b6bcd; --f4: #9085e9;
+    }
+  }
+
+  .op-cab { display: flex; flex-wrap: wrap; gap: 14px; justify-content: space-between;
+    align-items: flex-start; margin-bottom: 18px; }
+  .op-cab h2 { margin: 0 0 3px; font-size: 20px; letter-spacing: -.022em; }
+  .op-filtros { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .op-filtros select, .op-filtros input[type=date] {
+    height: 36px; font-size: 13.5px; margin: 0; width: auto; }
+  /* a setinha nativa do select fica POR CIMA do texto quando o campo
+     é estreito; o respiro à direita é para o nome do mês caber */
+  .op-filtros select { padding: 0 30px 0 12px; min-width: 112px; }
+  .op-filtros input[type=date] { padding: 0 10px; min-width: 140px; }
+
+  /* ---- os seis indicadores ---- */
+  .op-kpis { display: grid; gap: 12px; margin-bottom: 22px;
+    grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); }
+  .op-kpi { background: var(--surface); border: 1px solid var(--hairline);
+    border-radius: var(--r-card); padding: 15px 16px 14px; position: relative;
+    transition: border-color .18s, transform .18s cubic-bezier(.32,.72,0,1); }
+  .op-kpi:hover { border-color: var(--hairline-strong); transform: translateY(-2px); }
+  .op-kpi .rot { display: flex; align-items: center; justify-content: space-between;
+    font-size: 12.5px; color: var(--label-2); font-weight: 500; }
+  .op-kpi .rot svg { width: 15px; height: 15px; color: var(--label-3); flex: 0 0 auto; }
+  .op-kpi .num { font-size: 30px; font-weight: 700; letter-spacing: -.03em; margin-top: 8px;
+    font-variant-numeric: tabular-nums; line-height: 1.05; }
+  .op-kpi .pe { font-size: 11.5px; color: var(--label-3); margin-top: 3px; }
+  .op-kpi.bom .num { color: var(--green); }
+  .op-kpi.atencao .num { color: var(--orange); }
+  .op-kpi.ruim .num { color: var(--red); }
+
+  /* ---- a rosca ---- */
+  .op-grade2 { display: grid; gap: 14px; grid-template-columns: 1fr; margin-bottom: 14px; }
+  @media (min-width: 900px) { .op-grade2 { grid-template-columns: minmax(0,1fr) minmax(0,1fr); } }
+
+  .op-rosca { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
+  .op-rosca svg { flex: 0 0 auto; }
+  .op-rosca .anel { transform: rotate(-90deg); transform-origin: 50% 50%; }
+  .op-rosca .fatia { transition: opacity .18s, stroke-width .18s; cursor: pointer; }
+  .op-rosca .fatia:hover { stroke-width: 20; }
+  .op-rosca.focado .fatia { opacity: .3; }
+  .op-rosca.focado .fatia.aceso { opacity: 1; stroke-width: 20; }
+  .op-centro { font-variant-numeric: tabular-nums; }
+  .op-centro .n { font-size: 30px; font-weight: 700; letter-spacing: -.03em; fill: var(--label); }
+  .op-centro .t { font-size: 10px; fill: var(--label-3); letter-spacing: .06em; text-transform: uppercase; }
+
+  .op-legenda { flex: 1; min-width: 190px; display: flex; flex-direction: column; gap: 1px; }
+  .op-leg { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 9px;
+    cursor: pointer; background: none; border: none; width: 100%; text-align: left;
+    font-family: inherit; color: var(--label); transition: background .15s; }
+  .op-leg:hover { background: var(--fill-1); }
+  .op-leg .bolinha { width: 9px; height: 9px; border-radius: 3px; flex: 0 0 auto; }
+  .op-leg .nome { flex: 1; font-size: 13.5px; font-weight: 500; }
+  .op-leg .qtd { font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .op-leg .pct { font-size: 12px; color: var(--label-3); width: 46px; text-align: right;
+    font-variant-numeric: tabular-nums; }
+
+  /* ---- barras (fases, satisfação, situação) ---- */
+  .op-barra { margin-bottom: 13px; }
+  .op-barra:last-child { margin-bottom: 0; }
+  .op-barra .topo { display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 13.5px; margin-bottom: 6px; gap: 10px; }
+  .op-barra .topo b { font-weight: 500; }
+  .op-barra .topo span { color: var(--label-3); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .op-barra .topo span b { color: var(--label); font-weight: 600; font-size: 13.5px; }
+  .op-trilho { height: 8px; border-radius: 999px; background: var(--fill-1); overflow: hidden; }
+  .op-fita { height: 100%; border-radius: 999px; width: 0;
+    transition: width .9s cubic-bezier(.22,1,.36,1); }
+  button.op-barra { display: block; width: 100%; text-align: left; background: none;
+    border: none; font-family: inherit; color: var(--label); cursor: pointer; padding: 4px 2px; }
+  button.op-barra:hover .op-trilho { background: var(--fill-2); }
+
+  /* ---- a tabela da carteira ---- */
+  .op-pino { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px;
+    white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
+  .op-pino::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .op-pino.ativo { background: var(--green-tint); color: var(--green); }
+  .op-pino.suspenso { background: var(--orange-tint); color: var(--orange); }
+  .op-pino.flopado { background: var(--red-tint); color: var(--red); }
+  .op-pino.cancelado { background: var(--fill-2); color: var(--label-2); }
+  .op-carinha { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }
+  .op-carinha svg { width: 15px; height: 15px; flex: 0 0 auto; }
+  .op-carinha.satisfeito { color: var(--green); }
+  .op-carinha.neutro { color: var(--label-2); }
+  .op-carinha.insatisfeito { color: var(--red); }
+  .op-carinha.nao_informado { color: var(--label-3); }
+  .op-fase { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; white-space: nowrap; }
+  .op-fase i { width: 7px; height: 7px; border-radius: 2px; display: inline-block; }
+
+  .op-cartao-gestor { background: var(--surface); border: 1px solid var(--hairline);
+    border-radius: var(--r-card); padding: 16px; cursor: pointer; text-align: left;
+    font-family: inherit; color: var(--label); width: 100%;
+    transition: border-color .18s, transform .18s cubic-bezier(.32,.72,0,1), box-shadow .18s; }
+  .op-cartao-gestor:hover { border-color: var(--hairline-strong); transform: translateY(-2px);
+    box-shadow: var(--shadow-2); }
+  .op-ini { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center;
+    color: #fff; font-weight: 700; font-size: 14px; flex: 0 0 auto; }
+
+  /* ---- a entrada: cada bloco sobe um pouquinho depois do outro ---- */
+  .op-entra { opacity: 0; animation: opSobe .5s cubic-bezier(.22,1,.36,1) forwards; }
+  @keyframes opSobe { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .op-entra { animation: none; opacity: 1; }
+    .op-fita { transition: none; }
+    .op-kpi:hover, .op-cartao-gestor:hover { transform: none; }
+  }
+
   /* ---- START PLAY ---- */
   .pl-item { display: flex; align-items: center; gap: 12px; padding: 12px 4px;
     border-bottom: 1px solid var(--hairline); background: var(--card); }
@@ -640,6 +767,12 @@
       <button data-aba="avisos"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M5.4 9.6a6.6 6.6 0 0 1 13.2 0c0 4.2 1.4 5.6 1.4 5.6H4s1.4-1.4 1.4-5.6z"/><path d="M10.3 18.6a2 2 0 0 0 3.4 0"/></svg><span>Avisos</span></button>
       <button data-aba="space"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3.2" y="7.4" width="17.6" height="12.4" rx="2"/><path d="M3.2 11.6h17.6"/><path d="M12 7.4V4.6M12 4.6c-1.6-1.6-4.2-.4-3.4 1.5.5 1.2 2.2 1.3 3.4 1.3m0-2.8c1.6-1.6 4.2-.4 3.4 1.5-.5 1.2-2.2 1.3-3.4 1.3"/></svg><span>Benefícios</span></button>
       <button data-aba="play"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><circle cx="12" cy="12" r="2.4"/><path d="M12 3.4v6.2M12 14.4v6.2M20.6 12h-6.2M9.6 12H3.4"/></svg><span>START PLAY</span></button>
+</div></div></div>
+      <div class="nav-grupo" data-grupo="operacao">
+      <button type="button" class="nav-cab">Operação<svg class="seta" width="12" height="12" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
+      <div class="nav-itens"><div>
+      <button data-aba="opdash"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4"/><path d="M12 3.6v8.4l5.9 5.9"/></svg><span>Dashboard</span></button>
+      <button data-aba="opgestores"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><circle cx="9" cy="8.6" r="3.4"/><path d="M3.6 19.4c.6-3 2.9-4.5 5.4-4.5s4.8 1.5 5.4 4.5"/><path d="M15.4 5.7a3.4 3.4 0 0 1 0 6M16.9 15.2c1.9.6 3.1 2 3.5 4.2"/></svg><span>Gestores</span></button>
 </div></div></div>
       <div class="nav-grupo" data-grupo="conteudo">
       <button type="button" class="nav-cab">Start Academy<svg class="seta" width="12" height="12" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
@@ -808,6 +941,14 @@
       <div style="padding:22px 0 40px" id="painel-play"></div>
     </section>
 
+    <!-- ---------- OPERAÇÃO ---------- -->
+    <section data-painel="opdash" style="display:none">
+      <div style="padding:22px 0 40px" id="painel-opdash"></div>
+    </section>
+    <section data-painel="opgestores" style="display:none">
+      <div style="padding:22px 0 40px" id="painel-opgestores"></div>
+    </section>
+
     <!-- ---------- FINANCEIRO: a planilha ---------- -->
     <section data-painel="financeiro" style="display:none">
       <div style="padding:22px 0 40px" id="painel-financeiro"></div>
@@ -870,6 +1011,7 @@
 <script src="/js/admin-space.js"></script>
 <script src="/js/admin-financeiro.js"></script>
 <script src="/js/admin-play.js"></script>
+<script src="/js/admin-operacao.js"></script>
 <script src="/js/admin-inicio.js"></script>
 </body>
 </html>
