@@ -125,6 +125,9 @@
     },
     "api/admin.js": {
       "maxDuration": 60
+    },
+    "api/agenda.js": {
+      "maxDuration": 60
     }
   }
 }
