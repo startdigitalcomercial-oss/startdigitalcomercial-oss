@@ -6,6 +6,13 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Crie o seu acesso — Portal do Colaborador</title>
 <link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest">
+<script>
+  /* Pinta a tela ANTES de ela aparecer. Se a pessoa ja escolheu o
+     claro, o atributo entra agora — sem isso dava um flash branco
+     no meio do carregamento. Fica inline de proposito: um arquivo
+     separado chegaria tarde. */
+  try { if (localStorage.getItem('tema') === 'claro') document.documentElement.setAttribute('data-tema', 'claro'); } catch (e) {}
+</script>
 <link rel="stylesheet" href="/ui.css">
 <style>
   .wrap { max-width: 440px; margin: 9vh auto; padding: 0 22px; }
