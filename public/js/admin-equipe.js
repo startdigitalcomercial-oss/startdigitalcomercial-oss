@@ -111,11 +111,7 @@ async function carregaColaboradores() {
 
     // ---------- busca ----------
     '<div class="eq-busca-wrap">' +
-      '<svg class="eq-lupa" width="18" height="18" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.6"/><path d="m16 16 4.2 4.2"/></svg>' +
-      '<input type="search" id="eq-busca" autocomplete="off" ' +
-        'placeholder="Buscar por nome, apelido, e-mail, cargo, área, cidade ou tamanho…" ' +
-        'value="' + esc(EQUIPE_BUSCA) + '">' +
-      '<button type="button" class="eq-limpar" id="eq-limpar" title="Limpar" style="display:none">✕</button>' +
+      buscaHtml('eq-busca', 'Buscar por nome, apelido, e-mail, cargo, área ou cidade…', EQUIPE_BUSCA) +
     '</div>' +
     '<div class="small muted" id="eq-contagem" style="margin:0 0 12px 4px"></div>' +
 
@@ -191,7 +187,6 @@ function dataCurta(iso) {
 function ligaColaboradores(d) {
   const b = function (id) { return document.getElementById(id); };
   const busca = b('eq-busca');
-  const limpar = b('eq-limpar');
 
   b('eq-copiar').addEventListener('click', function () {
     navigator.clipboard.writeText(d.link).then(function () { toast('Link copiado'); });
@@ -241,17 +236,7 @@ function ligaColaboradores(d) {
   desenhaModos();
 
   // busca instantanea, sem ida e volta no servidor
-  function aplicaBusca() {
-    EQUIPE_BUSCA = busca.value;
-    limpar.style.display = busca.value ? 'flex' : 'none';
-    desenhaTabela();
-  }
-  busca.addEventListener('input', aplicaBusca);
-  busca.addEventListener('keydown', function (ev) {
-    if (ev.key === 'Escape') { busca.value = ''; aplicaBusca(); }
-  });
-  limpar.addEventListener('click', function () { busca.value = ''; busca.focus(); aplicaBusca(); });
-  limpar.style.display = busca.value ? 'flex' : 'none';
+  ligaBusca('eq-busca', function (texto) { EQUIPE_BUSCA = texto; desenhaTabela(); }, 0);
 
   // clicar no aniversariante abre a ficha dele
   document.querySelectorAll('.eq-pessoa').forEach(function (el) {
