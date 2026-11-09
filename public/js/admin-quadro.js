@@ -23,7 +23,7 @@ async function carregaBoard() {
       '<span><span class="n" style="display:block">' + n + '</span><span class="l">' + l + '</span></span></div>';
   }
   document.getElementById('stats').innerHTML =
-    statCard(ICO.pessoas(19), 'var(--accent-tint)', 'var(--accent)', total, 'candidatos ativos') +
+    statCard(ICO.pessoas(19), 'var(--accent-tint)', 'var(--accent-soft)', total, 'candidatos ativos') +
     statCard(ICO.grafico(19), 'var(--purple-tint)', 'var(--purple)', comDisc, 'com teste DISC respondido') +
     statCard(ICO.check(19), 'var(--blue-tint)', 'var(--blue)', contratados, 'contratados');
 
