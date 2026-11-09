@@ -649,6 +649,88 @@
     .op-kpi:hover, .op-cartao-gestor:hover { transform: none; }
   }
 
+  /* ---- Agenda ---- */
+  .ag-barra { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between;
+    align-items: center; margin: 4px 0 14px; }
+  .ag-sem { display: grid; grid-template-columns: repeat(7, 1fr); background: var(--fill-1);
+    font-size: 11.5px; font-weight: 600; color: var(--label-2); text-align: center; }
+  .ag-sem div { padding: 9px 0; }
+  .ag-mes { display: grid; grid-template-columns: repeat(7, 1fr); }
+  .ag-cel { min-height: 96px; min-width: 0; overflow: hidden;
+    border-right: 1px solid var(--hairline);
+    border-bottom: 1px solid var(--hairline); padding: 6px; display: flex; flex-direction: column;
+    gap: 3px; cursor: default; }
+  .ag-cel:nth-child(7n) { border-right: none; }
+  .ag-cel.fora { background: var(--fill-1); opacity: .55; }
+  .ag-cel.hoje { background: var(--accent-tint); }
+  .ag-num { font-size: 11.5px; font-weight: 600; color: var(--label-2); padding: 0 2px 2px;
+    font-variant-numeric: tabular-nums; }
+  .ag-cel.hoje .ag-num { color: var(--accent); }
+  .ag-chip { display: block; width: 100%; text-align: left; border: none; font-family: inherit;
+    font-size: 11.5px; line-height: 1.35; padding: 3px 6px; border-radius: 6px; cursor: pointer;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    border-left: 3px solid currentColor; background: var(--fill-1); color: var(--label-2); }
+  .ag-chip .ag-h { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .ag-chip:hover { background: var(--fill-2); }
+  .ag-chip.agendada { color: var(--blue); background: var(--blue-tint); }
+  .ag-chip.feita { color: var(--green); background: var(--green-tint); }
+  .ag-chip.atrasada { color: var(--orange); background: var(--orange-tint); }
+  .ag-chip.nao { color: var(--red); background: var(--red-tint); }
+  .ag-chip.cancelada { color: var(--label-3); background: var(--fill-1); text-decoration: line-through; }
+  .ag-mais { border: none; background: none; font-family: inherit; font-size: 11px; cursor: pointer;
+    color: var(--label-3); text-align: left; padding: 1px 6px; }
+  .ag-mais:hover { color: var(--accent); }
+
+  .ag-dia { border-bottom: 1px solid var(--hairline); }
+  .ag-dia:last-child { border-bottom: none; }
+  .ag-dia.hoje .ag-dia-cab { color: var(--accent); }
+  .ag-dia-cab { display: flex; align-items: center; gap: 8px; padding: 12px 18px 8px;
+    font-size: 12.5px; font-weight: 600; color: var(--label-2); }
+  .ag-dia-cab b { margin-left: auto; background: var(--fill-1); border-radius: 999px;
+    padding: 1px 8px; font-size: 11.5px; color: var(--label); font-variant-numeric: tabular-nums; }
+  .ag-linha { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
+    background: none; border: none; font-family: inherit; color: var(--label);
+    padding: 10px 18px; cursor: pointer; border-top: 1px solid var(--hairline); }
+  .ag-linha:hover { background: var(--fill-1); }
+  .ag-hora { font-size: 12.5px; color: var(--label-2); white-space: nowrap; min-width: 94px;
+    font-variant-numeric: tabular-nums; }
+  .ag-corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .ag-tit { font-size: 14px; font-weight: 600; }
+  @media (max-width: 620px) {
+    .ag-cel { min-height: 62px; padding: 4px 3px; }
+    .ag-chip { font-size: 10px; padding: 2px 4px; }
+    .ag-hora { min-width: 72px; font-size: 11.5px; }
+    .ag-linha { gap: 8px; padding: 10px 12px; }
+  }
+
+  /* ---- Onboarding: o quadro ---- */
+  .ob-quadro { display: grid; gap: 12px; align-items: start;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+  /* as seis colunas numa linha so quando a tela permite */
+  @media (min-width: 1180px) { .ob-quadro { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+  @media (max-width: 760px) {
+    .ob-quadro { display: flex; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x mandatory; }
+    .ob-coluna { flex: 0 0 78vw; scroll-snap-align: start; }
+  }
+  .ob-coluna { background: var(--fill-1); border-radius: var(--r-card); padding: 10px;
+    transition: background .18s, outline-color .18s; outline: 2px solid transparent; }
+  .ob-coluna.alvo { background: var(--accent-tint); outline-color: var(--accent); }
+  .ob-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 2px 4px 10px; font-size: 12.5px; font-weight: 600; color: var(--label-2); }
+  .ob-cab b { background: var(--surface); border-radius: 999px; padding: 1px 8px; font-size: 12px;
+    color: var(--label); font-variant-numeric: tabular-nums; }
+  .ob-pilha { display: flex; flex-direction: column; gap: 8px; }
+  .ob-nada { text-align: center; color: var(--label-3); font-size: 13px; padding: 14px 0; }
+  .ob-card { background: var(--surface); border: 1px solid var(--hairline); border-radius: 12px;
+    padding: 11px 12px; cursor: pointer;
+    transition: border-color .16s, transform .16s cubic-bezier(.32,.72,0,1), box-shadow .16s; }
+  .ob-card:hover { border-color: var(--hairline-strong); transform: translateY(-2px); box-shadow: var(--shadow-2); }
+  .ob-card.arrastando { opacity: .4; }
+  .ob-cliente { font-weight: 650; font-size: 13.5px; line-height: 1.3; margin-bottom: 7px; }
+  .ob-linha { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .ob-pe { margin-top: 7px; }
+  @media (prefers-reduced-motion: reduce) { .ob-card:hover { transform: none; } }
+
   /* ---- START PLAY ---- */
   .pl-item { display: flex; align-items: center; gap: 12px; padding: 12px 4px;
     border-bottom: 1px solid var(--hairline); background: var(--card); }
@@ -772,7 +854,9 @@
       <button type="button" class="nav-cab">Operação<svg class="seta" width="12" height="12" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
       <div class="nav-itens"><div>
       <button data-aba="opdash"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4"/><path d="M12 3.6v8.4l5.9 5.9"/></svg><span>Dashboard</span></button>
-      <button data-aba="opgestores"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><circle cx="9" cy="8.6" r="3.4"/><path d="M3.6 19.4c.6-3 2.9-4.5 5.4-4.5s4.8 1.5 5.4 4.5"/><path d="M15.4 5.7a3.4 3.4 0 0 1 0 6M16.9 15.2c1.9.6 3.1 2 3.5 4.2"/></svg><span>Gestores</span></button>
+      <button data-aba="opgestores"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><circle cx="9" cy="8.6" r="3.4"/><path d="M3.6 19.4c.6-3 2.9-4.5 5.4-4.5s4.8 1.5 5.4 4.5"/><path d="M15.4 5.7a3.4 3.4 0 0 1 0 6M16.9 15.2c1.9.6 3.1 2 3.5 4.2"/></svg><span>Gestão</span></button>
+      <button data-aba="oponboarding"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M6.4 4.4h11.2a1.6 1.6 0 0 1 1.6 1.6v13.6l-3-2-2.6 2-2.6-2-2.6 2-3-2V6a1.6 1.6 0 0 1 1.6-1.6z"/><path d="m9.4 10.6 1.8 1.8 3.6-3.6"/></svg><span>Onboarding</span></button>
+      <button data-aba="opagenda"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3.6" y="5.4" width="16.8" height="14.2" rx="2"/><path d="M3.6 9.8h16.8M8.4 3.4v3.4M15.6 3.4v3.4"/><path d="M8.2 13.4h2M8.2 16.4h2M13.8 13.4h2M13.8 16.4h2"/></svg><span>Agenda</span></button>
 </div></div></div>
       <div class="nav-grupo" data-grupo="conteudo">
       <button type="button" class="nav-cab">Start Academy<svg class="seta" width="12" height="12" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
@@ -791,7 +875,7 @@
       <button data-aba="findre"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M4 19.6h16"/><path d="M7.6 16.4v-5.2M12 16.4V5.6M16.4 16.4v-8"/></svg><span>DRE</span></button>
 </div></div></div>
       <div class="nav-grupo" data-grupo="admin">
-      <button type="button" class="nav-cab">Administração<svg class="seta" width="12" height="12" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
+      <button type="button" class="nav-cab">RH<svg class="seta" width="12" height="12" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
       <div class="nav-itens"><div>
       <button data-aba="usuarios"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><circle cx="9.2" cy="8" r="3.4"/><path d="M3.4 19.6c.6-3.3 3-5 5.8-5s5.2 1.7 5.8 5"/><path d="M17 9.4h4M19 7.4v4"/></svg><span>Usuários</span></button>
       <button data-aba="ajustes"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M4.5 8.2h7.7M16.8 8.2h2.7M4.5 15.8h2.7M12 15.8h7.5"/><circle cx="14.6" cy="8.2" r="2.1"/><circle cx="9.3" cy="15.8" r="2.1"/></svg><span>Ajustes</span></button>
@@ -948,6 +1032,12 @@
     <section data-painel="opgestores" style="display:none">
       <div style="padding:22px 0 40px" id="painel-opgestores"></div>
     </section>
+    <section data-painel="oponboarding" style="display:none">
+      <div style="padding:22px 0 40px" id="painel-oponboarding"></div>
+    </section>
+    <section data-painel="opagenda" style="display:none">
+      <div style="padding:22px 0 40px" id="painel-opagenda"></div>
+    </section>
 
     <!-- ---------- FINANCEIRO: a planilha ---------- -->
     <section data-painel="financeiro" style="display:none">
@@ -1012,6 +1102,8 @@
 <script src="/js/admin-financeiro.js"></script>
 <script src="/js/admin-play.js"></script>
 <script src="/js/admin-operacao.js"></script>
+<script src="/js/admin-onboarding.js"></script>
+<script src="/js/admin-agenda.js"></script>
 <script src="/js/admin-inicio.js"></script>
 </body>
 </html>
