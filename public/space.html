@@ -6,18 +6,25 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Space Colaborador — StartDigital</title>
 <link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest">
+<script>
+  /* Pinta a tela ANTES de ela aparecer. Se a pessoa ja escolheu o
+     claro, o atributo entra agora — sem isso dava um flash branco
+     no meio do carregamento. Fica inline de proposito: um arquivo
+     separado chegaria tarde. */
+  try { if (localStorage.getItem('tema') === 'claro') document.documentElement.setAttribute('data-tema', 'claro'); } catch (e) {}
+</script>
 <link rel="stylesheet" href="/ui.css">
 <style>
-  body { background: #0d1024; min-height: 100vh; }
+  body { background: var(--canvas); min-height: 100vh; }
   .topo { padding: 18px 0; }
   .topo .dentro { max-width: 560px; margin: 0 auto; padding: 0 22px; display: flex; align-items: center; gap: 10px; }
   .topo img { width: 26px; height: 26px; }
-  .topo b { color: #fff; font-size: 15px; font-weight: 600; letter-spacing: -.014em; }
-  .topo small { color: #7c85a3; font-size: 11px; display: block; font-weight: 400; letter-spacing: 0; }
+  .topo b { color: var(--label); font-size: 15px; font-weight: 600; letter-spacing: -.014em; }
+  .topo small { color: var(--label-2); font-size: 11px; display: block; font-weight: 400; letter-spacing: 0; }
 
   .folha { max-width: 560px; margin: 0 auto; padding: 8px 22px 60px; }
-  .ola { font-size: 23px; font-weight: 700; letter-spacing: -.02em; margin: 14px 0 2px; color: #fff; }
-  .ola + p { margin: 0 0 22px; color: #7c85a3; font-size: 14px; }
+  .ola { font-size: 23px; font-weight: 700; letter-spacing: -.02em; margin: 14px 0 2px; color: var(--label); }
+  .ola + p { margin: 0 0 22px; color: var(--label-2); font-size: 14px; }
 
   /* ---------------- o cartão do benefício ---------------- */
   .vale { position: relative; border-radius: 22px; padding: 30px 26px 28px; color: #fff;
@@ -53,9 +60,9 @@
   @keyframes correnteza { to { background-position: 220% 0; } }
   @media (prefers-reduced-motion: reduce) { .btn-liberar { animation: none; } }
 
-  /* ---------------- caixas claras ---------------- */
-  .cx { background: #fff; border-radius: 18px; padding: 22px; box-shadow: 0 8px 30px rgba(0,0,0,.25);
-        margin-bottom: 16px; }
+  /* ---------------- as caixas ---------------- */
+  .cx { background: var(--surface); border: 1px solid var(--hairline); border-radius: 18px;
+        padding: 22px; box-shadow: var(--shadow-2); margin-bottom: 16px; }
   .cx h3 { margin: 0 0 4px; font-size: 16px; font-weight: 700; letter-spacing: -.014em; }
   .cx p.sub { margin: 0 0 16px; font-size: 13.5px; color: var(--label-3); line-height: 1.55; }
   .aparece { animation: sobe .5s cubic-bezier(.2,.9,.3,1); }
@@ -76,8 +83,8 @@
   }
   .cx .field input::placeholder { color: var(--label-3); }
   .cx .field input:focus {
-    background: #fff; border-color: #10b981;
-    box-shadow: 0 0 0 4px rgba(16,185,129,.16);
+    background: var(--surface-2); border-color: var(--green);
+    box-shadow: 0 0 0 4px rgba(52,211,153,.18);
   }
   .cx .field input:disabled { opacity: .6; }
 
@@ -91,12 +98,12 @@
   .linha-h .qual { flex: 1; font-weight: 500; }
   .linha-h .quando { font-size: 12px; color: var(--label-3); }
   .pino { font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
-  .pino.pago { background: #dff5e8; color: #146c43; }
-  .pino.liberado { background: #e6ecfd; color: #26418f; }
-  .pino.processando { background: #fdf0d5; color: #8a5a00; }
-  .pino.falhou, .pino.cancelado { background: #fbe3e0; color: #a92b21; }
+  .pino.pago { background: rgba(52,211,153,.16); color: var(--green-soft); }
+  .pino.liberado { background: rgba(109,147,255,.16); color: var(--blue-soft); }
+  .pino.processando { background: rgba(251,191,36,.16); color: var(--orange-soft); }
+  .pino.falhou, .pino.cancelado { background: rgba(251,113,133,.16); color: var(--red-soft); }
 
-  .vale.vazio { background: #171b36; box-shadow: none; border: 1px solid #262c4e; }
+  .vale.vazio { background: var(--surface); box-shadow: none; border: 1px solid var(--hairline); }
   .vale.vazio h2 { font-size: 21px; }
 
   /* ---------------- confetes ---------------- */
@@ -107,7 +114,7 @@
          backdrop-filter: blur(4px); z-index: 100; display: none; align-items: center;
          justify-content: center; padding: 22px; }
   .veu.on { display: flex; }
-  .janela { background: #fff; border-radius: 20px; padding: 26px 24px; width: min(420px, 100%);
+  .janela { background: var(--surface-3); border: 1px solid var(--hairline); border-radius: 20px; padding: 26px 24px; width: min(420px, 100%);
             box-shadow: 0 24px 70px rgba(0,0,0,.45); animation: sobe .28s cubic-bezier(.2,.9,.3,1); }
   .janela h3 { margin: 0 0 8px; font-size: 17px; font-weight: 700; letter-spacing: -.014em; }
   .janela p { margin: 0 0 6px; font-size: 14.5px; line-height: 1.55; color: var(--label-2); }
@@ -122,6 +129,8 @@
 <div class="topo"><div class="dentro">
   <img src="/apple-touch-icon.png" alt="">
   <span><b>StartDigital</b><small>Space Colaborador</small></span>
+  <button type="button" class="btn btn-sm btn-ghost" data-tema-botao style="margin-left:auto">
+    <svg class="ico" data-tema-icone width="17" height="17" viewBox="0 0 24 24"></svg></button>
 </div></div>
 
 <div class="folha" id="folha"><div class="spinner"></div></div>
@@ -399,5 +408,6 @@ function ligarSaque(disp) {
 
 carregar();
 </script>
+<script src="/js/tema.js"></script>
 </body>
 </html>
