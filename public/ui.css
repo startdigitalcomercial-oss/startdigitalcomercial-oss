@@ -377,10 +377,24 @@ hr.sep { height: 1px; background: var(--hairline); margin: 24px 0; border: 0; }
 }
 .field .req { color: var(--red); }
 
+/* ------------------------------------------------------------
+   CAMPOS
+
+   Atencao ao `input:not([type])`: um <input> escrito sem type
+   e um campo de texto normal para o navegador, mas NAO casava
+   com a lista abaixo — ficava com a cara crua do sistema
+   operacional, quadrado e apertadinho, no meio de campos
+   redondos. Eram 25 deles espalhados pelo sistema (busca de
+   cliente, fichas da Operacao, Agenda, Financeiro). Agora
+   entram na lista como todo mundo.
+   ------------------------------------------------------------ */
 input[type=text], input[type=email], input[type=tel], input[type=date],
-input[type=number], input[type=password], select, textarea {
+input[type=number], input[type=password], input[type=search],
+input[type=url], input[type=time], input[type=datetime-local],
+input:not([type]), select, textarea {
   width: 100%;
-  padding: 11px 14px;
+  height: 44px;
+  padding: 0 14px;
   font-size: 15px;
   font-family: inherit;
   letter-spacing: -.008em;
@@ -391,7 +405,7 @@ input[type=number], input[type=password], select, textarea {
   transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
   appearance: none;
 }
-textarea { min-height: 96px; resize: vertical; line-height: 1.5; }
+textarea { height: auto; min-height: 96px; padding: 11px 14px; resize: vertical; line-height: 1.5; }
 input::placeholder, textarea::placeholder { color: var(--label-3); }
 
 input:hover, select:hover, textarea:hover { border-color: var(--label-3); }
@@ -404,7 +418,9 @@ input:focus, select:focus, textarea:focus {
 /* O campo fica um tom acima do cartão — no escuro isso é o que
    separa o que é editável do que é só leitura. */
 input[type=text], input[type=email], input[type=tel], input[type=date],
-input[type=number], input[type=password], select, textarea {
+input[type=number], input[type=password], input[type=search],
+input[type=url], input[type=time], input[type=datetime-local],
+input:not([type]), select, textarea {
   background: var(--surface-2);
 }
 input[type=checkbox] { background: var(--surface-2); }
@@ -470,8 +486,14 @@ input[type=checkbox]:checked::after {
 .btn:active { transform: scale(.985); }
 .btn:disabled { opacity: .42; cursor: not-allowed; transform: none; }
 
+/* A ESCALA DOS BOTOES
+   Quatro alturas, e so quatro: 36 pequeno, 40 normal, 48 grande.
+   O pequeno era 32 e nao batia com nada — ficava sempre 4px mais
+   baixo que os select das barras de filtro, e a linha inteira
+   parecia torta. Agora o pequeno tem a mesma altura das caixas
+   de filtro (36) e tudo numa barra fica no mesmo nivel. */
 .btn-lg { height: 48px; padding: 0 28px; font-size: 17px; }
-.btn-sm { height: 32px; padding: 0 14px; font-size: 13.5px; }
+.btn-sm { height: 36px; padding: 0 15px; font-size: 13.5px; }
 .btn-block { width: 100%; }
 
 .btn-ghost {
@@ -493,6 +515,144 @@ input[type=checkbox]:checked::after {
 .btn-danger:hover {
   background: var(--red); color: var(--canvas); filter: none;
   box-shadow: 0 4px 14px rgba(251, 113, 133, .26);
+}
+
+/* ============================================================
+   BOAS-VINDAS
+
+   Um cartaozinho no canto de cima, a direita. Aparece uma vez por
+   entrada no sistema e sai sozinho. Nao e modal: nao escurece a
+   tela, nao trava nada, da para clicar atras dele (o pointer-events
+   so volta no proprio cartao).
+
+   No celular ele encosta nas duas bordas com folga, em vez de
+   vazar para fora da tela.
+   ============================================================ */
+.bemvindo {
+  position: fixed;
+  top: 18px; right: 18px;
+  z-index: 240;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 330px;
+  padding: 13px 14px;
+  background: var(--surface-3);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-3), var(--glow);
+  opacity: 0;
+  transform: translateY(-10px) scale(.97);
+  pointer-events: none;
+  transition: opacity var(--t-medio), transform var(--t-medio);
+}
+.bemvindo.on { opacity: 1; transform: none; pointer-events: auto; }
+
+.bv-avatar {
+  display: flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; flex: none;
+  border-radius: 50%;
+  background: var(--accent-grad);
+  color: var(--accent-on);
+  font-size: 14px; font-weight: 600; letter-spacing: .01em;
+}
+.bv-texto { min-width: 0; line-height: 1.35; }
+.bv-texto b {
+  display: block; font-size: 14.5px; font-weight: 600;
+  color: var(--label); letter-spacing: -.01em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bv-texto span { display: block; font-size: 13px; color: var(--label-2); }
+
+.bv-x {
+  display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; flex: none; margin-left: 2px;
+  padding: 0; border: 0; border-radius: 50%;
+  background: transparent; color: var(--label-3);
+  font-family: inherit; font-size: 17px; line-height: 1; cursor: pointer;
+  transition: background var(--t-rapido), color var(--t-rapido);
+}
+.bv-x:hover { background: var(--fill-2); color: var(--label); }
+
+@media (max-width: 560px) {
+  .bemvindo { top: 12px; right: 12px; left: 12px; max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bemvindo { transition: opacity 120ms linear; transform: none; }
+  .bemvindo.on { transform: none; }
+}
+
+/* ============================================================
+   BUSCA
+
+   Um componente so para todas as buscas do sistema. Antes cada
+   tela tinha a sua: uma pilula de 48px nos Colaboradores, uma
+   caixinha de 36px no Financeiro e, no resto, o <input> cru do
+   navegador. Agora e sempre isto: a mesma altura dos outros
+   campos, a lupa dentro, e o X para limpar.
+
+   Marcacao:
+     <div class="busca">
+       <svg class="busca-lupa" ...><circle/><path/></svg>
+       <input type="search" placeholder="Buscar cliente...">
+       <button type="button" class="busca-x" aria-label="Limpar">...</button>
+     </div>
+   ============================================================ */
+.busca {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 44px;
+  padding: 0 12px 0 13px;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-ctl);
+  transition: border-color var(--t-rapido), box-shadow var(--t-rapido), background var(--t-rapido);
+  min-width: 220px;
+  flex: 1 1 260px;
+  max-width: 380px;
+}
+.busca:hover { border-color: var(--label-3); }
+.busca:focus-within { border-color: var(--accent); box-shadow: var(--glow-forte); }
+
+.busca-lupa {
+  width: 16px; height: 16px; flex: none;
+  fill: none; stroke: var(--label-3); stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+  transition: stroke var(--t-rapido);
+}
+.busca:focus-within .busca-lupa { stroke: var(--accent-soft); }
+
+.busca input,
+.busca input[type=search] {
+  flex: 1; min-width: 0; width: auto;
+  height: 100%; padding: 0;
+  border: 0; background: transparent; box-shadow: none;
+  font-family: inherit; font-size: 15px; letter-spacing: -.008em;
+  color: var(--label); outline: none;
+}
+.busca input:hover, .busca input:focus { border: 0; box-shadow: none; background: transparent; }
+/* o X do proprio navegador some: usamos o nosso, que da para estilizar */
+.busca input[type=search]::-webkit-search-cancel-button,
+.busca input[type=search]::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
+
+.busca-x {
+  display: none;
+  align-items: center; justify-content: center;
+  width: 22px; height: 22px; flex: none;
+  padding: 0; margin: 0;
+  border: 0; border-radius: 50%;
+  background: var(--fill-2); color: var(--label-2);
+  cursor: pointer; font-family: inherit; font-size: 13px; line-height: 1;
+  transition: background var(--t-rapido), color var(--t-rapido);
+}
+.busca-x:hover { background: var(--fill-3); color: var(--label); }
+.busca.tem-texto .busca-x { display: inline-flex; }
+
+/* no celular a busca ocupa a linha inteira */
+@media (max-width: 640px) {
+  .busca { max-width: none; flex: 1 1 100%; min-width: 0; }
 }
 
 /* ============================================================
