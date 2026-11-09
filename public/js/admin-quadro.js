@@ -104,7 +104,7 @@ function ligaArrasto() {
   });
 }
 
-document.getElementById('busca').addEventListener('input', desenhaBoard);
+ligaBusca('busca', desenhaBoard, 0);
 document.getElementById('filtro-vaga').addEventListener('change', desenhaBoard);
 document.getElementById('btn-recarregar').addEventListener('click', function () { carregaBoard(); });
 document.getElementById('btn-copiar-form').addEventListener('click', function () {
