@@ -6,6 +6,13 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Portal do Colaborador — StartDigital</title>
 <link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest">
+<script>
+  /* Pinta a tela ANTES de ela aparecer. Se a pessoa ja escolheu o
+     claro, o atributo entra agora — sem isso dava um flash branco
+     no meio do carregamento. Fica inline de proposito: um arquivo
+     separado chegaria tarde. */
+  try { if (localStorage.getItem('tema') === 'claro') document.documentElement.setAttribute('data-tema', 'claro'); } catch (e) {}
+</script>
 <link rel="stylesheet" href="/ui.css">
 <style>
   html, body { background: var(--canvas); min-height: 100%; }
@@ -32,7 +39,7 @@
   .cartao .nome { font-size: 14.5px; font-weight: 600; line-height: 1.3; letter-spacing: -.014em; }
   .cartao .vaga { font-size: 12.5px; color: var(--label-3); margin-top: 3px; }
   .cartao .tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 10px; }
-  .cartao .estrelas { color: #ff9f0a; font-size: 11px; letter-spacing: .5px; }
+  .cartao .estrelas { color: var(--orange); font-size: 11px; letter-spacing: .5px; }
   .vazio-col { text-align: center; color: var(--label-3); font-size: 12.5px; padding: 18px 8px; }
 
   /* ---------- gaveta ---------- */
@@ -85,7 +92,7 @@
 
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(8px); background: var(--label); color: var(--canvas); padding: 12px 20px; border-radius: var(--r-pill); font-size: 14px; font-weight: 500; z-index: 200; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; box-shadow: var(--shadow-2); }
   .toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
-  .toast.erro { background: var(--red); color: #fff; }
+  .toast.erro { background: var(--red); color: #0B1020; }
 
   .login-wrap { max-width: 380px; margin: 12vh auto; padding: 0 22px; }
   .stat { background: var(--surface); border-radius: 14px; padding: 18px 20px; box-shadow: var(--shadow-1); }
@@ -97,12 +104,27 @@
 
   /* ---------- casca com barra lateral ---------- */
   .app-shell { display: flex; min-height: 100vh; }
-  .sidebar { width: 218px; flex: none; background: #101828; display: flex; flex-direction: column; padding: 20px 12px 16px; position: sticky; top: 0; height: 100vh; }
-  .logo { display: flex; align-items: center; gap: 9px; color: #fff; font-weight: 600; font-size: 15px; letter-spacing: -.014em; padding: 2px 10px 14px; }
+  /* A BARRA LATERAL fica escura NOS DOIS TEMAS — e a moldura do
+     sistema, nao o conteudo. Por isso tem cores proprias, que nao
+     viram junto com o tema: se usasse --label-2, no tema claro o
+     texto clareava e desaparecia dentro da barra escura. */
+  .sidebar {
+    --sb-fundo: #0C1326;
+    --sb-tinta: #E9EDFB;         /* 15,8:1 */
+    --sb-tinta-2: #9FADCC;       /*  8,2:1 */
+    --sb-tinta-3: #8795B5;       /*  6,2:1 — titulos de grupo */
+    --sb-realce: rgba(129,158,255,.13);
+    --sb-linha: rgba(148,163,184,.16);
+    width: 218px; flex: none; display: flex; flex-direction: column;
+    padding: 20px 12px 16px; position: sticky; top: 0; height: 100vh;
+    background: linear-gradient(180deg, #0D1529 0%, var(--sb-fundo) 60%);
+    border-right: 1px solid var(--sb-linha);
+  }
+  .logo { display: flex; align-items: center; gap: 9px; color: var(--sb-tinta); font-weight: 600; font-size: 15px; letter-spacing: -.014em; padding: 2px 10px 14px; }
   .logo .logo-img { width: 24px; height: 24px; display: block; flex: none; }
   .logo .logo-txt { display: flex; flex-direction: column; line-height: 1.25; }
-  .logo small { color: #8a94a6; font-weight: 400; font-size: 11px; letter-spacing: 0; }
-  .nav-sec { font-size: 10.5px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: #475467; padding: 16px 10px 7px; }
+  .logo small { color: var(--sb-tinta-3); font-weight: 400; font-size: 11px; letter-spacing: 0; }
+  .nav-sec { font-size: 10.5px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--sb-tinta-3); padding: 16px 10px 7px; }
   #abas { display: block; }
 
   /* ---------- sanfona do menu ----------
@@ -113,16 +135,16 @@
     display: flex; align-items: center; justify-content: space-between; width: 100%;
     background: transparent; border: 0; cursor: pointer; text-align: left;
     font-family: inherit; font-size: 10.5px; font-weight: 600; letter-spacing: .09em;
-    text-transform: uppercase; color: #475467; padding: 14px 10px 6px; height: auto;
+    text-transform: uppercase; color: var(--sb-tinta-3); padding: 14px 10px 6px; height: auto;
     margin: 0; border-radius: 9px; transition: color .16s;
   }
-  #abas .nav-cab:hover { color: #98a2b3; background: transparent; }
+  #abas .nav-cab:hover { color: var(--sb-tinta); background: transparent; }
   #abas .nav-cab .seta {
     fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round;
     stroke-linejoin: round; flex: none; opacity: .8;
     transition: transform .26s cubic-bezier(.4,0,.2,1);
   }
-  .nav-grupo.on > .nav-cab { color: #98a2b3; }
+  .nav-grupo.on > .nav-cab { color: var(--sb-tinta-2); }
   .nav-grupo:not(.on) > .nav-cab .seta { transform: rotate(-90deg); }
 
   .nav-itens { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .26s cubic-bezier(.4,0,.2,1); }
@@ -132,23 +154,24 @@
   /* Grupo fechado com a pagina ativa dentro: um pontinho verde avisa
      onde voce esta, para o menu fechado nao esconder essa informacao. */
   .nav-grupo.tem-ativa:not(.on) > .nav-cab::before {
-    content: ''; width: 6px; height: 6px; border-radius: 50%; background: #1fbf6e;
+    content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--green);
     position: absolute; margin-left: -10px; margin-top: 1px;
   }
   #abas .nav-cab { position: relative; }
 
   #abas button, .sidebar .fim button {
     display: flex; align-items: center; gap: 10px; width: 100%; height: 36px; padding: 0 10px;
-    background: transparent; border: 0; border-radius: 9px; color: #98a2b3;
+    background: transparent; border: 0; border-radius: 9px; color: var(--sb-tinta-2);
     font-family: inherit; font-size: 13.5px; font-weight: 500; letter-spacing: -.008em;
     cursor: pointer; text-align: left; margin-bottom: 2px;
     transition: background .16s ease, color .16s ease;
   }
   #abas button .ico, .sidebar .fim button .ico { opacity: .7; transition: opacity .16s, color .16s; }
-  #abas button:hover, .sidebar .fim button:hover { background: rgba(255,255,255,.05); color: #e4e7ec; }
-  #abas button.on { background: rgba(255,255,255,.09); color: #fff; }
-  #abas button.on .ico { opacity: 1; color: #1fbf6e; }
-  .sidebar .fim { margin-top: auto; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }
+  #abas button:hover, .sidebar .fim button:hover { background: var(--sb-realce); color: var(--sb-tinta); }
+  #abas button.on { background: var(--sb-realce); color: var(--sb-tinta);
+                    box-shadow: inset 0 0 0 1px var(--hairline-strong); }
+  #abas button.on .ico { opacity: 1; color: var(--accent-2); }
+  .sidebar .fim { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--sb-linha); }
   .conteudo { flex: 1; min-width: 0; padding: 0 30px 44px; }
   .pagina-cab { display: flex; align-items: center; gap: 14px; padding: 24px 0 2px; }
   .pagina-cab h1 { margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -.022em; }
@@ -160,6 +183,8 @@
     #abas { display: flex; gap: 2px; }
     #abas button, .sidebar .fim button { width: auto; white-space: nowrap; }
     #abas button span { display: none; }
+    /* o botao de clarear tambem fica so com o iconezinho aqui */
+    .sidebar .fim button span { display: none; }
     .nav-sec { display: none; }
     /* No celular a barra vira uma fila deitada: sanfona ali atrapalha
        mais do que ajuda, entao tudo fica aberto e sem cabecalho. */
@@ -195,7 +220,7 @@
   .kpi-num { font-size: 32px; font-weight: 600; letter-spacing: -.028em; line-height: 1.1; margin-top: 6px; font-variant-numeric: tabular-nums; }
   .kpi-extra { font-size: 12.5px; color: var(--label-3); margin-top: 5px; }
   .var { font-weight: 600; }
-  .var.sobe { color: var(--accent); }
+  .var.sobe { color: var(--accent-soft); }
   .var.desce { color: var(--red); }
 
   /* ---------- gráficos ---------- */
@@ -248,7 +273,7 @@
   .eq-pessoa-txt strong { font-size: 14.5px; font-weight: 600; letter-spacing: -.012em; }
   .eq-data { text-align: right; flex: none; display: flex; flex-direction: column; }
   .eq-data strong { font-size: 14.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
-  .eq-data .destaque { color: var(--accent); font-weight: 600; }
+  .eq-data .destaque { color: var(--accent-soft); font-weight: 600; }
 
   .eq-av { flex: none; width: 38px; height: 38px; border-radius: 50%; background: var(--fill-2);
     color: var(--label-2); display: flex; align-items: center; justify-content: center;
@@ -285,7 +310,7 @@
   .papel-op:hover { border-color: var(--accent); }
   .papel-op.on { border-color: var(--accent); background: var(--accent-tint); }
   .papel-op strong { display: block; font-size: 14px; font-weight: 600; }
-  .papel-op.on strong { color: var(--accent); }
+  .papel-op.on strong { color: var(--accent-soft); }
   .papel-op span { display: block; font-size: 12.5px; color: var(--label-3); margin-top: 2px; line-height: 1.45; }
   .senha-nova { font-family: ui-monospace, monospace; font-size: 19px; font-weight: 600; letter-spacing: .5px;
     background: var(--fill-1); padding: 12px 16px; border-radius: var(--r-ctl); display: inline-block; margin: 8px 0; }
@@ -296,8 +321,8 @@
     cursor: pointer; transition: all .16s; }
   .av-filtro b { font-weight: 600; color: var(--label-3); margin-left: 3px; font-variant-numeric: tabular-nums; }
   .av-filtro:hover { border-color: var(--accent); }
-  .av-filtro.on { border-color: var(--accent); background: var(--accent-tint); color: var(--accent); font-weight: 600; }
-  .av-filtro.on b { color: var(--accent); }
+  .av-filtro.on { border-color: var(--accent); background: var(--accent-tint); color: var(--accent-soft); font-weight: 600; }
+  .av-filtro.on b { color: var(--accent-soft); }
   .av-pessoas { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px;
     max-height: 300px; overflow-y: auto; padding: 4px; background: var(--fill-1); border-radius: var(--r-ctl); }
   .av-pessoa { display: flex; align-items: center; gap: 9px; padding: 9px 12px; border-radius: 9px;
@@ -321,7 +346,7 @@
   .canal-op.on { border-color: var(--accent); background: var(--accent-tint); }
   .canal-op:disabled { opacity: .45; cursor: not-allowed; }
   .canal-op strong { display: block; font-size: 14.5px; font-weight: 600; letter-spacing: -.012em; }
-  .canal-op.on strong { color: var(--accent); }
+  .canal-op.on strong { color: var(--accent-soft); }
   .canal-op span { display: block; font-size: 12.5px; color: var(--label-3); margin-top: 3px; }
   @media (prefers-reduced-motion: reduce) { .canal-op:hover:not(:disabled) { transform: none; } }
 
@@ -400,37 +425,38 @@
      em cima, cabecalho roxo claro, linhas escuras. Cor de status
      nunca sozinha — sempre com a palavra do lado. */
   .fin-quadro { border-radius: 14px; overflow: hidden; box-shadow: 0 2px 18px rgba(0,0,0,.14); }
-  .fin-topo { display: flex; align-items: stretch; background: #35187a; }
+  .fin-topo { display: flex; align-items: stretch;
+               background: linear-gradient(104deg, #141C3C 0%, #241A54 100%); }
   .fin-marca { display: flex; align-items: center; gap: 10px; padding: 16px 22px;
-               background: #2b1266; border-right: 3px solid #6f8bf0; min-width: 220px; }
+               background: rgba(7,11,23,.42); border-right: 3px solid var(--accent); min-width: 220px; }
   .fin-marca img { width: 26px; height: 26px; }
   .fin-marca b { color: #fff; font-size: 15px; letter-spacing: .2px; display: block; line-height: 1.15; }
-  .fin-marca small { color: #b9a8ee; font-size: 8.5px; letter-spacing: 1.6px; text-transform: uppercase; }
+  .fin-marca small { color: var(--purple-soft); font-size: 8.5px; letter-spacing: 1.6px; text-transform: uppercase; }
   .fin-titulo { flex: 1; display: flex; align-items: center; justify-content: center;
                 color: #fff; font-size: 24px; font-weight: 800; letter-spacing: .6px; padding: 12px; }
 
   .fin-tab { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .fin-tab th { background: #5b4bb0; color: #fff; font-weight: 600; font-size: 12px;
+  .fin-tab th { background: #2A2160; color: #EDE9FE; font-weight: 600; font-size: 12px;
                 letter-spacing: .5px; text-transform: uppercase; padding: 12px 10px;
                 border-right: 1px solid rgba(255,255,255,.16); white-space: nowrap; }
-  .fin-tab td { background: #3d3d3d; color: #ececec; padding: 11px 10px; text-align: center;
-                border-right: 1px solid #4d4d4d; border-top: 1px solid #4d4d4d; }
-  .fin-tab tr:hover td { background: #494949; }
+  .fin-tab td { background: var(--surface-2); color: var(--label); padding: 11px 10px; text-align: center;
+                border-right: 1px solid var(--hairline); border-top: 1px solid var(--hairline); }
+  .fin-tab tr:hover td { background: var(--surface-3); }
   .fin-tab td.fin-nome { font-weight: 600; letter-spacing: .3px; }
-  .fin-tab td.fin-nome.on { background: #e08b28; color: #fff; }
-  .fin-tab tr:hover td.fin-nome.on { background: #ea9a3c; }
-  .fin-tab td.fin-obs { text-align: left; color: #cfcfcf; font-size: 12px; }
+  .fin-tab td.fin-nome.on { background: rgba(251,191,36,.20); color: var(--orange-soft); }
+  .fin-tab tr:hover td.fin-nome.on { background: rgba(251,191,36,.30); }
+  .fin-tab td.fin-obs { text-align: left; color: var(--label-2); font-size: 12px; }
   .fin-tab td.fin-resp { text-align: left; }
   .fin-tab td.fin-val { font-variant-numeric: tabular-nums; }
 
   .fin-st { display: block; padding: 8px 6px; border-radius: 6px; font-weight: 600; font-size: 12.5px; }
-  .fin-st.pago { background: #1d6f45; color: #eafff2; }
-  .fin-st.aguardando { background: #d2e3e8; color: #24404a; }
-  .fin-st.inadimplente { background: #a92b21; color: #ffecea; }
+  .fin-st.pago { background: rgba(52,211,153,.16); color: var(--green-soft); }
+  .fin-st.aguardando { background: rgba(109,147,255,.16); color: var(--blue-soft); }
+  .fin-st.inadimplente { background: rgba(251,113,133,.16); color: var(--red-soft); }
 
-  .fin-editar { background: none; border: 0; color: #b9c6ff; cursor: pointer; font-size: 12px;
+  .fin-editar { background: none; border: 0; color: var(--blue-soft); cursor: pointer; font-size: 12px;
                 padding: 4px 8px; border-radius: 6px; }
-  .fin-editar:hover { background: rgba(255,255,255,.1); color: #fff; }
+  .fin-editar:hover { background: var(--fill-2); color: var(--label); }
 
   /* ---- dashboard ---- */
   .fd-grade { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
@@ -441,11 +467,11 @@
   .fd-tile .num { font-size: 28px; font-weight: 700; margin-top: 7px; letter-spacing: -.5px;
                   font-variant-numeric: tabular-nums; }
   .fd-tile .pe { font-size: 12px; color: var(--label-3); margin-top: 5px; }
-  .fd-tile.ruim { border-color: #f0bfba; background: #fdf4f3; }
-  .fd-tile.ruim .num { color: #a92b21; }
-  .fd-tile.ruim .rot { color: #a92b21; }
-  .fd-tile.espera .num { color: #1c5f79; }
-  .fd-tile.ok .num { color: #1d6f45; }
+  .fd-tile.ruim { border-color: rgba(251,113,133,.40); background: var(--red-tint); }
+  .fd-tile.ruim .num { color: var(--red-soft); }
+  .fd-tile.ruim .rot { color: var(--red-soft); }
+  .fd-tile.espera .num { color: var(--cyan); }
+  .fd-tile.ok .num { color: var(--green); }
 
   /* ---- os cartoes por periodo (Recebidas / Aguardando / Vencidas) ----
      Seguem a referencia: cartao claro, canto bem arredondado, valor
@@ -460,7 +486,7 @@
              font-variant-numeric: tabular-nums; line-height: 1.1; }
   .fd2-sub { font-size: 12.5px; color: var(--label-3); margin-top: 5px; }
   .fd2-barra { height: 9px; border-radius: 999px; margin: 14px 0 6px; }
-  .fd2-barra.listras { background: repeating-linear-gradient(45deg, #f5deb0 0 10px, #fbeed4 10px 20px); }
+  .fd2-barra.listras { background: repeating-linear-gradient(45deg, rgba(251,191,36,.42) 0 10px, rgba(251,191,36,.16) 10px 20px); }
   .fd2-linha { display: flex; align-items: center; justify-content: space-between; width: 100%;
                background: none; border: 0; border-top: 1px solid var(--hairline);
                padding: 11px 2px; margin-top: 6px; font-family: inherit; font-size: 13.5px;
@@ -471,13 +497,13 @@
   /* o cartao de inadimplentes e um botao: clicou, filtrou a tabela */
   button.fd2-carta { font-family: inherit; text-align: left; cursor: pointer;
                      transition: border-color .15s, box-shadow .15s, transform .12s; }
-  button.fd2-carta:hover { border-color: #e0a29c; box-shadow: var(--shadow-1); transform: translateY(-1px); }
-  button.fd2-carta.on { border-color: #d9453a; box-shadow: 0 0 0 3px rgba(217,69,58,.12); }
+  button.fd2-carta:hover { border-color: var(--hairline-strong); box-shadow: var(--shadow-1); transform: translateY(-1px); }
+  button.fd2-carta.on { border-color: var(--red); box-shadow: 0 0 0 3px rgba(251,113,133,.20); }
 
-  .fin-chip { display: inline-flex; align-items: center; gap: 10px; background: #fbe3e0;
-              color: #b02a20; font-size: 13px; font-weight: 600; padding: 7px 8px 7px 14px;
+  .fin-chip { display: inline-flex; align-items: center; gap: 10px; background: rgba(251,113,133,.16);
+              color: var(--red-soft); font-size: 13px; font-weight: 600; padding: 7px 8px 7px 14px;
               border-radius: 999px; }
-  .fin-chip button { border: 0; background: rgba(176,42,32,.12); color: #b02a20; font-family: inherit;
+  .fin-chip button { border: 0; background: rgba(251,113,133,.22); color: var(--red-soft); font-family: inherit;
                      font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px;
                      cursor: pointer; }
   .fin-chip button:hover { background: rgba(176,42,32,.2); }
@@ -495,7 +521,7 @@
   .fin-comp select:focus { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
   .fin-comp .barra { color: var(--label-3); font-weight: 600; }
   .fin-comp .agora { font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase;
-                     color: var(--accent); background: var(--accent-tint); padding: 3px 8px;
+                     color: var(--accent-soft); background: var(--accent-tint); padding: 3px 8px;
                      border-radius: 999px; }
   .fin-comp .voltar { border: 0; background: var(--fill-2); color: var(--label-2); font-family: inherit;
                       font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px;
@@ -528,20 +554,23 @@
      (claro e escuro). A cor nunca carrega a informação sozinha:
      toda fatia tem nome e número ao lado, na legenda.
      ============================================================ */
+  /* O PADRAO agora e a paleta ESCURA — o sistema abre escuro. A
+     clara entra so quando alguem aperta o botao de clarear, que
+     poe data-tema="claro" no <html>. Antes isso dependia do modo
+     do sistema operacional do visitante, o que dava fatia clara
+     em cima de cartao escuro para quem usa Windows no claro. */
   .op {
+    --g-azul: #3987e5; --g-laranja: #d95926; --g-verdeagua: #199e70;
+    --g-amarelo: #c98500; --g-magenta: #d55181; --g-verde: #008300;
+    --g-violeta: #9085e9; --g-outros: #8e8e93;
+    /* as fases são uma escada: uma cor só, clareando */
+    --f1: #4b4080; --f2: #6153a8; --f3: #7b6bcd; --f4: #9085e9;
+  }
+  :root[data-tema="claro"] .op {
     --g-azul: #2a78d6; --g-laranja: #eb6834; --g-verdeagua: #1baf7a;
     --g-amarelo: #eda100; --g-magenta: #e87ba4; --g-verde: #008300;
     --g-violeta: #6250d6; --g-outros: #8e8e93;
-    /* as fases são uma escada: uma cor só, clareando para escuro */
     --f1: #cbc4f2; --f2: #a99ee8; --f3: #8578dd; --f4: #6250d6;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) .op {
-      --g-azul: #3987e5; --g-laranja: #d95926; --g-verdeagua: #199e70;
-      --g-amarelo: #c98500; --g-magenta: #d55181; --g-verde: #008300;
-      --g-violeta: #9085e9; --g-outros: #8e8e93;
-      --f1: #4b4080; --f2: #6153a8; --f3: #7b6bcd; --f4: #9085e9;
-    }
   }
 
   .op-cab { display: flex; flex-wrap: wrap; gap: 14px; justify-content: space-between;
@@ -665,25 +694,25 @@
   .ag-cel.hoje { background: var(--accent-tint); }
   .ag-num { font-size: 11.5px; font-weight: 600; color: var(--label-2); padding: 0 2px 2px;
     font-variant-numeric: tabular-nums; }
-  .ag-cel.hoje .ag-num { color: var(--accent); }
+  .ag-cel.hoje .ag-num { color: var(--accent-soft); }
   .ag-chip { display: block; width: 100%; text-align: left; border: none; font-family: inherit;
     font-size: 11.5px; line-height: 1.35; padding: 3px 6px; border-radius: 6px; cursor: pointer;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     border-left: 3px solid currentColor; background: var(--fill-1); color: var(--label-2); }
   .ag-chip .ag-h { font-weight: 700; font-variant-numeric: tabular-nums; }
   .ag-chip:hover { background: var(--fill-2); }
-  .ag-chip.agendada { color: var(--blue); background: var(--blue-tint); }
-  .ag-chip.feita { color: var(--green); background: var(--green-tint); }
-  .ag-chip.atrasada { color: var(--orange); background: var(--orange-tint); }
-  .ag-chip.nao { color: var(--red); background: var(--red-tint); }
+  .ag-chip.agendada { color: var(--blue-soft); background: var(--blue-tint); }
+  .ag-chip.feita { color: var(--green-soft); background: var(--green-tint); }
+  .ag-chip.atrasada { color: var(--orange-soft); background: var(--orange-tint); }
+  .ag-chip.nao { color: var(--red-soft); background: var(--red-tint); }
   .ag-chip.cancelada { color: var(--label-3); background: var(--fill-1); text-decoration: line-through; }
   .ag-mais { border: none; background: none; font-family: inherit; font-size: 11px; cursor: pointer;
     color: var(--label-3); text-align: left; padding: 1px 6px; }
-  .ag-mais:hover { color: var(--accent); }
+  .ag-mais:hover { color: var(--accent-soft); }
 
   .ag-dia { border-bottom: 1px solid var(--hairline); }
   .ag-dia:last-child { border-bottom: none; }
-  .ag-dia.hoje .ag-dia-cab { color: var(--accent); }
+  .ag-dia.hoje .ag-dia-cab { color: var(--accent-soft); }
   .ag-dia-cab { display: flex; align-items: center; gap: 8px; padding: 12px 18px 8px;
     font-size: 12.5px; font-weight: 600; color: var(--label-2); }
   .ag-dia-cab b { margin-left: auto; background: var(--fill-1); border-radius: 999px;
@@ -758,12 +787,12 @@
   /* ---- ficha do cliente ---- */
   .fc-dados { display: flex; gap: 20px; flex-wrap: wrap; font-size: 14px; color: var(--label-2); }
   .fc-dados b { font-weight: 600; color: var(--label-3); font-weight: 500; }
-  .fd-pino.pago-ok { background: #dff5e8; color: #146c43; }
+  .fd-pino.pago-ok { background: rgba(52,211,153,.16); color: var(--green-soft); }
   tr.fc-linha:hover td { background: var(--fill-1); }
 
   /* ---- DRE ---- */
   .dre-resultado { background: linear-gradient(180deg, var(--accent-tint), var(--card) 70%); }
-  .dre-resultado.negativo { background: linear-gradient(180deg, #fdf0ef, var(--card) 70%); }
+  .dre-resultado.negativo { background: linear-gradient(180deg, var(--red-tint), var(--card) 70%); }
   .dre-conta > div { display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
                      padding: 11px 0; border-top: 1px solid var(--hairline); font-size: 14.5px; }
   .dre-conta > div:first-child { border-top: 0; }
@@ -789,8 +818,8 @@
   .fd-sem-nome { flex: 1; font-weight: 600; }
   .fd-sem-val { font-variant-numeric: tabular-nums; font-weight: 600; }
   .fd-pino { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; }
-  .fd-pino.aguardando { background: #d2e3e8; color: #24404a; }
-  .fd-pino.inadimplente { background: #fbe3e0; color: #a92b21; }
+  .fd-pino.aguardando { background: rgba(109,147,255,.16); color: var(--blue-soft); }
+  .fd-pino.inadimplente { background: rgba(251,113,133,.16); color: var(--red-soft); }
 </style>
 </head>
 <body>
@@ -882,6 +911,7 @@
       </div></div></div>
     </nav>
     <div class="fim">
+      <button type="button" data-tema-botao><svg class="ico" data-tema-icone width="17" height="17" viewBox="0 0 24 24"></svg><span data-tema-palavra>Clarear</span></button>
       <button id="btn-sair"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M13.8 4.4h4A1.7 1.7 0 0 1 19.5 6.1v11.8a1.7 1.7 0 0 1-1.7 1.7h-4"/><path d="M9.8 8.2 6 12l3.8 3.8M6 12h9.5"/></svg><span>Sair</span></button>
     </div>
   </aside>
@@ -1087,6 +1117,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="/js/tema.js"></script>
 <script src="/js/admin-core.js"></script>
 <script src="/js/admin-quadro.js"></script>
 <script src="/js/admin-conteudo.js"></script>
