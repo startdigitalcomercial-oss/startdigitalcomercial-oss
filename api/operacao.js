@@ -115,8 +115,15 @@ function situacaoEm(cliente, eventos, ateISO) {
   const limite = ateISO + 'T23:59:59.999Z';
   let status = null, fase = null, satisfacao = null, gestor = null;
 
+  // Ordem do tempo, com desempate estável: dois eventos gravados no
+  // mesmo instante mantêm a ordem em que chegaram.
   const meus = (eventos || []).filter(function (e) { return String(e.quando) <= limite; })
-    .sort(function (a, b) { return String(a.quando) < String(b.quando) ? -1 : 1; });
+    .map(function (e, i) { return { e: e, i: i }; })
+    .sort(function (a, b) {
+      if (String(a.e.quando) === String(b.e.quando)) return a.i - b.i;
+      return String(a.e.quando) < String(b.e.quando) ? -1 : 1;
+    })
+    .map(function (x) { return x.e; });
 
   meus.forEach(function (e) {
     if (e.tipo === 'entrada') {
@@ -347,7 +354,12 @@ module.exports = async function handler(req, res) {
       // que alguem digitou. Sem isso, cadastrar hoje um cliente que
       // entrou em agosto faria agosto herdar a situacao de hoje — foi
       // exatamente o que o teste do historico pegou.
-      const naEntrada = campos.entrou_em + 'T12:00:00.000Z';
+      // MEIA-NOITE, nao meio-dia. Se a entrada fosse carimbada ao
+      // meio-dia, um cliente cadastrado de manha teria a entrada
+      // "acontecendo" depois de tudo o que fosse feito com ele no
+      // resto da manha — e a remontagem do historico leria a
+      // entrada como o ultimo acontecimento. O teste pegou isso.
+      const naEntrada = campos.entrou_em + 'T00:00:00.000Z';
       await anota(novo.id, 'entrada', null, status, quem, null, naEntrada);
       await anota(novo.id, 'fase', null, fase, quem, null, naEntrada);
       if (satisfacao) await anota(novo.id, 'satisfacao', null, satisfacao, quem, null, naEntrada);
@@ -536,6 +548,170 @@ module.exports = async function handler(req, res) {
         vazio: todos.length === 0,
         hoje: hojeSP(), meses: MESES
       });
+    }
+
+    // ============================================================
+    // ONBOARDING
+    //
+    // A SITUACAO e o que a equipe decide: a iniciar, em andamento,
+    // concluido. As colunas de PRAZO (atrasado, a vencer, em dia)
+    // nao sao status: sao contas feitas com a data de hoje. Guardar
+    // "atrasado" no banco daria errado no dia seguinte.
+    //
+    // Como as colunas se sobrepoem, cada card cai em UMA so, nesta
+    // ordem de prioridade:
+    //   1 concluido no mes · 2 a iniciar · 3 atrasado
+    //   4 a vencer em 7 dias · 5 em dia · 6 em andamento (sem prazo)
+    // ============================================================
+    if (action === 'ob_lista') {
+      const gestores = await carregaGestores();
+      const porG = {};
+      gestores.forEach(function (g) { porG[g.id] = g; });
+
+      const clientes = await carteiraViva();
+      const porC = {};
+      clientes.forEach(function (c) { porC[c.id] = c; });
+
+      const linhas = await db.select('op_onboardings', { order: 'created_at.desc', select: '*' });
+
+      // o mes de referencia das "concluidas no mes"
+      const ref = periodoDe(params);
+      const hoje = hojeSP();
+      const em7 = new Date(hoje + 'T12:00:00Z');
+      em7.setUTCDate(em7.getUTCDate() + 7);
+      const limite7 = em7.toISOString().slice(0, 10);
+
+      const lista = linhas.map(function (o) {
+        const c = porC[o.cliente_id];
+        const g = porG[o.gestor_id];
+        const atrasado = o.situacao === 'em_andamento' && !!o.prazo && o.prazo < hoje;
+
+        let coluna;
+        if (o.situacao === 'concluido') {
+          coluna = (o.concluido_em && o.concluido_em >= ref.de && o.concluido_em <= ref.ate)
+            ? 'concluidos_mes' : 'fora_do_mes';
+        } else if (o.situacao === 'cancelado') {
+          coluna = 'fora_do_mes';
+        } else if (o.situacao === 'a_iniciar') {
+          coluna = 'a_iniciar';
+        } else if (atrasado) {
+          coluna = 'atrasados';
+        } else if (o.prazo && o.prazo <= limite7) {
+          coluna = 'a_vencer';
+        } else if (o.prazo) {
+          coluna = 'em_dia';
+        } else {
+          coluna = 'em_andamento';
+        }
+
+        return {
+          id: o.id,
+          cliente_id: o.cliente_id,
+          cliente: c ? c.nome : '(cliente removido)',
+          categoria: c ? (c.categoria || '') : '',
+          gestor_id: o.gestor_id, gestor: g ? g.nome : '—', cor: g ? g.cor : 'azul',
+          situacao: o.situacao,
+          situacao_nome: { a_iniciar: 'A iniciar', em_andamento: 'Em andamento',
+            concluido: 'Concluído', cancelado: 'Cancelado' }[o.situacao] || o.situacao,
+          inicio_previsto: o.inicio_previsto, iniciado_em: o.iniciado_em,
+          prazo: o.prazo, concluido_em: o.concluido_em,
+          observacao: o.observacao || '',
+          criado_em: o.created_at,
+          atrasado: atrasado,
+          dias_para_o_prazo: o.prazo
+            ? Math.round((new Date(o.prazo + 'T12:00:00Z') - new Date(hoje + 'T12:00:00Z')) / 86400000)
+            : null,
+          coluna: coluna
+        };
+      });
+
+      // Clientes que ainda nao tem onboarding aberto — e dessa lista
+      // que sai o seletor do botao "Iniciar Onboarding", para nao
+      // cadastrar o mesmo cliente duas vezes.
+      const ocupados = {};
+      linhas.forEach(function (o) {
+        if (o.situacao === 'a_iniciar' || o.situacao === 'em_andamento') ocupados[o.cliente_id] = true;
+      });
+
+      return u.ok(res, {
+        onboardings: lista,
+        colunas: [
+          { chave: 'em_andamento', nome: 'Em andamento' },
+          { chave: 'atrasados', nome: 'Atrasados' },
+          { chave: 'concluidos_mes', nome: 'Concluídos no mês' },
+          { chave: 'em_dia', nome: 'Em dia' },
+          { chave: 'a_vencer', nome: 'A vencer em 7 dias' },
+          { chave: 'a_iniciar', nome: 'A iniciar' }
+        ],
+        gestores: gestores.map(function (g) { return { id: g.id, nome: g.nome, cor: g.cor }; }),
+        disponiveis: clientes.filter(function (c) { return !ocupados[c.id]; })
+          .map(function (c) { return { id: c.id, nome: c.nome, gestor_id: c.gestor_id }; }),
+        periodo: ref, hoje: hoje
+      });
+    }
+
+    if (action === 'ob_salvar') {
+      if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
+      const body = await u.readBody(req);
+      if (!body.cliente_id) return u.fail(res, 400, 'Escolha o cliente.');
+      if (!body.gestor_id) return u.fail(res, 400, 'Escolha o gestor responsável.');
+
+      const campos = {
+        cliente_id: body.cliente_id,
+        gestor_id: body.gestor_id,
+        inicio_previsto: eData(body.inicio_previsto) ? body.inicio_previsto : null,
+        prazo: eData(body.prazo) ? body.prazo : null,
+        observacao: limpaTexto(body.observacao, 400) || null,
+        updated_at: new Date().toISOString()
+      };
+
+      if (body.id) {
+        const antes = await db.selectOne('op_onboardings', { id: 'eq.' + body.id, select: '*' });
+        if (!antes) return u.fail(res, 404, 'Onboarding não encontrado.');
+        const row = await db.update('op_onboardings', campos, { id: 'eq.' + body.id });
+        return u.ok(res, { onboarding: row });
+      }
+
+      // Comecar agora ou deixar guardado para comecar depois.
+      const jaComeca = body.iniciar === true || body.iniciar === 'true';
+      campos.situacao = jaComeca ? 'em_andamento' : 'a_iniciar';
+      if (jaComeca) campos.iniciado_em = hojeSP();
+      campos.created_at = new Date().toISOString();
+
+      try {
+        const novo = await db.insert('op_onboardings', campos);
+        return u.ok(res, { onboarding: novo });
+      } catch (e) {
+        return u.fail(res, 409, 'Esse cliente já tem um onboarding em aberto.');
+      }
+    }
+
+    // Mudar a SITUACAO. As colunas de prazo nao entram aqui: elas sao
+    // calculadas, e arrastar um card nao pode "desatrasar" nada.
+    if (action === 'ob_mover') {
+      if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
+      const body = await u.readBody(req);
+      const para = String(body.situacao || '').toLowerCase();
+      if (['a_iniciar', 'em_andamento', 'concluido', 'cancelado'].indexOf(para) < 0) {
+        return u.fail(res, 400, 'Situação desconhecida.');
+      }
+      const antes = await db.selectOne('op_onboardings', { id: 'eq.' + String(body.id || ''), select: '*' });
+      if (!antes) return u.fail(res, 404, 'Onboarding não encontrado.');
+
+      const campos = { situacao: para, updated_at: new Date().toISOString() };
+      const hoje = hojeSP();
+      if (para === 'em_andamento' && !antes.iniciado_em) campos.iniciado_em = hoje;
+      if (para === 'concluido') campos.concluido_em = eData(body.quando) ? body.quando : hoje;
+      if (para !== 'concluido') campos.concluido_em = null;
+      if (para === 'a_iniciar') campos.iniciado_em = null;
+
+      let row;
+      try {
+        row = await db.update('op_onboardings', campos, { id: 'eq.' + antes.id });
+      } catch (e) {
+        return u.fail(res, 409, 'Esse cliente já tem outro onboarding em aberto.');
+      }
+      return u.ok(res, { onboarding: row });
     }
 
     return u.fail(res, 404, 'Acao desconhecida: ' + action);
