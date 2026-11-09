@@ -244,7 +244,7 @@ function ligaWhatsApp(inst) {
           '<div class="card" style="margin-top:14px"><h3 style="font-size:13.5px;margin:0 0 12px">Resultado do diagnóstico</h3>' +
           d.passos.map(function (p) {
             return '<div class="row" style="gap:10px;padding:7px 0;border-top:1px solid var(--hairline)">' +
-              '<span style="font-weight:600;color:' + (p.ok ? 'var(--ok,#00a15c)' : 'var(--erro,#d13b3b)') + '">' +
+              '<span style="font-weight:600;color:' + (p.ok ? 'var(--green)' : 'var(--red)') + '">' +
               (p.ok ? '✓' : '✕') + '</span>' +
               '<span style="min-width:170px">' + esc(p.passo) + '</span>' +
               '<span class="small muted" style="word-break:break-all">' + esc(String(p.detalhe)) + '</span></div>';
@@ -321,7 +321,7 @@ function desenhaQr(r) {
         '<p class="small muted" id="wa-espera">Esperando você escanear… o código se renova sozinho, pode ficar com a câmera apontada.</p>' +
         (r.webhook_ok === false
           ? '<p class="small" style="color:var(--orange)">Não consegui configurar o webhook sozinho: ' + esc(r.webhook_erro || '') + '</p>'
-          : '<p class="small" style="color:var(--accent)">Webhook configurado automaticamente.</p>') +
+          : '<p class="small" style="color:var(--accent-soft)">Webhook configurado automaticamente.</p>') +
       '</div>' +
     '</div>';
 }
