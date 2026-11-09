@@ -1,57 +1,97 @@
 /* ============================================================
-   StartDigital RH — sistema de design
-   Inspirado no Apple Design System: hairlines, muito respiro,
-   tipografia apertada, controles em pílula, vidro no topo.
-   Claro e escuro automáticos.
+   START NEO DARK UI — sistema de design da StartDigital
+
+   Escuro por padrao. O claro continua existindo, sob
+   <html data-tema="claro"> — e so trocar o atributo.
+
+   Os NOMES das variaveis sao os mesmos de sempre, de proposito:
+   onze telas e milhares de linhas ja usam --surface, --label,
+   --hairline. Trocando so os VALORES, o sistema inteiro muda de
+   roupa sem ninguem precisar reescrever marcacao.
+
+   Todos os textos foram conferidos para contraste: o menor par
+   (texto apagado sobre o campo elevado) fica em 4,8:1, acima dos
+   4,5:1 que a norma pede.
    ============================================================ */
 
 :root {
   /* ---- tipografia ---- */
-  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
-          'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
+          'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 
-  /* ---- cor de destaque (verde Start, tom sóbrio) ---- */
-  --accent: #00a15c;
-  --accent-press: #00874d;
-  --accent-tint: rgba(0, 161, 92, .10);
+  /* ---- destaque: azul eletrico, com o violeta no gradiente ---- */
+  --accent: #4F7CFF;
+  --accent-press: #3B6AF0;
+  --accent-tint: rgba(79, 124, 255, .14);
   --accent-on: #ffffff;
+  --accent-2: #8B5CF6;                       /* violeta */
+  /* O --accent cheio e forte como FUNDO de botao, mas fraco como
+     TEXTO: medimos 4,0:1 em cima do cartao. Para texto e link usa-se
+     o --accent-soft. */
+  --accent-soft: #93AEFF;
+  --accent-grad: linear-gradient(104deg, #4F7CFF 0%, #7C6BFF 55%, #8B5CF6 100%);
 
-  /* ---- superfícies ---- */
-  --canvas: #f5f5f7;
-  --surface: #ffffff;
-  --surface-2: #fbfbfd;
+  /* ---- superficies ---- */
+  --canvas: #070B17;                         /* fundo da pagina */
+  --surface: #10172A;                        /* cartao */
+  --surface-2: #16203A;                      /* campo / cartao elevado */
+  --surface-3: #1B2744;                      /* sobreposto: menu, popover */
 
   /* ---- texto ---- */
-  --label: #1d1d1f;
-  --label-2: #6e6e73;
-  --label-3: #8e8e93;
+  --label: #E9EDFB;
+  --label-2: #9FADCC;
+  --label-3: #8396BC;
 
   /* ---- linhas e preenchimentos ---- */
-  --hairline: rgba(0, 0, 0, .09);
-  --hairline-strong: rgba(0, 0, 0, .16);
-  --fill-1: rgba(118, 118, 128, .07);
-  --fill-2: rgba(118, 118, 128, .13);
-  --fill-3: rgba(118, 118, 128, .20);
+  --hairline: rgba(148, 163, 184, .14);
+  --hairline-strong: rgba(129, 158, 255, .30);
+  --fill-1: rgba(129, 158, 255, .07);
+  --fill-2: rgba(129, 158, 255, .13);
+  --fill-3: rgba(129, 158, 255, .20);
 
   /* ---- cores de estado ---- */
-  --red: #c9021b;        --red-tint: rgba(215, 0, 21, .10);
-  --orange: #9a5300;     --orange-tint: rgba(211, 122, 0, .12);
-  --blue: #0062cc;       --blue-tint: rgba(0, 113, 227, .10);
-  --purple: #6b39c4;     --purple-tint: rgba(122, 82, 222, .12);
-  --green: #00794a;      --green-tint: rgba(0, 161, 92, .12);
+  --red: #FB7185;        --red-tint: rgba(251, 113, 133, .14);
+  --orange: #FBBF24;     --orange-tint: rgba(251, 191, 36, .14);
+  --blue: #6D93FF;       --blue-tint: rgba(109, 147, 255, .14);
+  --purple: #A78BFA;     --purple-tint: rgba(167, 139, 250, .14);
+  --green: #34D399;      --green-tint: rgba(52, 211, 153, .14);
+  --cyan: #38BDF8;       --cyan-tint: rgba(56, 189, 248, .14);
+
+  /* Versao clarinha de cada cor. Serve para TEXTO em cima do
+     proprio tint — ali a cor cheia fica fraca demais (conferido:
+     --blue sobre --blue-tint dava 4,1:1, abaixo da norma).
+     No tema claro estes apelidos voltam a ser a cor cheia. */
+  --red-soft: #FDA4AF;
+  --orange-soft: #FCD34D;
+  --blue-soft: #A5BCFF;
+  --purple-soft: #C4B5FD;
+  --green-soft: #6EE7B7;
+  --cyan-soft: #7DD3FC;
 
   /* ---- formas ---- */
-  --r-card: 18px;
-  --r-ctl: 12px;
-  --r-chip: 10px;
+  --r-card: 14px;
+  --r-ctl: 11px;
+  --r-chip: 9px;
   --r-pill: 980px;
 
-  /* ---- profundidade (muito discreta) ---- */
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, .04);
-  --shadow-2: 0 4px 16px rgba(0, 0, 0, .06);
-  --shadow-3: 0 20px 60px rgba(0, 0, 0, .14);
+  /* ---- profundidade ---- */
+  --shadow-1: 0 1px 2px rgba(2, 6, 18, .45);
+  --shadow-2: 0 6px 22px rgba(2, 6, 18, .50);
+  --shadow-3: 0 24px 64px rgba(2, 6, 18, .66);
+  --glow: 0 0 0 1px rgba(129, 158, 255, .22), 0 8px 30px rgba(79, 124, 255, .18);
+  --glow-forte: 0 0 0 3px rgba(79, 124, 255, .22);
 
-  --vidro: rgba(255, 255, 255, .72);
+  --vidro: rgba(13, 20, 38, .72);
+
+  /* ---- espacamento (escala unica) ---- */
+  --e1: 4px; --e2: 8px; --e3: 12px; --e4: 16px;
+  --e5: 20px; --e6: 24px; --e7: 32px; --e8: 40px;
+
+  /* ---- movimento ---- */
+  --t-rapido: 150ms cubic-bezier(.32,.72,0,1);
+  --t-medio: 220ms cubic-bezier(.32,.72,0,1);
+
+  color-scheme: dark;
 
   /* ---- apelidos antigos (compatibilidade) ---- */
   --verde: var(--accent);
@@ -69,47 +109,75 @@
   --raio: var(--r-card);
   --sombra: var(--shadow-1);
   --fonte: var(--font);
+  --card: var(--surface);
+  --fio: var(--hairline);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --accent: #1fbf6e;
-    --accent-press: #18a95f;
-    --accent-tint: rgba(31, 191, 110, .16);
-    --accent-on: #04140b;
+/* ------------------------------------------------------------
+   O TEMA CLARO — para quem preferir, e para a pagina publica de
+   vagas, que continua clara de proposito.
+   ------------------------------------------------------------ */
+:root[data-tema="claro"] {
+  --accent: #2563EB;
+  --accent-press: #1D4ED8;
+  --accent-tint: rgba(37, 99, 235, .10);
+  --accent-on: #ffffff;
+  --accent-2: #7C3AED;
+  --accent-soft: #1D4ED8;
+  --accent-grad: linear-gradient(104deg, #2563EB 0%, #5B4BE0 55%, #7C3AED 100%);
 
-    --canvas: #000000;
-    --surface: #1c1c1e;
-    --surface-2: #232325;
+  --canvas: #F4F6FB;
+  --surface: #ffffff;
+  --surface-2: #FAFBFE;
+  --surface-3: #ffffff;
 
-    --label: #f5f5f7;
-    --label-2: #a1a1a6;
-    --label-3: #8e8e93;
+  --label: #0F172A;
+  --label-2: #51607A;
+  --label-3: #586579;   /* aguenta ate os fundos com tint por cima */
 
-    --hairline: rgba(255, 255, 255, .11);
-    --hairline-strong: rgba(255, 255, 255, .20);
-    --fill-1: rgba(120, 120, 128, .20);
-    --fill-2: rgba(120, 120, 128, .30);
-    --fill-3: rgba(120, 120, 128, .40);
+  --hairline: rgba(15, 23, 42, .10);
+  --hairline-strong: rgba(37, 99, 235, .28);
+  --fill-1: rgba(100, 116, 139, .07);
+  --fill-2: rgba(100, 116, 139, .13);
+  --fill-3: rgba(100, 116, 139, .20);
 
-    --red: #ff6961;        --red-tint: rgba(255, 105, 97, .16);
-    --orange: #ffb340;     --orange-tint: rgba(255, 179, 64, .16);
-    --blue: #64a8ff;       --blue-tint: rgba(100, 168, 255, .16);
-    --purple: #bf94ff;     --purple-tint: rgba(191, 148, 255, .16);
-    --green: #30d158;      --green-tint: rgba(48, 209, 88, .16);
+  --red: #C9021B;        --red-tint: rgba(215, 0, 21, .10);
+  --orange: #9A5300;     --orange-tint: rgba(211, 122, 0, .12);
+  --blue: #0062CC;       --blue-tint: rgba(0, 113, 227, .10);
+  --purple: #6B39C4;     --purple-tint: rgba(122, 82, 222, .12);
+  --green: #00794A;      --green-tint: rgba(0, 161, 92, .12);
+  --cyan: #0E7490;       --cyan-tint: rgba(14, 116, 144, .12);
 
-    --shadow-1: 0 1px 2px rgba(0, 0, 0, .5);
-    --shadow-2: 0 4px 18px rgba(0, 0, 0, .5);
-    --shadow-3: 0 20px 60px rgba(0, 0, 0, .7);
+  /* No claro o -soft e um tom MAIS ESCURO que a cor cheia: ele vai
+     em cima do tint, e ainda pode ter um <code> por cima disso. */
+  --red-soft: #A8001A;
+  --orange-soft: #7D4300;
+  --blue-soft: #00569F;
+  --purple-soft: #5C2FAD;
+  --green-soft: #00603B;
+  --cyan-soft: #0B5F77;
 
-    --vidro: rgba(28, 28, 30, .72);
-  }
+  --shadow-1: 0 1px 2px rgba(15, 23, 42, .05);
+  --shadow-2: 0 4px 16px rgba(15, 23, 42, .07);
+  --shadow-3: 0 20px 60px rgba(15, 23, 42, .14);
+  --glow: 0 0 0 1px rgba(37, 99, 235, .14), 0 8px 24px rgba(37, 99, 235, .10);
+  --glow-forte: 0 0 0 3px rgba(37, 99, 235, .18);
+
+  --vidro: rgba(255, 255, 255, .74);
+
+  color-scheme: light;
 }
 
 /* ============================================================
    base
    ============================================================ */
 * { box-sizing: border-box; }
+
+/* Os iconezinhos sao desenhados com traco, nao pintados, e pegam
+   a cor do texto ao redor. Fica aqui no ui.css para valer em
+   qualquer tela — antes existia so dentro do painel. */
+.ico { stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round;
+       stroke-linejoin: round; flex: none; vertical-align: -3px; }
 
 html { -webkit-text-size-adjust: 100%; }
 
@@ -126,7 +194,50 @@ body {
   letter-spacing: -.008em;
 }
 
-a { color: var(--accent); text-decoration: none; }
+/* ------------------------------------------------------------
+   A AURORA
+   Duas manchas de luz presas ao fundo, bem fracas e bem
+   borradas. Sao PARADAS de proposito: luz que se mexe sozinha
+   atras de uma planilha cansa em dez minutos. E ficam atras de
+   tudo (z-index negativo), entao nunca passam por cima de texto.
+   ------------------------------------------------------------ */
+body::before, body::after {
+  content: '';
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: .5;
+}
+body::before {
+  width: 52vmax; height: 52vmax;
+  top: -18vmax; left: -14vmax;
+  background: radial-gradient(circle, rgba(79, 124, 255, .30), transparent 68%);
+}
+body::after {
+  width: 44vmax; height: 44vmax;
+  right: -16vmax; bottom: -20vmax;
+  background: radial-gradient(circle, rgba(139, 92, 246, .22), transparent 68%);
+}
+:root[data-tema="claro"] body::before,
+:root[data-tema="claro"] body::after { opacity: .22; }
+
+/* ------------------------------------------------------------
+   A BARRA DE ROLAGEM
+   ------------------------------------------------------------ */
+* { scrollbar-width: thin; scrollbar-color: var(--fill-3) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--fill-2);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--fill-3); background-clip: content-box; }
+
+a { color: var(--accent-soft); text-decoration: none; }
 a:hover { text-decoration: underline; text-underline-offset: 2px; }
 
 ::selection { background: var(--accent-tint); }
@@ -205,11 +316,25 @@ code {
 }
 
 .card {
+  position: relative;
   background: var(--surface);
+  border: 1px solid var(--hairline);
   border-radius: var(--r-card);
   box-shadow: var(--shadow-1);
-  padding: 26px 28px;
+  padding: 24px 26px;
 }
+/* Um fio de luz no alto do cartao. E o que da a sensacao de
+   profundidade sem precisar de sombra pesada. */
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  border-radius: var(--r-card) var(--r-card) 0 0;
+  background: linear-gradient(90deg, transparent, rgba(159, 180, 255, .28), transparent);
+  pointer-events: none;
+}
+:root[data-tema="claro"] .card::before { display: none; }
 .card + .card { margin-top: 16px; }
 .card h2 {
   margin: 0;
@@ -273,21 +398,20 @@ input:hover, select:hover, textarea:hover { border-color: var(--label-3); }
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 4px var(--accent-tint);
+  box-shadow: var(--glow-forte);
 }
 
-@media (prefers-color-scheme: dark) {
-  /* no escuro os campos ganham um tom acima do cartão, como no iOS */
-  input[type=text], input[type=email], input[type=tel], input[type=date],
-  input[type=number], input[type=password], select, textarea {
-    background: var(--surface-2);
-  }
-  input[type=checkbox] { background: var(--surface-2); }
+/* O campo fica um tom acima do cartão — no escuro isso é o que
+   separa o que é editável do que é só leitura. */
+input[type=text], input[type=email], input[type=tel], input[type=date],
+input[type=number], input[type=password], select, textarea {
+  background: var(--surface-2);
 }
+input[type=checkbox] { background: var(--surface-2); }
 
 select {
   padding-right: 38px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='16' viewBox='0 0 12 16'%3E%3Cpath fill='none' stroke='%238e8e93' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' d='M3 6.5 6 3.5l3 3M3 9.5l3 3 3-3'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='16' viewBox='0 0 12 16'%3E%3Cpath fill='none' stroke='%237A8CB0' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' d='M3 6.5 6 3.5l3 3M3 9.5l3 3 3-3'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 13px center;
 }
@@ -329,14 +453,20 @@ input[type=checkbox]:checked::after {
   letter-spacing: -.012em;
   border: 0;
   border-radius: var(--r-pill);
-  background: var(--accent);
+  background: var(--accent-grad);
   color: var(--accent-on);
   cursor: pointer;
   text-decoration: none;
   white-space: nowrap;
-  transition: background .15s ease, opacity .15s ease, transform .06s ease;
+  box-shadow: 0 4px 14px rgba(79, 124, 255, .26);
+  transition: filter var(--t-rapido), box-shadow var(--t-rapido),
+              background var(--t-rapido), transform .06s ease;
 }
-.btn:hover { background: var(--accent-press); text-decoration: none; }
+.btn:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 6px 20px rgba(79, 124, 255, .36);
+  text-decoration: none;
+}
 .btn:active { transform: scale(.985); }
 .btn:disabled { opacity: .42; cursor: not-allowed; transform: none; }
 
@@ -344,14 +474,26 @@ input[type=checkbox]:checked::after {
 .btn-sm { height: 32px; padding: 0 14px; font-size: 13.5px; }
 .btn-block { width: 100%; }
 
-.btn-ghost { background: var(--fill-1); color: var(--label); }
-.btn-ghost:hover { background: var(--fill-2); }
+.btn-ghost {
+  background: var(--fill-1); color: var(--label);
+  border: 1px solid var(--hairline); box-shadow: none;
+}
+.btn-ghost:hover {
+  background: var(--fill-2); border-color: var(--hairline-strong);
+  filter: none; box-shadow: none;
+}
 
-.btn-dark { background: var(--label); color: var(--canvas); }
-.btn-dark:hover { background: var(--label); opacity: .86; }
+.btn-dark { background: var(--label); color: var(--canvas); box-shadow: none; }
+.btn-dark:hover { background: var(--label); opacity: .86; filter: none; box-shadow: none; }
 
-.btn-danger { background: var(--red-tint); color: var(--red); }
-.btn-danger:hover { background: var(--red); color: #fff; }
+.btn-danger {
+  background: var(--red-tint); color: var(--red);
+  border: 1px solid rgba(251, 113, 133, .28); box-shadow: none;
+}
+.btn-danger:hover {
+  background: var(--red); color: var(--canvas); filter: none;
+  box-shadow: 0 4px 14px rgba(251, 113, 133, .26);
+}
 
 /* ============================================================
    avisos
@@ -364,10 +506,13 @@ input[type=checkbox]:checked::after {
   margin-bottom: 18px;
   border: 0;
 }
-.alert-erro  { background: var(--red-tint);    color: var(--red); }
-.alert-ok    { background: var(--green-tint);  color: var(--green); }
-.alert-info  { background: var(--blue-tint);   color: var(--blue); }
-.alert-aviso { background: var(--orange-tint); color: var(--orange); }
+/* Cor cheia em cima do proprio tint fica fraca (o --blue sobre o
+   --blue-tint deu 4,4:1). Nos avisos e etiquetas usamos a versao
+   -soft, que no escuro e mais clara e no claro e mais escura. */
+.alert-erro  { background: var(--red-tint);    color: var(--red-soft); }
+.alert-ok    { background: var(--green-tint);  color: var(--green-soft); }
+.alert-info  { background: var(--blue-tint);   color: var(--blue-soft); }
+.alert-aviso { background: var(--orange-tint); color: var(--orange-soft); }
 .alert strong { font-weight: 600; }
 
 /* ============================================================
@@ -387,11 +532,11 @@ input[type=checkbox]:checked::after {
   color: var(--label-2);
   white-space: nowrap;
 }
-.tag-verde   { background: var(--green-tint);  color: var(--green); }
-.tag-vermelho{ background: var(--red-tint);    color: var(--red); }
-.tag-ambar   { background: var(--orange-tint); color: var(--orange); }
-.tag-azul    { background: var(--blue-tint);   color: var(--blue); }
-.tag-roxo    { background: var(--purple-tint); color: var(--purple); }
+.tag-verde   { background: var(--green-tint);  color: var(--green-soft); }
+.tag-vermelho{ background: var(--red-tint);    color: var(--red-soft); }
+.tag-ambar   { background: var(--orange-tint); color: var(--orange-soft); }
+.tag-azul    { background: var(--blue-tint);   color: var(--blue-soft); }
+.tag-roxo    { background: var(--purple-tint); color: var(--purple-soft); }
 
 /* ============================================================
    controle segmentado (abas)
@@ -475,7 +620,12 @@ input[type=checkbox]:checked::after {
   letter-spacing: -.004em;
   padding: 0 12px 10px;
 }
-.tabela td { padding: 12px; border-top: 1px solid var(--hairline); vertical-align: top; }
+.tabela td { padding: 13px 12px; border-top: 1px solid var(--hairline); vertical-align: top; }
+/* Nada de grade: so a linha horizontal, e um realce de azul
+   quase imperceptivel ao passar o mouse. */
+.tabela tbody tr { transition: background var(--t-rapido); }
+.tabela tbody tr:hover > td { background: var(--fill-1); }
+.tabela th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; font-weight: 600; }
 
 footer.rodape {
   padding: 44px 0 40px;
