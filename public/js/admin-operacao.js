@@ -523,10 +523,8 @@ function desenhaCarteira(id, d) {
       '</div>' +
     '</div>' +
 
-    '<div class="row row-wrap" style="gap:10px;align-items:flex-end;margin-bottom:14px">' +
-      '<div class="field" style="margin:0;min-width:200px;flex:1;max-width:300px">' +
-        '<label for="opc-busca">Cliente</label>' +
-        '<input id="opc-busca" placeholder="Procurar pelo nome…" value="' + esc(OP_BUSCA) + '" autocomplete="off"></div>' +
+    '<div class="row row-wrap ob-filtros" style="gap:10px;align-items:flex-end;margin-bottom:14px">' +
+      buscaHtml('opc-busca', 'Buscar cliente…', OP_BUSCA) +
       '<div class="field" style="margin:0"><label for="opc-status">Situação</label>' +
         '<select id="opc-status"><option value="">Todas</option>' +
           d.status.map(function (s) {
@@ -558,10 +556,8 @@ function desenhaCarteira(id, d) {
   document.getElementById('opg-editar').addEventListener('click', function () { abreFichaGestor(id); });
   document.getElementById('opc-novo').addEventListener('click', function () { abreFichaCliente(null, id); });
 
-  let timer = null;
-  document.getElementById('opc-busca').addEventListener('input', function () {
-    OP_BUSCA = this.value; clearTimeout(timer); timer = setTimeout(pintaCarteira, 140);
-  });
+  // a carteira inteira já veio nesta chamada: filtra na mesma tecla
+  ligaBusca('opc-busca', function (texto) { OP_BUSCA = texto; pintaCarteira(); }, 0);
   document.getElementById('opc-status').addEventListener('change', function () {
     OP_F_STATUS = this.value; pintaCarteira();
   });
