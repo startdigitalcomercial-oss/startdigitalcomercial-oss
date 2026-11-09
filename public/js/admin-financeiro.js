@@ -353,28 +353,28 @@ function finPinta() {
     '<div class="fd2-grade" style="margin-bottom:16px">' +
       '<div class="fd2-carta">' +
         '<div class="fd2-tit">Valor total a receber</div>' +
-        '<div class="fd2-val" style="color:#157347">' + finDinheiro(ind.a_receber) + '</div>' +
+        '<div class="fd2-val" style="color:var(--green-soft)">' + finDinheiro(ind.a_receber) + '</div>' +
         '<div class="fd2-sub">' + ind.a_receber_qtd + ' cobrança(s) em aberto</div>' +
-        '<div class="fd2-barra" style="background:#1fbf6e"></div>' +
+        '<div class="fd2-barra" style="background:var(--green)"></div>' +
       '</div>' +
       '<div class="fd2-carta">' +
         '<div class="fd2-tit">Previsão próxima semana</div>' +
-        '<div class="fd2-val" style="color:#26418f">' +
+        '<div class="fd2-val" style="color:var(--blue-soft)">' +
           (compAtual ? finDinheiro(ind.proxima_semana) : '<span style="color:var(--label-3)">—</span>') + '</div>' +
         '<div class="fd2-sub">' + (compAtual
           ? 'vencimentos de ' + esc(ind.semana_de) + ' a ' + esc(ind.semana_ate)
           : 'só no mês corrente') + '</div>' +
-        '<div class="fd2-barra" style="background:' + (compAtual ? '#6f8bf0' : 'var(--fio)') + '"></div>' +
+        '<div class="fd2-barra" style="background:' + (compAtual ? 'var(--accent)' : 'var(--fio)') + '"></div>' +
       '</div>' +
       '<button type="button" class="fd2-carta fd2-clique' +
         (FIN_FILTRO === 'inadimplentes' ? ' on' : '') + '" id="fin-card-inad">' +
         '<div class="fd2-tit">Inadimplentes</div>' +
-        '<div class="fd2-val" style="color:#b02a20">' + ind.inadimplentes +
+        '<div class="fd2-val" style="color:var(--red-soft)">' + ind.inadimplentes +
           ' <span style="font-size:15px;font-weight:600">cliente' + (ind.inadimplentes === 1 ? '' : 's') + '</span></div>' +
         '<div class="fd2-sub">' + (FIN_FILTRO === 'inadimplentes'
           ? 'filtrando a tabela — clique para ver todas'
           : 'clique para filtrar a tabela') + '</div>' +
-        '<div class="fd2-barra" style="background:#d9453a"></div>' +
+        '<div class="fd2-barra" style="background:var(--red)"></div>' +
       '</button>' +
     '</div>';
 
@@ -794,32 +794,32 @@ function desenhaFinDre(d) {
     '<div class="fd2-grade" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr))">' +
       '<div class="fd2-carta">' +
         '<div class="fd2-tit">Entradas</div>' +
-        '<div class="fd2-val" style="color:#157347">' + finDinheiro(d.entradas) + '</div>' +
+        '<div class="fd2-val" style="color:var(--green-soft)">' + finDinheiro(d.entradas) + '</div>' +
         '<div class="fd2-sub">' + (d.entradas_qtd || 0) + ' cobrança(s) recebida(s)</div>' +
-        '<div class="fd2-barra" style="background:#1fbf6e"></div>' +
+        '<div class="fd2-barra" style="background:var(--green)"></div>' +
       '</div>' +
       '<div class="fd2-carta">' +
         '<div class="fd2-tit">Despesas</div>' +
-        '<div class="fd2-val" style="color:#b02a20">' + finDinheiro(d.despesas) + '</div>' +
+        '<div class="fd2-val" style="color:var(--red-soft)">' + finDinheiro(d.despesas) + '</div>' +
         '<div class="fd2-sub">' + (d.despesas_qtd || 0) + ' gasto(s) no mês</div>' +
-        '<div class="fd2-barra" style="background:#d9453a"></div>' +
+        '<div class="fd2-barra" style="background:var(--red)"></div>' +
       '</div>' +
       '<div class="fd2-carta dre-resultado' + (positivo ? '' : ' negativo') + '">' +
         '<div class="fd2-tit">Resultado líquido</div>' +
-        '<div class="fd2-val" style="color:' + (positivo ? '#157347' : '#b02a20') + '">' +
+        '<div class="fd2-val" style="color:' + (positivo ? 'var(--green-soft)' : 'var(--red-soft)') + '">' +
           (positivo ? '' : '− ') + finDinheiro(Math.abs(Number(d.resultado || 0))) + '</div>' +
         '<div class="fd2-sub">entradas menos despesas</div>' +
-        '<div class="fd2-barra" style="background:' + (positivo ? '#1fbf6e' : '#d9453a') + '"></div>' +
+        '<div class="fd2-barra" style="background:' + (positivo ? 'var(--green)' : 'var(--red)') + '"></div>' +
       '</div>' +
     '</div>' +
 
     '<div class="card" style="padding:18px;margin-top:16px">' +
       '<h3 style="font-size:14px;margin:0 0 10px">De onde vem cada número</h3>' +
       '<div class="dre-conta">' +
-        '<div><span>Entradas</span><b style="color:#157347">' + finDinheiro(d.entradas) + '</b></div>' +
-        '<div><span>Despesas</span><b style="color:#b02a20">− ' + finDinheiro(d.despesas) + '</b></div>' +
+        '<div><span>Entradas</span><b style="color:var(--green-soft)">' + finDinheiro(d.entradas) + '</b></div>' +
+        '<div><span>Despesas</span><b style="color:var(--red-soft)">− ' + finDinheiro(d.despesas) + '</b></div>' +
         '<div class="total"><span>Resultado líquido</span><b style="color:' +
-          (positivo ? '#157347' : '#b02a20') + '">' + (positivo ? '' : '− ') +
+          (positivo ? 'var(--green-soft)' : 'var(--red-soft)') + '">' + (positivo ? '' : '− ') +
           finDinheiro(Math.abs(Number(d.resultado || 0))) + '</b></div>' +
       '</div>' +
       '<p class="small muted" style="margin:14px 0 0;line-height:1.6">' +
@@ -906,9 +906,9 @@ function desenhaFinGastos(d) {
     '<div class="fd2-grade" style="grid-template-columns:minmax(240px,340px);margin-bottom:16px">' +
       '<div class="fd2-carta">' +
         '<div class="fd2-tit">Total de gastos</div>' +
-        '<div class="fd2-val" style="color:#b02a20">' + finDinheiro(d.total) + '</div>' +
+        '<div class="fd2-val" style="color:var(--red-soft)">' + finDinheiro(d.total) + '</div>' +
         '<div class="fd2-sub">' + gastos.length + ' gasto(s) no período</div>' +
-        '<div class="fd2-barra" style="background:#d9453a"></div>' +
+        '<div class="fd2-barra" style="background:var(--red)"></div>' +
       '</div>' +
     '</div>' +
 
@@ -1138,9 +1138,9 @@ function finCartoesHtml(c) {
     '</div>';
   }
   return '<div class="fd2-grade" id="fd2-cartoes">' +
-    cartao('recebidas', 'Recebidas', '#157347', '#1fbf6e', c.recebidas) +
-    cartao('aguardando', 'Aguardando pagamento', '#b45309', '#f5c26b', c.aguardando, true) +
-    cartao('vencidas', 'Vencidas', '#b02a20', '#d9453a', c.vencidas) +
+    cartao('recebidas', 'Recebidas', 'var(--green-soft)', 'var(--green)', c.recebidas) +
+    cartao('aguardando', 'Aguardando pagamento', 'var(--orange-soft)', 'var(--orange)', c.aguardando, true) +
+    cartao('vencidas', 'Vencidas', 'var(--red-soft)', 'var(--red)', c.vencidas) +
   '</div>';
 }
 
@@ -1396,8 +1396,8 @@ function desenhaFichaCliente(d) {
       '</div>' +
 
       '<div class="row row-wrap" style="gap:40px;margin-top:22px">' +
-        fcTile('Já recebido', finDinheiro(r.recebido), 'somando todas as competências', '#146c43') +
-        fcTile('Em aberto', finDinheiro(r.em_aberto), 'ainda não pago', '#b02a20') +
+        fcTile('Já recebido', finDinheiro(r.recebido), 'somando todas as competências', 'var(--green-soft)') +
+        fcTile('Em aberto', finDinheiro(r.em_aberto), 'ainda não pago', 'var(--red-soft)') +
         fcTile('Cobranças', String(r.cobrancas || 0), 'no histórico', '') +
       '</div>' +
     '</div>' +
