@@ -285,7 +285,7 @@ function ligaAurea(d) {
     alvo.textContent = 'testando…';
     try {
       const r = await api('aurea_test');
-      alvo.innerHTML = '<span style="color:var(--accent)">✓ ' + esc(r.resposta) + '</span>';
+      alvo.innerHTML = '<span style="color:var(--accent-soft)">✓ ' + esc(r.resposta) + '</span>';
     } catch (e) {
       alvo.innerHTML = '<span style="color:var(--red)">✕ ' + esc(e.message) + '</span>';
     }
