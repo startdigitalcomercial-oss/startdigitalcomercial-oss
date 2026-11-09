@@ -169,7 +169,7 @@ async function carregaCandidatos() {
 
   box.innerHTML =
     '<div class="card"><div class="row row-wrap" style="gap:10px">' +
-      '<input type="text" id="cl-busca" placeholder="Buscar por nome, e-mail, telefone ou vaga…" style="flex:1;min-width:240px">' +
+      buscaHtml('cl-busca', 'Buscar por nome, e-mail, telefone ou vaga…', '') +
       '<select id="cl-etapa" style="width:180px"><option value="">Todas as etapas</option>' +
         etapas.map(function (e) { return '<option value="' + e.key + '">' + esc(e.name) + '</option>'; }).join('') +
       '</select>' +
@@ -250,8 +250,8 @@ async function carregaCandidatos() {
     return { feitos: feitos, erros: erros };
   }
 
-  ['cl-busca', 'cl-etapa', 'cl-origem'].forEach(function (id) {
-    document.getElementById(id).addEventListener('input', desenha);
+  ligaBusca('cl-busca', desenha, 0);
+  ['cl-etapa', 'cl-origem'].forEach(function (id) {
     document.getElementById(id).addEventListener('change', desenha);
   });
 

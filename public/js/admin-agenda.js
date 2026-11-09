@@ -80,28 +80,84 @@ function agAnda(passo) {
     const novo = { mes: (o % 12) + 1, ano: Math.floor(o / 12) };
     AG_REF = novo.ano + '-' + String(novo.mes).padStart(2, '0') + '-01';
   }
-  carregaAgenda();
+  agRemonta();
 }
 
-/* ---------------- carregar ---------------- */
+/* ---------------- carregar ----------------
+
+   Buscar o período é ida ao servidor, não tem jeito: os dados de
+   novembro não estavam na memória quando a pessoa pediu dezembro.
+
+   O que MUDOU foi o que acontece enquanto isso. Antes a tela
+   inteira era apagada e desenhada de novo — filtros, indicadores,
+   calendário, o bloco do Google, tudo. Parecia um F5 a cada clique
+   na seta, e o foco do teclado se perdia junto.
+
+   Agora o casco fica onde está. O calendário velho continua à
+   vista, só que apagadinho, e é trocado quando a resposta chega.
+   Trocar de mês virou um piscar de olhos em vez de uma reconstrução.
+   ---------------------------------------------------------------- */
+async function agBusca() {
+  if (!AG_REF) {
+    const inicial = await apiAg('ag_lista');
+    AG_REF = inicial.hoje;
+    AG = inicial;
+  }
+  const j = agJanela();
+  const p = { de: j.de, ate: j.ate };
+  if (AG_GESTOR) p.gestor_id = AG_GESTOR;
+  if (AG_STATUS) p.status = AG_STATUS;
+  AG = await apiAg('ag_lista', { params: p });
+}
+
 async function carregaAgenda() {
   const alvo = document.getElementById('painel-opagenda');
   if (!AG) alvo.innerHTML = '<div class="spinner"></div>';
   try {
-    if (!AG_REF) {
-      const inicial = await apiAg('ag_lista');
-      AG_REF = inicial.hoje;
-      AG = inicial;
-    }
-    const j = agJanela();
-    const p = { de: j.de, ate: j.ate };
-    if (AG_GESTOR) p.gestor_id = AG_GESTOR;
-    if (AG_STATUS) p.status = AG_STATUS;
-    AG = await apiAg('ag_lista', { params: p });
+    await agBusca();
     desenhaAgenda();
   } catch (e) {
     alvo.innerHTML = '<div class="alert alert-erro">' + esc(e.message) + '</div>';
   }
+}
+
+/* Troca só o calendário e os números. O resto da tela não se mexe. */
+let AG_VOANDO = false;
+async function agRemonta() {
+  if (AG_VOANDO) return;                 // dois cliques rápidos na seta não brigam
+  const miolo = document.getElementById('ag-miolo');
+  if (!miolo) { carregaAgenda(); return; }
+
+  AG_VOANDO = true;
+  miolo.classList.add('ag-esperando');
+  // o título responde na hora, antes mesmo de os dados virem
+  const tit = document.getElementById('ag-titulo');
+  if (tit) tit.textContent = agTitulo();
+
+  try {
+    await agBusca();
+    miolo.innerHTML = AG_VISTA === 'mes' ? agComoMes() : agComoAgenda();
+    if (tit) tit.textContent = agTitulo();
+    agAtualizaKpis();
+    agLigaMiolo();
+  } catch (e) {
+    toast(e.message, true);
+  }
+  miolo.classList.remove('ag-esperando');
+  AG_VOANDO = false;
+}
+
+/* Os quatro números no topo acompanham o período, sem redesenhar
+   os cartões: só o texto de dentro muda. */
+function agAtualizaKpis() {
+  const k = (AG && AG.kpis) || {};
+  const nums = document.querySelectorAll('#painel-opagenda .op-kpi .num');
+  const valores = [k.hoje, k.agendadas, k.realizadas, k.atrasadas];
+  nums.forEach(function (el, i) {
+    if (valores[i] === undefined) return;
+    el.dataset.ate = valores[i];
+    el.textContent = valores[i];
+  });
 }
 
 function desenhaAgenda() {
@@ -144,18 +200,20 @@ function desenhaAgenda() {
     // ---------- os quatro indicadores ----------
     '<div class="op-kpis op-entra" style="animation-delay:60ms;grid-template-columns:repeat(auto-fit,minmax(176px,1fr))">' +
       cartao('Reuniões para hoje', k.hoje, 'na data de hoje', I.hoje, '') +
-      cartao('Agendadas', k.agendadas, 'ainda sem resposta', I.agenda, '') +
+      cartao('Agendadas', k.agendadas, 'ainda sem resposta', I.agenda, 'agenda') +
       cartao('Realizadas', k.realizadas, 'aconteceram no período', I.feito, 'bom') +
-      cartao('Atrasadas', k.atrasadas, 'a hora passou e ninguém respondeu', I.atraso, 'ruim') +
+      cartao('Atrasadas', k.atrasadas, 'a hora passou e ninguém respondeu', I.atraso, 'atencao') +
     '</div>' +
 
     // ---------- navegação do calendário ----------
     '<div class="ag-barra op-entra" style="animation-delay:120ms">' +
       '<div class="row" style="gap:6px;align-items:center">' +
-        '<button class="btn btn-sm btn-ghost" id="ag-antes" aria-label="Anterior">‹</button>' +
+        '<button class="btn btn-sm btn-ghost ag-seta" id="ag-antes" aria-label="Mês anterior">' +
+          '<svg class="ico" width="16" height="16" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></svg></button>' +
         '<button class="btn btn-sm btn-ghost" id="ag-hoje">Hoje</button>' +
-        '<button class="btn btn-sm btn-ghost" id="ag-depois" aria-label="Próximo">›</button>' +
-        '<strong style="margin-left:8px;font-size:15px">' + esc(agTitulo()) + '</strong>' +
+        '<button class="btn btn-sm btn-ghost ag-seta" id="ag-depois" aria-label="Próximo mês">' +
+          '<svg class="ico" width="16" height="16" viewBox="0 0 24 24"><path d="m10 6 6 6-6 6"/></svg></button>' +
+        '<strong id="ag-titulo" class="ag-titulo">' + esc(agTitulo()) + '</strong>' +
       '</div>' +
       '<div class="fd2-filtro" id="ag-vista">' +
         ['mes|Mês', 'semana|Semana', 'dia|Dia'].map(function (o) {
@@ -166,7 +224,7 @@ function desenhaAgenda() {
       '</div>' +
     '</div>' +
 
-    '<div class="op-entra" style="animation-delay:160ms">' +
+    '<div class="op-entra" id="ag-miolo" style="animation-delay:160ms">' +
       (AG_VISTA === 'mes' ? agComoMes() : agComoAgenda()) + '</div>' +
 
     // ---------- Google ----------
@@ -226,10 +284,12 @@ function agComoMes() {
     const fora = d < j.de || d > j.ate;
     const itens = porDia[d] || [];
     celulas += '<div class="ag-cel' + (fora ? ' fora' : '') + (d === AG.hoje ? ' hoje' : '') + '" data-dia="' + d + '">' +
-      '<div class="ag-num">' + Number(d.slice(8, 10)) + '</div>' +
+      '<div class="ag-num-linha"><div class="ag-num">' + Number(d.slice(8, 10)) + '</div></div>' +
       itens.slice(0, 3).map(function (r) {
-        return '<button type="button" class="ag-chip ' + agClasse(r) + ' ag-abrir" data-id="' + esc(r.id) + '">' +
-          '<span class="ag-h">' + esc(r.hora.split(' ')[0]) + '</span> ' + esc(r.titulo) + '</button>';
+        return '<button type="button" class="ag-chip ' + agClasse(r) + ' ag-abrir" data-id="' + esc(r.id) + '" ' +
+          'title="' + esc(r.hora + ' · ' + r.titulo) + '">' +
+          '<span class="ag-h">' + esc(r.hora.split(' ')[0]) + '</span>' +
+          '<span>' + esc(r.titulo) + '</span></button>';
       }).join('') +
       (itens.length > 3 ? '<button type="button" class="ag-mais" data-dia="' + d + '">+' +
         (itens.length - 3) + '</button>' : '') +
@@ -296,7 +356,28 @@ function agPino(r) {
   if (r.status === 'nao_realizada') return '<span class="op-pino flopado">Não realizada</span>';
   if (r.status === 'cancelada') return '<span class="op-pino cancelado">Cancelada</span>';
   if (r.atrasada) return '<span class="op-pino suspenso">Atrasada</span>';
-  return '<span class="op-pino cancelado">Agendada</span>';
+  return '<span class="op-pino agendada">Agendada</span>';
+}
+
+/* As ligações que vivem DENTRO do calendário. Ficam separadas
+   porque o miolo é trocado sozinho quando se muda de mês, e os
+   cliques precisam ser religados nos elementos novos. */
+function agLigaMiolo() {
+  document.querySelectorAll('#painel-opagenda .ag-abrir').forEach(function (x) {
+    x.addEventListener('click', function (ev) { ev.stopPropagation(); abreReuniao(x.dataset.id); });
+  });
+  document.querySelectorAll('#painel-opagenda .ag-mais').forEach(function (x) {
+    x.addEventListener('click', function () {
+      AG_VISTA = 'dia'; AG_REF = x.dataset.dia;
+      document.querySelectorAll('#ag-vista button').forEach(function (bt) {
+        bt.classList.toggle('on', bt.dataset.v === 'dia');
+      });
+      agRemonta();
+    });
+  });
+  document.querySelectorAll('#painel-opagenda .ag-cel').forEach(function (c) {
+    c.addEventListener('dblclick', function () { abreReuniao(null, c.dataset.dia); });
+  });
 }
 
 /* ---------------- ligações ---------------- */
@@ -305,25 +386,23 @@ function ligaAgenda() {
 
   b('ag-antes').addEventListener('click', function () { agAnda(-1); });
   b('ag-depois').addEventListener('click', function () { agAnda(1); });
-  b('ag-hoje').addEventListener('click', function () { AG_REF = AG.hoje; carregaAgenda(); });
+  b('ag-hoje').addEventListener('click', function () { AG_REF = AG.hoje; agRemonta(); });
   document.querySelectorAll('#ag-vista button').forEach(function (bt) {
-    bt.addEventListener('click', function () { AG_VISTA = bt.dataset.v; carregaAgenda(); });
-  });
-  b('ag-gestor').addEventListener('change', function () { AG_GESTOR = this.value; carregaAgenda(); });
-  b('ag-status').addEventListener('change', function () { AG_STATUS = this.value; carregaAgenda(); });
-  b('ag-nova').addEventListener('click', function () { abreReuniao(null); });
-
-  document.querySelectorAll('.ag-abrir').forEach(function (x) {
-    x.addEventListener('click', function (ev) { ev.stopPropagation(); abreReuniao(x.dataset.id); });
-  });
-  document.querySelectorAll('.ag-mais').forEach(function (x) {
-    x.addEventListener('click', function () {
-      AG_VISTA = 'dia'; AG_REF = x.dataset.dia; carregaAgenda();
+    bt.addEventListener('click', function () {
+      if (AG_VISTA === bt.dataset.v) return;
+      AG_VISTA = bt.dataset.v;
+      // o botão acende na hora; os dados chegam depois
+      document.querySelectorAll('#ag-vista button').forEach(function (x) {
+        x.classList.toggle('on', x === bt);
+      });
+      agRemonta();
     });
   });
-  document.querySelectorAll('.ag-cel').forEach(function (c) {
-    c.addEventListener('dblclick', function () { abreReuniao(null, c.dataset.dia); });
-  });
+  b('ag-gestor').addEventListener('change', function () { AG_GESTOR = this.value; agRemonta(); });
+  b('ag-status').addEventListener('change', function () { AG_STATUS = this.value; agRemonta(); });
+  b('ag-nova').addEventListener('click', function () { abreReuniao(null); });
+
+  agLigaMiolo();
 
   const gl = b('ag-g-ligar');
   if (gl) gl.addEventListener('click', async function () {
@@ -340,7 +419,7 @@ function ligaAgenda() {
       const j = agJanela();
       const r = await apiAg('ag_google_sync', { body: { de: j.de, ate: j.ate } });
       toast(r.novos + ' nova(s) · ' + r.atualizados + ' atualizada(s)');
-      AG = null; carregaAgenda();
+      carregaAgenda();                   // o cartão do Google também muda
     } catch (e) {
       toast(e.message, true);
       this.disabled = false; this.textContent = 'Sincronizar período';
@@ -354,7 +433,7 @@ function ligaAgenda() {
         try {
           await apiAg('ag_google_desligar', { body: {} });
           toast('Google desconectado');
-          AG = null; carregaAgenda();
+          carregaAgenda();
         } catch (e) { toast(e.message, true); }
       }, 'Desconectar');
   });
@@ -477,7 +556,7 @@ function abreReuniao(id, diaSugerido) {
       const out = await apiAg('ag_salvar', { body: corpo });
       toast(out.aviso || (novo ? 'Reunião marcada' : 'Reunião salva'));
       fechaGaveta();
-      AG = null; carregaAgenda();
+      agRemonta();                       // só o calendário se repinta
     } catch (e) {
       document.getElementById('ag-f-saida').innerHTML =
         '<div class="alert alert-erro" style="margin-top:14px">' + esc(e.message) + '</div>';
@@ -491,7 +570,7 @@ function abreReuniao(id, diaSugerido) {
         const out = await apiAg('ag_status', { body: { id: r.id, status: status } });
         toast(out.aviso || recado);
         fechaGaveta();
-        AG = null; carregaAgenda();
+        agRemonta();
       } catch (e) { toast(e.message, true); }
     };
     const liga = function (id, status, recado) {
@@ -511,7 +590,7 @@ function abreReuniao(id, diaSugerido) {
             await apiAg('ag_excluir', { body: { id: r.id } });
             toast('Reunião excluída');
             fechaGaveta();
-            AG = null; carregaAgenda();
+            agRemonta();
           } catch (e) { toast(e.message, true); }
         }, 'Excluir');
     });

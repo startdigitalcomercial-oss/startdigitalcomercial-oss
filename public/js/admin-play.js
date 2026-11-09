@@ -118,7 +118,7 @@ function desenhaPlay() {
         '<div class="row row-wrap" style="gap:10px;align-items:flex-end;margin-bottom:14px">' +
           '<div class="field" style="margin:0;min-width:180px;flex:1;max-width:260px">' +
             '<label for="pl-busca">Nome</label>' +
-            '<input id="pl-busca" placeholder="Procurar quem jogou…" value="' + esc(PL_FILTRO.nome) + '" autocomplete="off"></div>' +
+            buscaHtml('pl-busca', 'Procurar quem jogou…', PL_FILTRO.nome) + '</div>' +
           '<div class="field" style="margin:0;min-width:170px"><label for="pl-premio">Prêmio</label>' +
             '<select id="pl-premio"><option value="">Todos</option>' +
               premios.map(function (p) {
@@ -207,18 +207,18 @@ function ligaPlay() {
   });
 
   // ---- filtros do histórico ----
-  let timer = null;
-  b('pl-busca').addEventListener('input', function () {
-    PL_FILTRO.nome = this.value;
-    clearTimeout(timer);
-    timer = setTimeout(buscaHistorico, 220);
-  });
+  // Esta busca vai ao SERVIDOR (o histórico pode ser grande demais para
+  // caber na memória), então espera a pessoa parar de digitar antes de
+  // perguntar. Sem isso seriam dez pedidos para escrever um nome.
+  ligaBusca('pl-busca', function (texto) { PL_FILTRO.nome = texto; buscaHistorico(); }, 280);
   b('pl-premio').addEventListener('change', function () { PL_FILTRO.premio_id = this.value; buscaHistorico(); });
   b('pl-de').addEventListener('change', function () { PL_FILTRO.de = this.value; buscaHistorico(); });
   b('pl-ate').addEventListener('change', function () { PL_FILTRO.ate = this.value; buscaHistorico(); });
   b('pl-limpar').addEventListener('click', function () {
     PL_FILTRO = { nome: '', premio_id: '', de: '', ate: '' };
-    b('pl-busca').value = ''; b('pl-premio').value = '';
+    b('pl-busca').value = '';
+    b('pl-busca').dispatchEvent(new Event('input'));
+    b('pl-premio').value = '';
     b('pl-de').value = ''; b('pl-ate').value = '';
     buscaHistorico();
   });

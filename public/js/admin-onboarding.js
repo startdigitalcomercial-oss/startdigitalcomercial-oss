@@ -29,6 +29,24 @@ async function apiOb(action, opts) {
   return data;
 }
 
+/* Busca a lista de novo e repinta SÓ a área dos cards. Os filtros,
+   a busca e a escolha entre Lista e Quadro ficam onde estavam —
+   antes isto era "OB = null" + redesenhar tudo, que acendia o
+   spinner e devolvia a pessoa para o topo da página. */
+async function obRecarrega() {
+  const area = document.getElementById('ob-area');
+  if (!area) { OB = null; carregaOnboarding(); return; }
+  area.classList.add('ob-esperando');
+  try {
+    OB = await apiOb('ob_lista');
+    obPinta();
+  } catch (e) {
+    toast(e.message, true);
+  }
+  const depois = document.getElementById('ob-area');
+  if (depois) depois.classList.remove('ob-esperando');
+}
+
 async function carregaOnboarding() {
   const alvo = document.getElementById('painel-oponboarding');
   if (!OB) alvo.innerHTML = '<div class="spinner"></div>';
@@ -83,10 +101,8 @@ function desenhaOnboarding() {
     '</div>' +
 
     (vazio ? obVazio() : (
-      '<div class="row row-wrap" style="gap:10px;align-items:flex-end;margin-bottom:14px">' +
-        '<div class="field" style="margin:0;min-width:190px;flex:1;max-width:290px">' +
-          '<label for="ob-busca">Cliente</label>' +
-          '<input id="ob-busca" placeholder="Procurar pelo nome…" value="' + esc(OB_BUSCA) + '" autocomplete="off"></div>' +
+      '<div class="row row-wrap ob-filtros" style="gap:10px;align-items:flex-end;margin-bottom:14px">' +
+        buscaHtml('ob-busca', 'Buscar cliente…', OB_BUSCA) +
         '<div class="field" style="margin:0"><label for="ob-gestor">Gestor</label>' +
           '<select id="ob-gestor"><option value="">Todos</option>' +
             (OB.gestores || []).map(function (g) {
@@ -179,9 +195,126 @@ function obCard(o) {
     '<div class="ob-linha"><span class="op-fase"><i style="background:' + opCor(o.cor) + '"></i>' +
       esc(o.gestor) + '</span></div>' +
     '<div class="ob-linha ob-pe">' +
-      '<span class="small muted">' + (o.prazo ? 'prazo ' + obDataBr(o.prazo) : 'sem prazo') + '</span>' +
+      '<span class="small muted" style="white-space:nowrap">' +
+        (o.prazo ? 'prazo ' + obDataBr(o.prazo) : 'sem prazo') + '</span>' +
       obPino(o) +
     '</div></div>';
+}
+
+/* ============================================================
+   ONDE O CARD CAI
+
+   Isto é um ESPELHO da regra que está em api/operacao.js, no
+   ob_lista. Precisa existir aqui porque, ao arrastar, a tela
+   mostra o resultado na hora, antes de o servidor responder.
+
+   Quem manda continua sendo o servidor: quando ele responde, a
+   gente recalcula com os campos que vieram dele e, se o card
+   tiver que ficar noutro lugar, ele anda sozinho. O espelho só
+   adianta o que quase sempre vai acontecer.
+
+   Se a regra mudar lá, muda aqui. O tools/test-kanban.js compara
+   os dois lado a lado e quebra se eles discordarem.
+   ============================================================ */
+function obDiasAte(prazo, hoje) {
+  if (!prazo) return null;
+  return Math.round((new Date(prazo + 'T12:00:00Z') - new Date(hoje + 'T12:00:00Z')) / 86400000);
+}
+
+function obRecalcula(o, hoje, periodo) {
+  o.atrasado = o.situacao === 'em_andamento' && !!o.prazo && o.prazo < hoje;
+  o.dias_para_o_prazo = obDiasAte(o.prazo, hoje);
+  o.situacao_nome = { a_iniciar: 'A iniciar', em_andamento: 'Em andamento',
+    concluido: 'Concluído', cancelado: 'Cancelado' }[o.situacao] || o.situacao;
+
+  const em7 = new Date(hoje + 'T12:00:00Z');
+  em7.setUTCDate(em7.getUTCDate() + 7);
+  const limite7 = em7.toISOString().slice(0, 10);
+
+  if (o.situacao === 'concluido') {
+    o.coluna = (o.concluido_em && periodo && o.concluido_em >= periodo.de && o.concluido_em <= periodo.ate)
+      ? 'concluidos_mes' : 'fora_do_mes';
+  } else if (o.situacao === 'cancelado') {
+    o.coluna = 'fora_do_mes';
+  } else if (o.situacao === 'a_iniciar') {
+    o.coluna = 'a_iniciar';
+  } else if (o.atrasado) {
+    o.coluna = 'atrasados';
+  } else if (o.prazo && o.prazo <= limite7) {
+    o.coluna = 'a_vencer';
+  } else if (o.prazo) {
+    o.coluna = 'em_dia';
+  } else {
+    o.coluna = 'em_andamento';
+  }
+  return o;
+}
+
+/* O que o servidor faz com as datas quando a situação muda — mesmo
+   espelho, mesma razão. Aplica no objeto e devolve ele. */
+function obAplicaSituacao(o, para, hoje) {
+  o.situacao = para;
+  if (para === 'em_andamento' && !o.iniciado_em) o.iniciado_em = hoje;
+  if (para === 'concluido') o.concluido_em = hoje;
+  else o.concluido_em = null;
+  if (para === 'a_iniciar') o.iniciado_em = null;
+  return o;
+}
+
+/* ---------------- mexer no quadro sem redesenhar ---------------- */
+
+// Acha o card na memória pelo id.
+function obAchaPorId(id) {
+  return (OB.onboardings || []).filter(function (o) { return o.id === id; })[0] || null;
+}
+
+// Põe o nó na pilha da coluna certa (ou tira do quadro, se a coluna
+// nem existe por lá). Cuida do travessão de coluna vazia e da conta
+// do cabeçalho. Nada disso redesenha o quadro.
+function obPoeNaColuna(no, chave) {
+  const col = document.querySelector('.ob-coluna[data-col="' + chave + '"]');
+  const antiga = no.parentElement;
+  if (!col) { no.remove(); obContaColunas(); return false; }
+  const pilha = col.querySelector('.ob-pilha');
+  const nada = pilha.querySelector('.ob-nada');
+  if (nada) nada.remove();
+  pilha.appendChild(no);
+  // recomeça a animação de pouso na mão: mover um nó no DOM não
+  // faz o navegador tocar de novo uma animação que já tocou.
+  no.classList.remove('pousou');
+  void no.offsetWidth;
+  no.classList.add('pousou');
+  if (antiga && antiga !== pilha && !antiga.querySelector('.ob-card')) {
+    antiga.insertAdjacentHTML('beforeend', '<div class="ob-nada">—</div>');
+  }
+  obContaColunas();
+  return true;
+}
+
+// Reconta o número no topo de cada coluna.
+function obContaColunas() {
+  document.querySelectorAll('.ob-coluna').forEach(function (col) {
+    const n = col.querySelectorAll('.ob-card').length;
+    const b = col.querySelector('.ob-cab b');
+    if (b) b.textContent = n;
+    const pilha = col.querySelector('.ob-pilha');
+    if (pilha && !n && !pilha.querySelector('.ob-nada')) {
+      pilha.insertAdjacentHTML('beforeend', '<div class="ob-nada">—</div>');
+    }
+  });
+  const conta = document.getElementById('ob-conta');
+  if (conta) {
+    const l = obFiltrados();
+    conta.textContent = l.length + (l.length === 1 ? ' processo' : ' processos');
+  }
+}
+
+// Troca só a etiqueta de situação dentro do card, sem refazer o card.
+function obAtualizaPino(no, o) {
+  const pe = no.querySelector('.ob-pe');
+  if (!pe) return;
+  const velho = pe.querySelector('.op-pino');
+  if (velho) velho.outerHTML = obPino(o);
 }
 
 function obLigaCards() {
@@ -199,29 +332,113 @@ function obLigaCards() {
   let pego = null;
 
   document.querySelectorAll('.ob-card').forEach(function (c) {
-    c.addEventListener('dragstart', function () { pego = c; c.classList.add('arrastando'); });
+    c.addEventListener('dragstart', function (ev) {
+      pego = c;
+      c.classList.add('arrastando');
+      // sem isto o Firefox nem começa a arrastar
+      if (ev.dataTransfer) { ev.dataTransfer.effectAllowed = 'move'; try { ev.dataTransfer.setData('text/plain', c.dataset.id); } catch (e) { } }
+    });
     c.addEventListener('dragend', function () { c.classList.remove('arrastando'); pego = null; });
   });
+
   document.querySelectorAll('.ob-coluna').forEach(function (col) {
     const destino = manuais[col.dataset.col];
     col.addEventListener('dragover', function (ev) {
       if (!pego || !destino) return;
       ev.preventDefault();
+      if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
       col.classList.add('alvo');
     });
-    col.addEventListener('dragleave', function () { col.classList.remove('alvo'); });
-    col.addEventListener('drop', async function (ev) {
+    col.addEventListener('dragleave', function (ev) {
+      if (col.contains(ev.relatedTarget)) return;
+      col.classList.remove('alvo');
+    });
+    col.addEventListener('drop', function (ev) {
       col.classList.remove('alvo');
       if (!pego || !destino) return;
       ev.preventDefault();
-      const id = pego.dataset.id;
-      try {
-        await apiOb('ob_mover', { body: { id: id, situacao: destino } });
-        toast('Onboarding atualizado');
-        OB = null; carregaOnboarding();
-      } catch (e) { toast(e.message, true); }
+      obSolta(pego, destino);
     });
   });
+}
+
+/* ============================================================
+   SOLTAR UM CARD
+
+   O jeito antigo era: pede ao servidor, espera, joga TODO o
+   onboarding fora e desenha a tela de novo. Dava a sensação de
+   F5 — piscava, voltava para o topo, perdia o scroll.
+
+   Agora:
+     1. o card anda na hora;
+     2. o pedido vai por baixo;
+     3. deu certo → confere com a resposta do servidor e, se
+        precisar, ajeita;
+     4. deu errado → o card volta exatamente para onde estava,
+        com a etiqueta de antes, e o erro aparece.
+
+   Nada é redesenhado. O scroll fica onde o usuário deixou.
+   ============================================================ */
+async function obSolta(no, destino) {
+  const id = no.dataset.id;
+  const o = obAchaPorId(id);
+  if (!o) return;
+  if (o.situacao === destino) return;              // soltou na mesma coluna: nada a fazer
+
+  const hoje = (OB && OB.hoje) || new Date().toISOString().slice(0, 10);
+  const periodo = OB && OB.periodo;
+
+  // a fotografia do antes, para conseguir desfazer
+  const antes = {
+    situacao: o.situacao, iniciado_em: o.iniciado_em, concluido_em: o.concluido_em,
+    coluna: o.coluna, atrasado: o.atrasado, dias: o.dias_para_o_prazo,
+    pai: no.parentElement, vizinho: no.nextElementSibling
+  };
+
+  // 1 e 2: anda na hora
+  obAplicaSituacao(o, destino, hoje);
+  obRecalcula(o, hoje, periodo);
+  obAtualizaPino(no, o);
+  const ficou = obPoeNaColuna(no, o.coluna);
+  no.classList.add('salvando');
+
+  function desfaz() {
+    o.situacao = antes.situacao; o.iniciado_em = antes.iniciado_em;
+    o.concluido_em = antes.concluido_em; o.coluna = antes.coluna;
+    o.atrasado = antes.atrasado; o.dias_para_o_prazo = antes.dias;
+    o.situacao_nome = { a_iniciar: 'A iniciar', em_andamento: 'Em andamento',
+      concluido: 'Concluído', cancelado: 'Cancelado' }[o.situacao] || o.situacao;
+    obAtualizaPino(no, o);
+    if (antes.pai) {
+      const nada = antes.pai.querySelector('.ob-nada');
+      if (nada) nada.remove();
+      antes.pai.insertBefore(no, antes.vizinho && antes.vizinho.parentElement === antes.pai ? antes.vizinho : null);
+    }
+    no.classList.remove('salvando');
+    obContaColunas();
+  }
+
+  try {
+    const r = await apiOb('ob_mover', { body: { id: id, situacao: destino } });
+
+    // 3: o servidor é quem manda. Se ele devolveu datas diferentes
+    // das que a gente chutou, vale a dele — e o card se ajeita.
+    const linha = r && r.onboarding;
+    if (linha) {
+      o.situacao = linha.situacao;
+      o.iniciado_em = linha.iniciado_em;
+      o.concluido_em = linha.concluido_em;
+      const coluna = obRecalcula(o, hoje, periodo).coluna;
+      if (coluna !== o.coluna || !ficou) obPoeNaColuna(no, coluna);
+      obAtualizaPino(no, o);
+    }
+    no.classList.remove('salvando');
+    toast(ficou ? 'Onboarding atualizado' : 'Onboarding atualizado — saiu do quadro deste mês');
+  } catch (e) {
+    // 4: voltou tudo como estava
+    desfaz();
+    toast(e.message, true);
+  }
 }
 
 function ligaOnboarding() {
@@ -239,10 +456,10 @@ function ligaOnboarding() {
   b('ob-novo').addEventListener('click', function () { abreOnboarding(null); });
 
   if (!b('ob-busca')) return;
-  let timer = null;
-  b('ob-busca').addEventListener('input', function () {
-    OB_BUSCA = this.value; clearTimeout(timer); timer = setTimeout(obPinta, 140);
-  });
+  // A lista inteira já está na memória (veio no ob_lista). Filtrar não
+  // custa nada, então o resultado aparece na mesma tecla — esperar aqui
+  // só faria a tela parecer lenta de graça.
+  ligaBusca('ob-busca', function (texto) { OB_BUSCA = texto; obPinta(); }, 0);
   b('ob-gestor').addEventListener('change', function () { OB_GESTOR = this.value; obPinta(); });
   b('ob-sit').addEventListener('change', function () { OB_SIT = this.value; obPinta(); });
 }
@@ -338,7 +555,7 @@ function abreOnboarding(id) {
       await apiOb('ob_salvar', { body: corpo });
       toast(novo ? (iniciar ? 'Onboarding iniciado' : 'Onboarding criado') : 'Onboarding salvo');
       fechaGaveta();
-      OB = null; carregaOnboarding();
+      obRecarrega();
       return true;
     } catch (e) {
       document.getElementById('ob-f-saida').innerHTML =
@@ -356,7 +573,7 @@ function abreOnboarding(id) {
       await apiOb('ob_mover', { body: { id: o.id, situacao: situacao } });
       toast(recado);
       fechaGaveta();
-      OB = null; carregaOnboarding();
+      obRecarrega();
     } catch (e) { toast(e.message, true); }
   };
   const liga = function (id, situacao, recado) {

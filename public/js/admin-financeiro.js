@@ -264,12 +264,7 @@ function desenhaFinanceiro() {
 
     /* ---- busca + vencimento ---- */
     '<div class="fin-filtros">' +
-      '<div class="fin-busca">' +
-        '<svg width="15" height="15" viewBox="0 0 24 24"><circle cx="10.6" cy="10.6" r="6.4"/>' +
-          '<path d="m15.4 15.4 4.2 4.2"/></svg>' +
-        '<input type="search" id="fin-q" placeholder="Buscar cliente…" autocomplete="off" ' +
-          'value="' + esc(FIN_BUSCA) + '">' +
-      '</div>' +
+      buscaHtml('fin-q', 'Buscar cliente…', FIN_BUSCA) +
       '<label class="fin-venc"><span>Vencimento</span>' +
         '<select id="fin-dia">' +
           '<option value="">Todos os vencimentos</option>' +
@@ -308,15 +303,7 @@ function desenhaFinanceiro() {
   // A busca filtra o que JÁ está na tela: nada de ida ao servidor a
   // cada tecla. Com centenas de linhas isso é instantâneo, e o mês
   // inteiro já veio numa chamada só.
-  const campoQ = document.getElementById('fin-q');
-  campoQ.addEventListener('input', function () {
-    FIN_BUSCA = campoQ.value;
-    finPinta();
-  });
-  campoQ.addEventListener('search', function () {      // o "x" do campo
-    FIN_BUSCA = campoQ.value;
-    finPinta();
-  });
+  ligaBusca('fin-q', function (texto) { FIN_BUSCA = texto; finPinta(); }, 0);
 
   document.getElementById('fin-dia').addEventListener('change', function () {
     FIN_VENC = this.value;
@@ -325,10 +312,12 @@ function desenhaFinanceiro() {
 
   document.getElementById('fin-limpar').addEventListener('click', function () {
     FIN_BUSCA = ''; FIN_VENC = ''; FIN_FILTRO = '';
-    document.getElementById('fin-q').value = '';
+    const q = document.getElementById('fin-q');
+    q.value = '';
+    q.dispatchEvent(new Event('input'));          // o botão de limpar da busca acompanha
     document.getElementById('fin-dia').value = '';
     finPinta();
-    document.getElementById('fin-q').focus();
+    q.focus();
   });
 
   finPinta();
@@ -1079,6 +1068,12 @@ async function escondeFinanceiroSeNaoPode() {
     })).json();
     if (!r.ok) return;
 
+    // Já que esta chamada acontece em toda entrada, ela também serve de
+    // crachá para o cartão de boas-vindas. Pedir o nome de novo numa
+    // segunda chamada seria desperdício.
+    EU = r.usuario || null;
+    if (typeof daBoasVindas === 'function') daBoasVindas(EU);
+
     // Automação: escondida por padrão; a chave fica em Ajustes.
     if (r.mostrar_automacao !== true) {
       const auto = document.querySelector('#abas .nav-grupo[data-grupo="automacao"]');
@@ -1299,9 +1294,7 @@ function fcFiltrados() {
 function desenhaListaClientes() {
   document.getElementById('painel-finclientes').innerHTML =
     '<div class="row row-wrap" style="justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px">' +
-      '<div class="field" style="margin:0;min-width:260px;flex:1;max-width:380px">' +
-        '<input id="fc-busca" placeholder="Procurar cliente pelo nome…" value="' + esc(FC_BUSCA) + '" autocomplete="off">' +
-      '</div>' +
+      buscaHtml('fc-busca', 'Buscar cliente…', FC_BUSCA) +
       '<div class="small muted" id="fc-conta"></div>' +
     '</div>' +
 
@@ -1317,13 +1310,8 @@ function desenhaListaClientes() {
 
   pintaListaClientes();
 
-  // debounce curtinho: espera a pessoa parar de digitar
-  let timer = null;
-  document.getElementById('fc-busca').addEventListener('input', function () {
-    FC_BUSCA = this.value;
-    clearTimeout(timer);
-    timer = setTimeout(pintaListaClientes, 120);
-  });
+  // a lista já está na memória: filtra na mesma tecla
+  ligaBusca('fc-busca', function (texto) { FC_BUSCA = texto; pintaListaClientes(); }, 0);
 }
 
 function fcCompNome(c) {
