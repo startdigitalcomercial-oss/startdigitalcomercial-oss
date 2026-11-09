@@ -245,6 +245,9 @@ const DB = {
   }),
   op_clientes: [],
   op_eventos: [],
+  op_onboardings: [],
+  op_reunioes: [],
+  op_google_contas: [],
 
   play_prizes: [
     ['PIX R$ 100', 'Cai na sua chave Pix', 100, 'dinheiro', 'roxo'],
@@ -298,6 +301,9 @@ const DEFAULTS = {
   op_gestores: function () { return { id: uuid(), collaborator_id: null, cor: 'azul', ativo: true, position: 1, created_at: agora(), updated_at: agora() }; },
   op_clientes: function () { return { id: uuid(), customer_id: null, gestor_id: null, categoria: null, satisfacao: null, fase: 'onboarding', status: 'ativo', entrou_em: agora().slice(0, 10), excluido_em: null, created_at: agora(), updated_at: agora() }; },
   op_eventos: function () { return { id: uuid(), de: null, para: null, quem: null, observacao: null, quando: agora() }; },
+  op_onboardings: function () { return { id: uuid(), gestor_id: null, situacao: 'a_iniciar', inicio_previsto: null, iniciado_em: null, prazo: null, concluido_em: null, observacao: null, created_at: agora(), updated_at: agora() }; },
+  op_reunioes: function () { return { id: uuid(), cliente_id: null, gestor_id: null, fim: null, status: 'agendada', link: null, observacao: null, origem: 'sistema', externo_id: null, externo_conta: null, resolvido_em: null, resolvido_por: null, created_at: agora(), updated_at: agora() }; },
+  op_google_contas: function () { return { id: uuid(), panel_user_id: null, email: null, access_token: null, refresh_token: null, expira_em: null, escopo: null, ultimo_sync: null, created_at: agora(), updated_at: agora() }; },
   play_prizes: function () { return { id: uuid(), descricao: null, valor: null, icone: 'presente', cor: 'roxo', ativo: true, position: 1, created_at: agora(), updated_at: agora() }; },
   play_spins: function () { return { id: uuid(), prize_id: null, prize_descricao: null, prize_cor: 'roxo', client_token: null, criado_em: agora() }; },
     finance_customers: function () { return { id: uuid(), telefone: null, responsavel: null, observacoes: null, ativo: true, created_at: agora(), updated_at: agora() }; },
@@ -523,6 +529,14 @@ const server = http.createServer(function (req, res) {
           if (r.excluido_em || !r.customer_id) return null;
           return 'opcli|' + r.customer_id;
         },
+        // um onboarding em aberto por cliente
+        op_onboardings: function (r) {
+          if (['a_iniciar', 'em_andamento'].indexOf(String(r.situacao)) < 0) return null;
+          return 'onb|' + r.cliente_id;
+        },
+        // o mesmo evento externo nunca entra duas vezes
+        op_reunioes: function (r) { return r.externo_id ? 'reu|' + r.origem + '|' + r.externo_id : null; },
+        op_google_contas: function (r) { return 'gc|' + String(r.dono || ''); },
         // um beneficio em aberto por colaborador
         benefit_releases: function (r) {
           if (['liberado', 'processando'].indexOf(String(r.status)) < 0) return null;

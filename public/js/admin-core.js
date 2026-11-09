@@ -153,7 +153,8 @@ const TITULOS = {
   mensagens: 'Modelos de mensagem', ajustes: 'Ajustes',
   financeiro: 'Cobranças', findash: 'Dashboard financeiro', fingastos: 'Despesas', findre: 'DRE', finclientes: 'Clientes',
   space: 'Benefícios', play: 'START PLAY',
-  opdash: 'Dashboard Operacional', opgestores: 'Gestores'
+  opdash: 'Dashboard Operacional', opgestores: 'Gestão',
+  oponboarding: 'Onboarding', opagenda: 'Agenda'
 };
 /* ---------------------------------------------- sanfona do menu
    Um grupo aberto por vez. O grupo da página em que você está abre
@@ -220,7 +221,9 @@ document.getElementById('abas').addEventListener('click', function (ev) {
     space: carregaSpace,
     play: (typeof carregaPlay === 'function' ? carregaPlay : null),
     opdash: (typeof carregaOpDash === 'function' ? carregaOpDash : null),
-    opgestores: (typeof carregaOpGestores === 'function' ? carregaOpGestores : null)
+    opgestores: (typeof carregaOpGestores === 'function' ? carregaOpGestores : null),
+    oponboarding: (typeof carregaOnboarding === 'function' ? carregaOnboarding : null),
+    opagenda: (typeof carregaAgenda === 'function' ? carregaAgenda : null)
   };
   marcaGrupoAtivo();
   if (carregar[b.dataset.aba]) carregar[b.dataset.aba]();

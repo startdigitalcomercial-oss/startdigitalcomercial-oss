@@ -326,11 +326,15 @@ function opBarra(nome, qtd, pct, cor, filtro, chave) {
 }
 
 // Dispara as animações depois que o HTML já está na tela.
-function opAnima() {
-  document.querySelectorAll('#painel-opdash .op-kpi .num, #painel-opdash .op-sobe')
+// Recebe QUAL painel animar: a Agenda também usa estes cartões, e
+// com o seletor preso no dashboard os números dela ficavam em zero.
+function opAnima(painel) {
+  const raiz = document.getElementById(painel || 'painel-opdash');
+  if (!raiz) return;
+  raiz.querySelectorAll('.op-kpi .num, .op-sobe')
     .forEach(function (el) { opConta(el, el.dataset.ate); });
   requestAnimationFrame(function () {
-    document.querySelectorAll('#painel-opdash .op-fita').forEach(function (f) {
+    raiz.querySelectorAll('.op-fita').forEach(function (f) {
       f.style.width = Math.max(Number(f.dataset.pct) || 0, 0) + '%';
     });
   });
