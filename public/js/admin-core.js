@@ -6,6 +6,7 @@ let TOKEN = localStorage.getItem(LS) || '';
 let BOARD = { stages: [], candidates: [] };
 let APP_URL = '';
 let atualCand = null;
+let EU = null;                    // quem está logado (vem de usuarios_eu)
 let bvItens = [];
 
 function esc(s) {
@@ -59,6 +60,8 @@ async function api(action, opts) {
    ============================================================ */
 function sair() {
   localStorage.removeItem(LS);
+  // apaga a marca das boas-vindas: entrar de novo cumprimenta de novo
+  if (typeof bvEsquece === 'function') bvEsquece();
   TOKEN = '';
   document.getElementById('app').style.display = 'none';
   document.getElementById('tela-login').style.display = 'block';
