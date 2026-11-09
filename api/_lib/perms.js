@@ -90,6 +90,10 @@ const ACOES = {
 
   // --- OPERACAO: a carteira de trafego por gestor ---
   op_dashboard: 'ver', op_gestores: 'ver', op_carteira: 'ver', op_cliente_historico: 'ver',
+  ob_lista: 'ver', ob_salvar: 'mexer', ob_mover: 'mexer',
+  ag_lista: 'ver', ag_salvar: 'mexer', ag_status: 'mexer', ag_excluir: 'mexer',
+  ag_google_status: 'ver', ag_google_ligar: 'ajustes',
+  ag_google_desligar: 'ajustes', ag_google_sync: 'mexer',
   op_gestor_salvar: 'mexer', op_cliente_salvar: 'mexer',
   op_cliente_excluir: 'mexer', op_movimentar: 'mexer',
 
@@ -151,13 +155,13 @@ function menuDoPapel(papel) {
   if (papel === 'dono') {
     return ['dashboard', 'vagas', 'triagem', 'candidatos', 'prequalificacao', 'aurea', 'preonboarding',
       'colaboradores', 'avisos', 'space', 'play', 'conteudo', 'quiz', 'mensagens',
-      'opdash', 'opgestores',
+      'opdash', 'opgestores', 'oponboarding', 'opagenda',
       'financeiro', 'finclientes', 'findash', 'fingastos', 'findre', 'ajustes', 'usuarios'];
   }
   if (papel === 'rh') {
     return ['dashboard', 'vagas', 'triagem', 'candidatos', 'prequalificacao', 'aurea', 'preonboarding',
       'colaboradores', 'avisos', 'space', 'play', 'conteudo', 'quiz', 'mensagens',
-      'opdash', 'opgestores',
+      'opdash', 'opgestores', 'oponboarding', 'opagenda',
       'financeiro', 'finclientes', 'findash', 'fingastos', 'findre', 'ajustes'];
   }
   if (papel === 'avaliador') {
