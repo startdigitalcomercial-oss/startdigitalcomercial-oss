@@ -281,21 +281,14 @@
   .eq-pessoa.perto .eq-av { background: var(--accent-tint); color: var(--accent); }
   .eq-av-sm { width: 32px; height: 32px; font-size: 11.5px; }
 
-  .eq-busca-wrap { position: relative; margin-bottom: 8px; }
-  .eq-busca-wrap .eq-lupa { position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
-    stroke: var(--label-3); fill: none; stroke-width: 2; stroke-linecap: round; pointer-events: none; }
-  .eq-busca-wrap input { width: 100%; height: 48px; padding: 0 46px 0 46px; font-size: 15px;
-    border-radius: var(--r-pill); transition: border-color .16s, box-shadow .16s; }
-  .eq-busca-wrap input::-webkit-search-cancel-button { display: none; }
-  .eq-limpar { position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-    width: 26px; height: 26px; border: 0; border-radius: 50%; background: var(--fill-2);
-    color: var(--label-2); font-size: 11px; cursor: pointer; display: flex;
-    align-items: center; justify-content: center; transition: background .14s; }
-  .eq-limpar:hover { background: var(--fill-3, var(--hairline-strong)); color: var(--label); }
+  /* a busca daqui virou a .busca do ui.css, igual a de todo mundo —
+     so o lugar dela na pagina e que continua sendo daqui */
+  .eq-busca-wrap { margin-bottom: 8px; }
+  .eq-busca-wrap .busca { max-width: none; }
   .eq-linha { cursor: pointer; transition: background .12s; }
   .eq-linha:hover { background: var(--fill-1); }
 
-  @media (prefers-reduced-motion: reduce) { .eq-pessoa, .eq-linha, .eq-limpar { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .eq-pessoa, .eq-linha { transition: none; } }
 
   /* ---------- quem esta logado ---------- */
   .eu-sou { padding: 10px 14px; margin: 0 10px 6px; border-radius: 10px; background: rgba(255,255,255,.06); }
@@ -510,13 +503,13 @@
 
   /* o seletor de competencia (mes/ano), usado em Cobrancas e no Dashboard */
   .fin-comp { display: inline-flex; align-items: center; gap: 8px; background: var(--fill-1);
-              border-radius: 10px; padding: 5px 12px 5px 11px; color: var(--label-2);
-              white-space: nowrap; }
+              border-radius: var(--r-ctl); padding: 0 12px 0 11px; height: 36px;
+              color: var(--label-2); white-space: nowrap; }
   /* os select do sistema nascem com largura total; aqui eles precisam
      ocupar so o tamanho do texto, senao o seletor empilha */
-  .fin-comp select { width: auto !important; border: 0; background: transparent;
-                     font-family: inherit; font-size: 14px; font-weight: 600; color: var(--label);
-                     cursor: pointer; padding: 3px 22px 3px 2px; height: auto; min-width: 0;
+  .fin-comp select, .fin-venc select { width: auto !important; border: 0; background: transparent;
+                     font-family: inherit; font-size: 13.5px; font-weight: 600; color: var(--label);
+                     cursor: pointer; padding: 0 22px 0 2px; height: 100%; min-width: 0;
                      box-shadow: none; margin: 0; }
   .fin-comp select:focus { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
   .fin-comp .barra { color: var(--label-3); font-weight: 600; }
@@ -530,23 +523,15 @@
 
   /* ---- barra de filtros das Cobrancas: busca + vencimento ---- */
   .fin-filtros { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 14px; }
-  .fin-busca { display: flex; align-items: center; gap: 8px; background: var(--surface);
-               border: 1.5px solid var(--fio); border-radius: 11px; padding: 0 12px;
-               height: 38px; min-width: 230px; flex: 1 1 230px; max-width: 340px;
-               transition: border-color .15s, box-shadow .15s; }
-  .fin-busca:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
-  .fin-busca svg { fill: none; stroke: var(--label-3); stroke-width: 2; stroke-linecap: round; flex: none; }
-  .fin-busca input { flex: 1; min-width: 0; border: 0; background: transparent; outline: none;
-                     font-family: inherit; font-size: 14px; color: var(--label); height: 100%;
-                     padding: 0; box-shadow: none; }
-  .fin-busca input::-webkit-search-cancel-button { cursor: pointer; }
+  /* A busca do Financeiro virou a busca de TODO MUNDO: o componente
+     .busca agora mora no ui.css e e o mesmo na Operacao, no Onboarding,
+     nos Clientes e aqui. Tinhamos tres buscas diferentes; agora e uma. */
 
   .fin-venc { display: flex; align-items: center; gap: 8px; background: var(--fill-1);
-              border-radius: 11px; padding: 0 12px; height: 38px; white-space: nowrap; }
+              border-radius: var(--r-ctl); padding: 0 12px; height: 36px; white-space: nowrap; }
   .fin-venc > span { font-size: 12.5px; font-weight: 600; color: var(--label-3); }
-  .fin-venc select { width: auto !important; border: 0; background: transparent; font-family: inherit;
-                     font-size: 13.5px; font-weight: 600; color: var(--label); cursor: pointer;
-                     height: auto; padding: 2px 20px 2px 0; margin: 0; box-shadow: none; min-width: 0; }
+  /* o select do vencimento usa as mesmas regras do de competencia,
+     logo acima — eram duas receitas quase iguais para a mesma coisa */
 
   /* ============================================================
      OPERAÇÃO — dashboard e carteira.
@@ -576,13 +561,20 @@
   .op-cab { display: flex; flex-wrap: wrap; gap: 14px; justify-content: space-between;
     align-items: flex-start; margin-bottom: 18px; }
   .op-cab h2 { margin: 0 0 3px; font-size: 20px; letter-spacing: -.022em; }
-  .op-filtros { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  /* AS BARRAS DE FILTRO
+     Campo normal do sistema tem 44px. Numa barra de filtros isso vira
+     uma parede. Entao existe UMA segunda altura, 36px, e tudo que
+     mora nessas barras usa ela: select, data, botao e o controle de
+     abas. Antes cada peca tinha a sua (36, 32, 29...) e a linha
+     ficava com cara de coisa montada as pressas. */
+  .op-filtros, .ag-barra .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .op-filtros select, .op-filtros input[type=date] {
     height: 36px; font-size: 13.5px; margin: 0; width: auto; }
   /* a setinha nativa do select fica POR CIMA do texto quando o campo
      é estreito; o respiro à direita é para o nome do mês caber */
   .op-filtros select { padding: 0 30px 0 12px; min-width: 112px; }
   .op-filtros input[type=date] { padding: 0 10px; min-width: 140px; }
+  .op-filtros .fd2-filtro, .ag-barra .fd2-filtro { height: 36px; align-items: center; }
 
   /* ---- os seis indicadores ---- */
   .op-kpis { display: grid; gap: 12px; margin-bottom: 22px;
@@ -598,6 +590,8 @@
     font-variant-numeric: tabular-nums; line-height: 1.05; }
   .op-kpi .pe { font-size: 11.5px; color: var(--label-3); margin-top: 3px; }
   .op-kpi.bom .num { color: var(--green); }
+  /* o numero combina com a etiqueta: agendada e azul nos dois lugares */
+  .op-kpi.agenda .num { color: var(--blue); }
   .op-kpi.atencao .num { color: var(--orange); }
   .op-kpi.ruim .num { color: var(--red); }
 
@@ -650,6 +644,12 @@
   .op-pino.suspenso { background: var(--orange-tint); color: var(--orange); }
   .op-pino.flopado { background: var(--red-tint); color: var(--red); }
   .op-pino.cancelado { background: var(--fill-2); color: var(--label-2); }
+  /* "Agendada" era cinza — a MESMA etiqueta de "Cancelada". Duas
+     coisas bem diferentes com a mesma cara. Agora e azul: azul
+     agendada, verde realizada, laranja atrasada, vermelho nao
+     realizada, cinza cancelada. Quem decide o status continua
+     sendo o servidor; aqui so mudou a cor. */
+  .op-pino.agendada { background: var(--blue-tint); color: var(--blue-soft); }
   .op-carinha { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }
   .op-carinha svg { width: 15px; height: 15px; flex: 0 0 auto; }
   .op-carinha.satisfeito { color: var(--green); }
@@ -681,26 +681,49 @@
   /* ---- Agenda ---- */
   .ag-barra { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between;
     align-items: center; margin: 4px 0 14px; }
-  .ag-sem { display: grid; grid-template-columns: repeat(7, 1fr); background: var(--fill-1);
-    font-size: 11.5px; font-weight: 600; color: var(--label-2); text-align: center; }
-  .ag-sem div { padding: 9px 0; }
+  /* sem capitalize: aqui aparece "08/11 a 14/11" e o "a" virava "A" */
+  .ag-titulo { margin-left: 10px; font-size: 15px; font-weight: 600; letter-spacing: -.012em; }
+  .ag-titulo::first-letter { text-transform: uppercase; }
+  /* as setas sao quadradinhas: o icone ja diz tudo, texto so atrapalha */
+  .ag-barra .btn.ag-seta { width: 36px; padding: 0; }
+
+  /* Enquanto o mes novo vem do servidor, o mes velho continua na
+     tela, apagadinho. Trocar de mes vira um piscar, nao um F5. */
+  #ag-miolo, #ob-area { transition: opacity var(--t-rapido); }
+  #ag-miolo.ag-esperando, #ob-area.ob-esperando { opacity: .45; pointer-events: none; }
+
+  .ag-sem { display: grid; grid-template-columns: repeat(7, 1fr);
+    background: var(--fill-1); border-bottom: 1px solid var(--hairline);
+    font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--label-3); text-align: center; }
+  .ag-sem div { padding: 10px 0; }
   .ag-mes { display: grid; grid-template-columns: repeat(7, 1fr); }
-  .ag-cel { min-height: 96px; min-width: 0; overflow: hidden;
+  .ag-cel { min-height: 104px; min-width: 0; overflow: hidden;
     border-right: 1px solid var(--hairline);
-    border-bottom: 1px solid var(--hairline); padding: 6px; display: flex; flex-direction: column;
-    gap: 3px; cursor: default; }
+    border-bottom: 1px solid var(--hairline); padding: 7px 6px; display: flex; flex-direction: column;
+    gap: 3px; cursor: default; transition: background var(--t-rapido); }
   .ag-cel:nth-child(7n) { border-right: none; }
-  .ag-cel.fora { background: var(--fill-1); opacity: .55; }
-  .ag-cel.hoje { background: var(--accent-tint); }
-  .ag-num { font-size: 11.5px; font-weight: 600; color: var(--label-2); padding: 0 2px 2px;
+  .ag-cel:hover { background: var(--fill-1); }
+  .ag-cel.fora { background: var(--fill-1); opacity: .5; }
+  /* hoje nao e um fundo chapado: e uma marca no numero, que nao
+     briga com a cor das reunioes que estao dentro da celula */
+  .ag-cel.hoje { background: var(--accent-tint); box-shadow: inset 0 2px 0 var(--accent); }
+  .ag-num-linha { display: flex; }
+  .ag-num { font-size: 11.5px; font-weight: 600; color: var(--label-3); padding: 0 2px 3px;
     font-variant-numeric: tabular-nums; }
-  .ag-cel.hoje .ag-num { color: var(--accent-soft); }
-  .ag-chip { display: block; width: 100%; text-align: left; border: none; font-family: inherit;
-    font-size: 11.5px; line-height: 1.35; padding: 3px 6px; border-radius: 6px; cursor: pointer;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    border-left: 3px solid currentColor; background: var(--fill-1); color: var(--label-2); }
-  .ag-chip .ag-h { font-weight: 700; font-variant-numeric: tabular-nums; }
-  .ag-chip:hover { background: var(--fill-2); }
+  .ag-cel.hoje .ag-num {
+    color: var(--accent-on); background: var(--accent); border-radius: 50%;
+    width: 21px; height: 21px; display: flex; align-items: center; justify-content: center;
+    padding: 0; margin-bottom: 3px; font-size: 11px; }
+  .ag-chip { display: flex; align-items: center; gap: 5px; width: 100%; text-align: left;
+    border: none; font-family: inherit;
+    font-size: 11.5px; line-height: 1.35; padding: 3px 7px; border-radius: var(--r-chip);
+    cursor: pointer; overflow: hidden; white-space: nowrap;
+    border-left: 3px solid currentColor; background: var(--fill-1); color: var(--label-2);
+    transition: filter var(--t-rapido), transform var(--t-rapido); }
+  .ag-chip > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+  .ag-chip .ag-h { font-weight: 700; font-variant-numeric: tabular-nums; flex: none; }
+  .ag-chip:hover { filter: brightness(1.22); transform: translateX(1px); }
   .ag-chip.agendada { color: var(--blue-soft); background: var(--blue-tint); }
   .ag-chip.feita { color: var(--green-soft); background: var(--green-tint); }
   .ag-chip.atrasada { color: var(--orange-soft); background: var(--orange-tint); }
@@ -712,24 +735,50 @@
 
   .ag-dia { border-bottom: 1px solid var(--hairline); }
   .ag-dia:last-child { border-bottom: none; }
+  /* o cabecalho do dia gruda no topo quando a lista e longa: a
+     pessoa nao perde de vista em que dia esta olhando */
+  .ag-dia-cab { position: sticky; top: 0; z-index: 1;
+    display: flex; align-items: center; gap: 8px; padding: 11px 18px 9px;
+    background: var(--surface); border-bottom: 1px solid var(--hairline);
+    font-size: 12px; font-weight: 600; letter-spacing: .02em; color: var(--label-2);
+    text-transform: capitalize; }
   .ag-dia.hoje .ag-dia-cab { color: var(--accent-soft); }
-  .ag-dia-cab { display: flex; align-items: center; gap: 8px; padding: 12px 18px 8px;
-    font-size: 12.5px; font-weight: 600; color: var(--label-2); }
-  .ag-dia-cab b { margin-left: auto; background: var(--fill-1); border-radius: 999px;
-    padding: 1px 8px; font-size: 11.5px; color: var(--label); font-variant-numeric: tabular-nums; }
+  .ag-dia-cab b { margin-left: auto; background: var(--fill-2); border-radius: var(--r-pill);
+    padding: 2px 9px; font-size: 11.5px; font-weight: 600; color: var(--label);
+    font-variant-numeric: tabular-nums; }
   .ag-linha { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
     background: none; border: none; font-family: inherit; color: var(--label);
-    padding: 10px 18px; cursor: pointer; border-top: 1px solid var(--hairline); }
+    padding: 12px 18px; cursor: pointer; border-top: 1px solid var(--hairline);
+    position: relative; transition: background var(--t-rapido); }
+  .ag-linha:first-of-type { border-top: 0; }
   .ag-linha:hover { background: var(--fill-1); }
-  .ag-hora { font-size: 12.5px; color: var(--label-2); white-space: nowrap; min-width: 94px;
-    font-variant-numeric: tabular-nums; }
+  /* uma fitinha da cor da situacao na beirada esquerda: da para ler
+     a agenda inteira de relance, sem passar por cada etiqueta */
+  .ag-linha::before { content: ''; position: absolute; left: 0; top: 8px; bottom: 8px;
+    width: 3px; border-radius: 0 3px 3px 0; background: var(--hairline-strong);
+    transition: background var(--t-rapido); }
+  .ag-linha:has(.op-pino.agendada)::before { background: var(--blue); }
+  .ag-linha:has(.op-pino.ativo)::before { background: var(--green); }
+  .ag-linha:has(.op-pino.suspenso)::before { background: var(--orange); }
+  .ag-linha:has(.op-pino.flopado)::before { background: var(--red); }
+  .ag-linha:has(.op-pino.cancelado)::before { background: var(--label-3); }
+  .ag-hora { font-size: 13px; font-weight: 600; color: var(--label-2); white-space: nowrap;
+    min-width: 98px; font-variant-numeric: tabular-nums; }
   .ag-corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-  .ag-tit { font-size: 14px; font-weight: 600; }
+  .ag-tit { font-size: 14px; font-weight: 600; letter-spacing: -.008em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   @media (max-width: 620px) {
-    .ag-cel { min-height: 62px; padding: 4px 3px; }
-    .ag-chip { font-size: 10px; padding: 2px 4px; }
-    .ag-hora { min-width: 72px; font-size: 11.5px; }
-    .ag-linha { gap: 8px; padding: 10px 12px; }
+    .ag-cel { min-height: 66px; padding: 5px 4px; }
+    .ag-chip { font-size: 10px; padding: 2px 5px; gap: 3px; }
+    .ag-cel.hoje .ag-num { width: 18px; height: 18px; font-size: 10px; }
+    .ag-hora { min-width: 70px; font-size: 12px; }
+    .ag-linha { gap: 10px; padding: 11px 13px 11px 14px; }
+    .ag-dia-cab { padding: 10px 14px 8px; }
+    .ag-titulo { margin-left: 4px; font-size: 14px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ag-chip:hover { transform: none; }
+    #ag-miolo { transition: none; }
   }
 
   /* ---- Onboarding: o quadro ---- */
@@ -742,23 +791,63 @@
     .ob-coluna { flex: 0 0 78vw; scroll-snap-align: start; }
   }
   .ob-coluna { background: var(--fill-1); border-radius: var(--r-card); padding: 10px;
+    display: flex; flex-direction: column; min-height: 0;
     transition: background .18s, outline-color .18s; outline: 2px solid transparent; }
   .ob-coluna.alvo { background: var(--accent-tint); outline-color: var(--accent); }
   .ob-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px;
     padding: 2px 4px 10px; font-size: 12.5px; font-weight: 600; color: var(--label-2); }
   .ob-cab b { background: var(--surface); border-radius: 999px; padding: 1px 8px; font-size: 12px;
     color: var(--label); font-variant-numeric: tabular-nums; }
-  .ob-pilha { display: flex; flex-direction: column; gap: 8px; }
+  /* Cada coluna rola por dentro, em vez de uma delas esticar a
+     pagina inteira. Antes, uma coluna com 18 cards fazia o quadro
+     ter 2500px de altura e as outras cinco ficavam perdidas la em
+     cima — rolar para achar uma coluna vazia nao e quadro, e lista. */
+  .ob-pilha { display: flex; flex-direction: column; gap: 8px;
+    max-height: calc(100vh - 330px); min-height: 60px;
+    overflow-y: auto; overscroll-behavior: contain;
+    padding-right: 2px; margin-right: -2px; }
+  .ob-pilha::-webkit-scrollbar { width: 6px; }
+  @media (max-width: 760px) { .ob-pilha { max-height: 62vh; } }
   .ob-nada { text-align: center; color: var(--label-3); font-size: 13px; padding: 14px 0; }
   .ob-card { background: var(--surface); border: 1px solid var(--hairline); border-radius: 12px;
     padding: 11px 12px; cursor: pointer;
     transition: border-color .16s, transform .16s cubic-bezier(.32,.72,0,1), box-shadow .16s; }
   .ob-card:hover { border-color: var(--hairline-strong); transform: translateY(-2px); box-shadow: var(--shadow-2); }
   .ob-card.arrastando { opacity: .4; }
-  .ob-cliente { font-weight: 650; font-size: 13.5px; line-height: 1.3; margin-bottom: 7px; }
-  .ob-linha { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .ob-pe { margin-top: 7px; }
-  @media (prefers-reduced-motion: reduce) { .ob-card:hover { transform: none; } }
+  .ob-card:active { cursor: grabbing; }
+  /* O card acabou de chegar na coluna nova e o salvamento ainda esta
+     voando. Fica com uma listra discreta de "estou indo" — se der
+     errado, ele volta sozinho para a coluna de origem. */
+  .ob-card.salvando { border-color: var(--hairline-strong); }
+  .ob-card.salvando::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    border-radius: 0 0 12px 12px; background: var(--accent-grad);
+    animation: ob-salvando 1.1s ease-in-out infinite;
+  }
+  .ob-card { position: relative; }
+  @keyframes ob-salvando { 0%, 100% { opacity: .25; } 50% { opacity: .9; } }
+  /* o card que acabou de pousar numa coluna da um "oi" de 220ms.
+     E uma classe, e nao uma regra fixa, porque mover um no no DOM
+     nao faz uma animacao ja tocada tocar de novo: tem que recomecar
+     na mao. */
+  @keyframes ob-pousou { from { transform: scale(.96); opacity: .5; } }
+  .ob-card.pousou { animation: ob-pousou .22s cubic-bezier(.32,.72,0,1); }
+  .ob-cliente { font-weight: 650; font-size: 13.5px; line-height: 1.3; margin-bottom: 7px;
+    overflow-wrap: anywhere; }
+  .ob-linha { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    min-width: 0; }
+  .ob-linha > * { min-width: 0; }
+  /* A coluna tem ~175px por dentro. "prazo 12/11/2026" mais a
+     etiqueta "Vence em 3d" nao cabem lado a lado, e a etiqueta
+     ficava cortada na beirada. Agora a linha quebra: a etiqueta
+     desce em vez de sumir pela direita. */
+  .ob-pe { margin-top: 8px; flex-wrap: wrap; row-gap: 6px; }
+  .ob-pe .op-pino { max-width: 100%; }
+  @media (prefers-reduced-motion: reduce) {
+    .ob-card:hover { transform: none; }
+    .ob-card.pousou { animation: none; }
+    .ob-card.salvando::after { animation: none; opacity: .7; }
+  }
 
   /* ---- START PLAY ---- */
   .pl-item { display: flex; align-items: center; gap: 12px; padding: 12px 4px;
@@ -923,7 +1012,11 @@
     <section data-painel="triagem" style="display:none">
       <div class="row row-wrap" style="padding:18px 0 0;justify-content:space-between">
         <div class="row row-wrap">
-          <input type="text" id="busca" placeholder="Buscar por nome, e-mail ou vaga…" style="width:290px">
+          <div class="busca" style="max-width:320px">
+            <svg class="busca-lupa" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.6" cy="10.6" r="6.4"/><path d="m15.4 15.4 4.2 4.2"/></svg>
+            <input type="search" id="busca" autocomplete="off" spellcheck="false" placeholder="Buscar por nome, e-mail ou vaga…">
+            <button type="button" class="busca-x" tabindex="-1" aria-label="Limpar a busca">&times;</button>
+          </div>
           <select id="filtro-vaga" style="width:200px"><option value="">Todas as vagas</option></select>
         </div>
         <div class="row row-wrap">
@@ -1119,6 +1212,7 @@
 
 <script src="/js/tema.js"></script>
 <script src="/js/admin-core.js"></script>
+<script src="/js/admin-ui.js"></script>
 <script src="/js/admin-quadro.js"></script>
 <script src="/js/admin-conteudo.js"></script>
 <script src="/js/admin-ajustes.js"></script>
