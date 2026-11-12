@@ -14,7 +14,14 @@
    4,5:1 que a norma pede.
    ============================================================ */
 
-:root {
+/* O bloco escuro vale para a pagina inteira (:root) E para qualquer
+   pedaco marcado com .tema-escuro.
+
+   Isso existe por causa da TELA DE ENTRADA: ela e sempre escura, mesmo
+   para quem deixou o painel no claro. Como as variaveis sao
+   re-declaradas no proprio pedaco, elas ganham do que viria herdado
+   la de cima — nao precisa de !important nem de copiar a lista. */
+:root, .tema-escuro {
   /* ---- tipografia ---- */
   --font: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
           'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -119,6 +126,13 @@
   --card: var(--surface);
   --fio: var(--hairline);
 }
+
+/* A cor do texto e HERDADA do <body>, nao lida da variavel a cada
+   elemento. Entao trocar as variaveis num pedaco da pagina nao bastava:
+   o titulo do login continuava chegando com a tinta escura do tema
+   claro, herdada la de cima. Esta linha manda o pedaco resolver a
+   propria cor de novo. */
+.tema-escuro { color: var(--label); }
 
 /* ------------------------------------------------------------
    O TEMA CLARO — para quem preferir, e para a pagina publica de
@@ -676,27 +690,11 @@ input[type=checkbox]:checked::after {
   .orbit-anel:nth-child(4) { transform: rotate(60deg) rotateX(58deg); }
 }
 
-/* No tema claro o ORBIT fica bem mais discreto: o mesmo gradiente
-   num fundo claro vira uma mancha suja atrás do texto. */
-:root[data-tema="claro"] .orbit { background: var(--canvas); }
-:root[data-tema="claro"] .orbit-luz { opacity: .34; filter: blur(100px); }
-/* No claro vale a mesma ideia, ao contrario: a coluna do meio
-   CLAREIA, para a letra escura do rodape ter fundo claro embaixo
-   dela em qualquer ponto do giro. */
-:root[data-tema="claro"] .orbit::after {
-  background:
-    linear-gradient(90deg, transparent 0%, rgba(248, 250, 253, .52) 32%,
-      rgba(248, 250, 253, .52) 68%, transparent 100%),
-    radial-gradient(66% 78% at 50% 48%,
-      rgba(248, 250, 253, .80) 0%,
-      rgba(248, 250, 253, .58) 55%,
-      rgba(248, 250, 253, .90) 100%);
-}
-/* No claro o anel fica bem mais fino de cor. Alem de combinar com
-   um fundo claro, isso resolve um detalhe que so a medicao pegou:
-   o risco do anel passando atras de uma letra pequena derrubava o
-   contraste daquele pedacinho de texto. */
-:root[data-tema="claro"] .orbit-anel { border-color: rgba(37, 99, 235, .09); }
+/* Antes existia aqui uma versao clara do ORBIT. Nao existe mais:
+   as unicas telas que usam o ORBIT — a entrada, os Termos e a
+   Privacidade — sao sempre escuras, por decisao, entao a versao
+   clara nunca chegava a aparecer. Codigo que nunca roda mente
+   sobre como o sistema funciona; melhor fora. */
 
 /* Nao precisa mexer no fundo do <body>: o ORBIT esta em z-index 0 e
    e opaco, entao ja pinta POR CIMA do fundo do bloco. (Era com
