@@ -973,7 +973,12 @@
 <body>
 
 <!-- ==================== LOGIN ==================== -->
-<div id="tela-login" style="display:none">
+<!-- A TELA DE ENTRADA E SEMPRE ESCURA, mesmo para quem deixou o
+     painel no claro: e a porta da frente do sistema, e o ORBIT so
+     faz sentido no escuro. O .tema-escuro re-declara as cores aqui
+     dentro; o painel, depois do login, continua obedecendo o botao
+     de clarear normalmente. -->
+<div id="tela-login" class="tema-escuro" style="display:none">
   <!-- ORBIT: so enfeite. Fica fora do alcance de quem usa leitor de
        tela, que nao ganha nada ouvindo "imagem decorativa" tres vezes. -->
   <div class="orbit" aria-hidden="true">
