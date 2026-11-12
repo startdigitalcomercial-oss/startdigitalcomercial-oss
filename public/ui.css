@@ -29,7 +29,14 @@
      TEXTO: medimos 4,0:1 em cima do cartao. Para texto e link usa-se
      o --accent-soft. */
   --accent-soft: #93AEFF;
-  --accent-grad: linear-gradient(104deg, #4F7CFF 0%, #7C6BFF 55%, #8B5CF6 100%);
+  /* O GRADIENTE DO BOTAO e um tom mais fundo que o --accent.
+     Nao e capricho: medimos o pixel atras da palavra "Entrar" e o
+     branco em cima do azul claro dava 3,8:1 — abaixo dos 4,5:1 que
+     a norma pede. Como isto aqui e o botao mais clicado do sistema,
+     ele escureceu o suficiente para a palavra aparecer (4,8:1 no
+     pior ponto). O --accent em si NAO mudou: borda, pontinho e anel
+     de foco continuam no azul eletrico de sempre. */
+  --accent-grad: linear-gradient(104deg, #3A69EC 0%, #6E5CF2 55%, #7D4CEC 100%);
 
   /* ---- superficies ---- */
   --canvas: #070B17;                         /* fundo da pagina */
@@ -479,7 +486,9 @@ input[type=checkbox]:checked::after {
               background var(--t-rapido), transform .06s ease;
 }
 .btn:hover {
-  filter: brightness(1.08);
+  /* 1.04 e nao 1.08: clarear demais no hover derrubava o contraste
+     da palavra justamente quando o dedo esta em cima dela */
+  filter: brightness(1.04);
   box-shadow: 0 6px 20px rgba(79, 124, 255, .36);
   text-decoration: none;
 }
@@ -516,6 +525,187 @@ input[type=checkbox]:checked::after {
   background: var(--red); color: var(--canvas); filter: none;
   box-shadow: 0 4px 14px rgba(251, 113, 133, .26);
 }
+
+/* ============================================================
+   ORBIT — o fundo das telas de entrada
+
+   Um gradiente só, girando devagar, trocando de azul escuro
+   para roxo. Em volta dele, três anéis finos como órbitas, e um
+   pontinho que dá a volta num deles. Nada mais.
+
+   POR QUE AQUI PODE SE MEXER, se a aurora do painel é parada?
+   Porque são dois lugares diferentes. No painel a pessoa passa
+   oito horas olhando uma planilha — luz se mexendo atrás disso
+   cansa em dez minutos. Na tela de entrada ela passa cinco
+   segundos, e é o primeiro aperto de mão do sistema. Então aqui
+   o movimento é bem-vindo; só precisa ser LENTO (a volta inteira
+   leva quase um minuto) e ficar bem longe do texto.
+
+   Tudo que se mexe é transform e opacity — as duas únicas coisas
+   que o navegador anima sem refazer a conta da página inteira.
+   Por isso roda liso até em celular fraco.
+
+   Marcação:
+     <div class="orbit" aria-hidden="true">
+       <i class="orbit-luz"></i>
+       <i class="orbit-anel"></i><i class="orbit-anel"></i><i class="orbit-anel"></i>
+     </div>
+   ============================================================ */
+/* z-index 0, e NAO -1. Com -1 o ORBIT sumia: o <body> tem fundo
+   proprio (`html, body { background: var(--canvas) }`), e fundo de
+   bloco e pintado POR CIMA de quem tem z-index negativo. Ficava a
+   tela chapada e nenhum erro em lugar nenhum. Entao o ORBIT fica no
+   zero e quem sobe e o conteudo, logo abaixo. */
+.orbit {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--canvas);
+}
+/* o que a pessoa le e usa fica acima do enfeite, sempre */
+.orbit ~ * { position: relative; z-index: 1; }
+
+/* O GRADIENTE. É um só, bem grande, centrado um pouco acima do
+   meio. Ele gira e, ao girar, a parte azul e a parte roxa trocam
+   de lugar — é daí que vem a troca de cor, sem precisar animar
+   cor nenhuma (animar cor é caro; girar não é). */
+.orbit-luz {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 150vmax; height: 150vmax;
+  margin: -75vmax 0 0 -75vmax;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg,
+    #0B1836 0deg,
+    #1D4ED8 58deg,
+    #4F7CFF 104deg,
+    #7C6BFF 152deg,
+    #8B5CF6 198deg,
+    #5B21B6 244deg,
+    #16204A 300deg,
+    #0B1836 360deg);
+  filter: blur(80px);
+  opacity: .70;
+  z-index: 0;
+  animation: orbit-gira 58s linear infinite;
+  will-change: transform;
+}
+
+/* Uma sombra por cima puxa o centro de volta para o escuro, para
+   o cartão do login não nascer em cima do ponto mais claro. */
+.orbit::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  /* A coluna do meio e onde moram o cartao e os links do rodape.
+     Ali a sombra aperta, para a letra pequena nao ter que disputar
+     com o gradiente quando o roxo passa por baixo dela. Nas bordas
+     ela afrouxa, e e la que a cor aparece de verdade. */
+  background:
+    linear-gradient(90deg, transparent 0%, rgba(7,11,23,.42) 32%,
+      rgba(7,11,23,.42) 68%, transparent 100%),
+    radial-gradient(62% 58% at 50% 44%,
+      rgba(7, 11, 23, .60) 0%,
+      rgba(7, 11, 23, .20) 52%,
+      rgba(7, 11, 23, .74) 100%);
+}
+
+/* OS ANÉIS. Elipses de um traço só, bem apagadas, cada uma
+   girando num tempo diferente — é o desencontro entre elas que
+   dá a sensação de órbita, e não o giro de cada uma. */
+.orbit-anel {
+  position: absolute;
+  top: 50%; left: 50%;
+  /* acima da sombra (z-index 1), senao o anel some debaixo dela */
+  z-index: 2;
+  border: 1px solid rgba(146, 172, 255, .30);
+  border-radius: 50%;
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+.orbit-anel:nth-child(2) {
+  width: 78vmin; height: 78vmin; margin: -39vmin 0 0 -39vmin;
+  animation: orbit-anel-a 34s linear infinite;
+}
+.orbit-anel:nth-child(3) {
+  width: 112vmin; height: 112vmin; margin: -56vmin 0 0 -56vmin;
+  border-color: rgba(181, 157, 255, .26);
+  animation: orbit-anel-b 48s linear infinite;
+}
+.orbit-anel:nth-child(4) {
+  width: 148vmin; height: 148vmin; margin: -74vmin 0 0 -74vmin;
+  border-color: rgba(146, 172, 255, .17);
+  animation: orbit-anel-a 72s linear infinite reverse;
+}
+
+/* O PONTINHO. Mora no anel do meio e dá a volta junto com ele —
+   por isso basta pendurá-lo na borda; quem o faz girar é o anel. */
+.orbit-anel:nth-child(3)::before {
+  content: '';
+  position: absolute;
+  top: -4px; left: 50%;
+  width: 7px; height: 7px;
+  margin-left: -3.5px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgba(79, 124, 255, .14), 0 0 22px 5px rgba(79, 124, 255, .55);
+}
+
+@keyframes orbit-gira { to { transform: rotate(360deg); } }
+/* os anéis são elipses: a inclinação é o que faz parecer órbita
+   vista de lado, em vez de um círculo girando no próprio eixo */
+@keyframes orbit-anel-a {
+  from { transform: rotate(0deg) rotateX(58deg); }
+  to   { transform: rotate(360deg) rotateX(58deg); }
+}
+@keyframes orbit-anel-b {
+  from { transform: rotate(0deg) rotateX(64deg) rotateY(10deg); }
+  to   { transform: rotate(360deg) rotateX(64deg) rotateY(10deg); }
+}
+
+/* Quem pediu menos movimento no sistema operacional recebe a
+   mesma tela, parada. A cor e os anéis continuam; só o giro para. */
+@media (prefers-reduced-motion: reduce) {
+  .orbit-luz, .orbit-anel { animation: none; }
+  .orbit-luz { transform: rotate(42deg); }
+  .orbit-anel:nth-child(2) { transform: rotate(18deg) rotateX(58deg); }
+  .orbit-anel:nth-child(3) { transform: rotate(-24deg) rotateX(64deg) rotateY(10deg); }
+  .orbit-anel:nth-child(4) { transform: rotate(60deg) rotateX(58deg); }
+}
+
+/* No tema claro o ORBIT fica bem mais discreto: o mesmo gradiente
+   num fundo claro vira uma mancha suja atrás do texto. */
+:root[data-tema="claro"] .orbit { background: var(--canvas); }
+:root[data-tema="claro"] .orbit-luz { opacity: .34; filter: blur(100px); }
+/* No claro vale a mesma ideia, ao contrario: a coluna do meio
+   CLAREIA, para a letra escura do rodape ter fundo claro embaixo
+   dela em qualquer ponto do giro. */
+:root[data-tema="claro"] .orbit::after {
+  background:
+    linear-gradient(90deg, transparent 0%, rgba(248, 250, 253, .52) 32%,
+      rgba(248, 250, 253, .52) 68%, transparent 100%),
+    radial-gradient(66% 78% at 50% 48%,
+      rgba(248, 250, 253, .80) 0%,
+      rgba(248, 250, 253, .58) 55%,
+      rgba(248, 250, 253, .90) 100%);
+}
+/* No claro o anel fica bem mais fino de cor. Alem de combinar com
+   um fundo claro, isso resolve um detalhe que so a medicao pegou:
+   o risco do anel passando atras de uma letra pequena derrubava o
+   contraste daquele pedacinho de texto. */
+:root[data-tema="claro"] .orbit-anel { border-color: rgba(37, 99, 235, .09); }
+
+/* Nao precisa mexer no fundo do <body>: o ORBIT esta em z-index 0 e
+   e opaco, entao ja pinta POR CIMA do fundo do bloco. (Era com
+   z-index -1 que ele sumia: fundo de bloco cobre quem e negativo.)
+   E como ele e `fixed`, numa pagina comprida o que aparece abaixo da
+   primeira tela e o fundo do body — a mesma cor. Encaixa sozinho.
+
+   A aurora parada do painel tambem nao precisa ser desligada aqui:
+   ela e `fixed` com z-index -1, entao ja fica atras de tudo isto. */
 
 /* ============================================================
    BOAS-VINDAS

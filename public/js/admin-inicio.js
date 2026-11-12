@@ -9,4 +9,4 @@ async function iniciar() {
   catch (e) { if (e.message !== 'sessao expirada') toast(e.message, true); }
 }
 
-if (TOKEN) iniciar(); else document.getElementById('tela-login').style.display = 'block';
+if (TOKEN) iniciar(); else document.getElementById('tela-login').style.display = 'grid';

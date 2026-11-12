@@ -52,7 +52,11 @@ const ROTAS = {
   '/time': '/equipe.html',
   '/colaborador': '/equipe.html',
   '/play': '/play.html',
-  '/startplay': '/play.html'
+  '/startplay': '/play.html',
+  '/termos': '/termos.html',
+  '/termo': '/termos.html',
+  '/privacidade': '/privacidade.html',
+  '/privacy': '/privacidade.html'
 };
 
 // Os icones sao gerados por codigo. Na Vercel isso e um rewrite no

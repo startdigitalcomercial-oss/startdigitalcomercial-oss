@@ -64,7 +64,9 @@ function sair() {
   if (typeof bvEsquece === 'function') bvEsquece();
   TOKEN = '';
   document.getElementById('app').style.display = 'none';
-  document.getElementById('tela-login').style.display = 'block';
+  // 'grid' e nao 'block': a tela de entrada se centra sozinha com
+  // grid + place-items, e um display inline em 'block' desmanchava isso.
+  document.getElementById('tela-login').style.display = 'grid';
   // Recarrega para a tela de login se montar do zero: assim ela sempre sabe
   // se ainda estamos no primeiro acesso (senha mestra) ou ja e por e-mail.
   setTimeout(function () { location.reload(); }, 60);
@@ -81,6 +83,22 @@ let PRIMEIRO_ACESSO = false;
     const r = await (await fetch('/api/admin?action=dica_senha')).json();
     if (!r.ok) return;
     const alvo = document.getElementById('login-erro');
+
+    // O "Suporte" do rodapé aponta para o WhatsApp configurado nos
+    // Ajustes. Sem número salvo, o link vira e-mail — melhor um
+    // e-mail que funciona do que um link bonito que não leva a lugar
+    // nenhum. O endereço fica aqui mesmo porque a tela de login
+    // acontece antes de existir login, e não pode perguntar ao banco.
+    const sup = document.getElementById('link-suporte');
+    if (sup) {
+      if (r.suporte) {
+        sup.href = r.suporte;
+      } else {
+        sup.href = 'mailto:startdigitalcomercial@gmail.com'
+          + '?subject=' + encodeURIComponent('Ajuda para entrar no painel');
+        sup.removeAttribute('target');
+      }
+    }
 
     // Enquanto nao existe nenhum Dono cadastrado, quem entra e a senha mestra —
     // e ela SO funciona com o campo de e-mail vazio. Entao o campo some da tela,
