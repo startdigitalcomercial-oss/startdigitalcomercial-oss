@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Portal do Colaborador — StartDigital</title>
+<title>Orbit — StartDigital</title>
 <link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest">
 <script>
   /* Pinta a tela ANTES de ela aparecer. Se a pessoa ja escolheu o
@@ -111,8 +111,13 @@
   .login-marca img { width: 30px; height: 30px; display: block;
     border-radius: 8px; box-shadow: 0 0 0 1px var(--hairline-strong), 0 6px 20px rgba(79,124,255,.28); }
   .login-marca b { font-size: 17px; font-weight: 600; letter-spacing: -.02em; line-height: 1.1; }
-  .login-marca small { display: block; font-size: 11px; font-weight: 500; letter-spacing: .1em;
-    text-transform: uppercase; color: var(--label-2); margin-top: 2px; }
+
+  /* O LOGO DO ORBIT
+     A largura vem da altura: o desenho tem 1550 por 578, entao
+     `width: auto` com altura fixa mantem a proporcao sozinho em
+     qualquer lugar onde ele for usado. */
+  .orbit-logo { display: block; height: 21px; width: auto; margin-top: 5px;
+    color: var(--label); }
 
   /* O cartao e de vidro: deixa o ORBIT passar por tras, de leve.
      O fundo semi-opaco por baixo garante o contraste do texto
@@ -179,6 +184,15 @@
   .logo .logo-img { width: 24px; height: 24px; display: block; flex: none; }
   .logo .logo-txt { display: flex; flex-direction: column; line-height: 1.25; }
   .logo small { color: var(--sb-tinta-3); font-weight: 400; font-size: 11px; letter-spacing: 0; }
+  /* na barra lateral o logo e menor, e segue a tinta da barra —
+     que fica clara nos dois temas, porque a barra e sempre escura */
+  /* align-self: start porque a .logo-txt e uma coluna flex: sem
+     isso o logo era esticado/centralizado e nao batia com a
+     margem esquerda do "StartDigital" logo acima dele */
+  .logo .orbit-logo { height: 15px; margin-top: 4px; color: var(--sb-tinta); align-self: flex-start; }
+  /* no celular a barra vira uma fila deitada e o logo some junto
+     com o resto do texto, para sobrar espaco para os botoes */
+  @media (max-width: 900px) { .logo .orbit-logo { display: none; } }
   .nav-sec { font-size: 10.5px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--sb-tinta-3); padding: 16px 10px 7px; }
   #abas { display: block; }
 
@@ -972,6 +986,39 @@
 </head>
 <body>
 
+<!-- ============================================================
+     O LOGO DO ORBIT
+
+     Desenho, nao foto: e um SVG, entao fica nitido em qualquer
+     tamanho e em qualquer tela, e pesa uma fracao de uma imagem.
+
+     As letras usam `currentColor` — elas pegam a cor do texto de
+     onde estiverem. Por isso o mesmo logo serve na barra escura e
+     numa tela clara, sem ter que manter duas versoes.
+
+     A bolinha do "i" e um circulo de verdade com gradiente, nao
+     parte do desenho das letras: as cores sao as do logo original
+     (roxo #AC32FA em cima a esquerda, azul #00ADFF embaixo a
+     direita).
+
+     Fica aqui uma vez so, escondido, e cada lugar que precisa
+     chama com <use href="#orbit">.
+     ============================================================ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="orbit-bolinha" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#AC32FA"/>
+      <stop offset=".52" stop-color="#5866FC"/>
+      <stop offset="1" stop-color="#00ADFF"/>
+    </linearGradient>
+    <symbol id="orbit" viewBox="0 0 1550 578">
+      <g transform="translate(0 31)"><path fill="currentColor" fill-rule="evenodd" d="M 721.8 1.2 C 717.2 2.4, 711.5 8.5, 710.1 13.7 C 709.3 16.3, 709 95.3, 709 270.6 L 709 523.7 711.3 528 C 712.9 531, 715 533.1, 718 534.7 C 722.3 537, 722.7 537, 756.5 537 C 790.3 537, 790.7 537, 794 534.8 C 800.7 530.2, 801.5 528.2, 801.8 514.4 C 802 507.6, 802.5 502, 802.9 502 C 803.3 502, 807.9 505.4, 813.1 509.5 C 884.4 566.4, 988.4 557.1, 1054.5 487.9 C 1077.4 463.9, 1091.7 440.4, 1102.7 408.5 C 1114.2 375, 1116.6 337.3, 1109.9 296 C 1099.7 234.2, 1055 175, 998.6 149 C 935.1 119.6, 863.5 127.6, 814 169.4 L 807.5 174.9 806.8 170.2 C 806.5 167.6, 806.1 131.4, 806.1 89.8 C 806.1 27.5, 805.8 13.5, 804.7 10.7 C 802.9 6.5, 798 2.4, 793.2 1 C 788.4-0.3, 726.8-0.2, 721.8 1.2 M 1333.5 38.4 C 1329.8 40.1, 1325.5 44.6, 1324.1 48.3 C 1323.4 50.2, 1323 66.7, 1323 96.1 L 1323 141 1305.8 141 C 1287.1 141, 1282.3 141.8, 1277.1 145.7 C 1271 150.4, 1270.9 151.3, 1271.2 190.4 L 1271.5 225.7 1274.3 229.3 C 1279.3 235.9, 1281.2 236.4, 1303 237 L 1322.5 237.5 1323 337 C 1323.6 434.4, 1323.6 436.7, 1325.7 445 C 1338.8 496.9, 1375.6 530.5, 1430.5 540.6 C 1444.6 543.2, 1481 543.3, 1496 540.7 C 1506.6 538.8, 1523.4 534.6, 1534.6 530.9 C 1541.8 528.6, 1547.3 523.4, 1548.9 517.5 C 1550.4 512.1, 1550.4 442.2, 1548.9 438.3 C 1547.2 433.7, 1543.1 430.2, 1538 429 C 1533.6 428, 1532.2 428.1, 1522.3 431 C 1478.4 443.6, 1449.3 436.5, 1436.8 410.3 C 1431.2 398.4, 1431 395, 1431.2 312.5 L 1431.5 237.5 1475 237 C 1523.5 236.4, 1522.1 236.6, 1527.7 229.3 L 1530.5 225.7 1530.8 191.1 C 1531.2 152.9, 1530.9 150.9, 1525.5 146.1 C 1519.9 141.2, 1517.7 141, 1472.8 141 L 1431 141 1431 96 C 1431 31.9, 1435.7 37, 1376.3 37 C 1345.3 37.1, 1335.8 37.4, 1333.5 38.4 M 191 125 C 166.6 128.1, 142.4 135, 121.5 144.9 C-8.2 206.5-40.9 377.5, 57.5 479.9 C 81.4 504.8, 110 523.1, 141.2 533.5 C 168.1 542.5, 189.4 545.6, 218.5 544.7 C 333.2 541.3, 424.1 448.7, 424 335 C 424 287.6, 409 241.7, 382.1 206.5 C 350.3 164.8, 305.5 137.4, 253 127.4 C 238.3 124.6, 204.5 123.2, 191 125 M 566.4 130.5 C 547.1 132.7, 532.3 137, 513.5 146 C 475.4 164.3, 453.1 195.4, 444.7 241.9 L 442.5 254.5 442.5 389 L 442.5 523.5 444.9 527.3 C 449.6 534.9, 450.1 535, 492.3 535 C 533.4 535, 534.4 534.9, 539.3 529 C 540.8 527.3, 542.4 524.3, 543 522.2 C 543.6 519.8, 544 479, 544 401.9 C 544 289.9, 544.1 285, 545.9 277.8 C 551.8 254.7, 570.2 238.3, 596 233 C 604.2 231.3, 609.7 231, 636.5 231 C 671.5 231, 673.1 230.7, 678.6 223.4 L 681.5 219.7 681.5 180 L 681.5 140.3 678.6 136.6 C 672.8 129, 673.1 129, 623 129.1 C 593.5 129.2, 574.4 129.7, 566.4 130.5 M 1149.2 142.5 C 1144 144.1, 1141.4 146.3, 1138.9 151.2 C 1137.1 154.8, 1137 160.4, 1137 339.6 C 1137 521.9, 1137 524.4, 1139 528.4 C 1140.1 530.7, 1142.6 533.6, 1144.7 535 L 1148.4 537.5 1189.2 537.8 C 1235.5 538.1, 1235.2 538.1, 1240.7 529.8 L 1243.5 525.7 1243.5 340.1 C 1243.5 166.7, 1243.4 154.3, 1241.8 151.4 C 1239.5 147.1, 1234.7 143.3, 1230.2 142 C 1224.3 140.4, 1154.6 140.8, 1149.2 142.5 M 200.9 225 C 171.4 228.5, 140.4 247.3, 123.2 272.3 C 96.6 310.9, 97.2 364.5, 124.8 401.6 C 156.5 444.4, 212.2 458.1, 260.4 435 C 288.5 421.5, 312.8 390.5, 319.8 359.1 C 322.5 347, 322.1 319.1, 319.1 308 C 313.6 287.3, 305.8 273.1, 292.1 258.8 C 280.3 246.4, 273.7 241.5, 260.8 235.2 C 242.2 226.2, 221.2 222.7, 200.9 225 M 889.9 235 C 846.8 242.3, 812.9 274.6, 803.3 317.4 C 801.1 327.4, 801.1 351, 803.4 361.4 C 807.9 382, 816.4 397.2, 832 413.1 C 852.6 433.9, 876.5 444, 905.7 444 C 970.4 444, 1020.1 377.5, 1003.4 313.4 C 990.1 262.3, 938.7 226.8, 889.9 235"/></g>
+      <circle cx="1197" cy="77" r="76.5" fill="url(#orbit-bolinha)"/>
+    </symbol>
+  </defs>
+</svg>
+
+
 <!-- ==================== LOGIN ==================== -->
 <!-- A TELA DE ENTRADA E SEMPRE ESCURA, mesmo para quem deixou o
      painel no claro: e a porta da frente do sistema, e o ORBIT so
@@ -989,7 +1036,9 @@
   <div class="login-wrap">
     <div class="login-marca">
       <img src="/favicon-32.png" alt="">
-      <span><b>StartDigital</b><small>Portal do Colaborador</small></span>
+      <span><b>StartDigital</b>
+        <svg class="orbit-logo" viewBox="0 0 1550 578" role="img" aria-label="Orbit"><use href="#orbit"/></svg>
+      </span>
     </div>
 
     <div class="login-card">
@@ -1023,7 +1072,7 @@
   <div class="app-shell">
 
   <aside class="sidebar">
-    <div class="logo"><img src="/favicon-32.png" alt="" class="logo-img"><span class="logo-txt">StartDigital<small>Portal do Colaborador</small></span></div>
+    <div class="logo"><img src="/favicon-32.png" alt="" class="logo-img"><span class="logo-txt">StartDigital<svg class="orbit-logo" viewBox="0 0 1550 578" role="img" aria-label="Orbit"><use href="#orbit"/></svg></span></div>
     <nav id="abas">
       <div class="nav-grupo on" data-grupo="principal">
       <button type="button" class="nav-cab">Vagas<svg class="seta" width="12" height="12" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
