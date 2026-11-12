@@ -467,6 +467,23 @@ module.exports = async function handler(req, res) {
       // A Automacao existe inteira por baixo — este ajuste so decide se
       // ela aparece no menu. Vem DESLIGADA de fabrica, a pedido.
       const painelCfg = await getSetting('painel', {});
+
+      // O COMERCIAL tem uma porta a mais: alem do papel, quem foi
+      // cadastrado como participante da simulacao tambem enxerga o
+      // modulo — so que apenas a propria carteira. Sem isto, um SDR
+      // com acesso de Leitura nao acharia o proprio painel no menu.
+      // Uma leitura a mais numa chamada que ja acontece em toda
+      // entrada; nao vale um pedido separado so para isso.
+      let simParticipante = null;
+      if (session.uid) {
+        try {
+          const p = await db.selectOne('sim_participantes', {
+            user_id: 'eq.' + session.uid, ativo: 'is.true', select: 'id,nome,funcao'
+          });
+          if (p) simParticipante = { id: p.id, nome: p.nome, funcao: p.funcao };
+        } catch (e) { /* modulo ainda nao migrado: segue sem */ }
+      }
+
       return u.ok(res, {
         usuario: {
           nome: session.nome || 'Senha mestra',
@@ -476,6 +493,10 @@ module.exports = async function handler(req, res) {
           mestra: !!session.mestra
         },
         menu: perms.menuDoPapel(papel),
+        comercial: {
+          gerente: perms.permite(papel, 'cm_participante_salvar'),
+          participante: simParticipante
+        },
         mostrar_automacao: painelCfg.mostrar_automacao === true
       });
     }

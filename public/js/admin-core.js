@@ -7,6 +7,7 @@ let BOARD = { stages: [], candidates: [] };
 let APP_URL = '';
 let atualCand = null;
 let EU = null;                    // quem está logado (vem de usuarios_eu)
+let COMERCIAL = { gerente: false, participante: null };   // acesso ao módulo Comercial
 let bvItens = [];
 
 function esc(s) {
@@ -175,7 +176,9 @@ const TITULOS = {
   financeiro: 'Cobranças', findash: 'Dashboard financeiro', fingastos: 'Despesas', findre: 'DRE', finclientes: 'Clientes',
   space: 'Benefícios', play: 'START PLAY',
   opdash: 'Dashboard Operacional', opgestores: 'Gestão',
-  oponboarding: 'Onboarding', opagenda: 'Agenda'
+  oponboarding: 'Onboarding', opagenda: 'Agenda',
+  cmleads: 'Leads', cmagenda: 'Agenda Comercial',
+  cmatendimento: 'Atendimento', cmsimulacoes: 'Simulações Comerciais'
 };
 /* ---------------------------------------------- sanfona do menu
    Um grupo aberto por vez. O grupo da página em que você está abre
@@ -244,7 +247,11 @@ document.getElementById('abas').addEventListener('click', function (ev) {
     opdash: (typeof carregaOpDash === 'function' ? carregaOpDash : null),
     opgestores: (typeof carregaOpGestores === 'function' ? carregaOpGestores : null),
     oponboarding: (typeof carregaOnboarding === 'function' ? carregaOnboarding : null),
-    opagenda: (typeof carregaAgenda === 'function' ? carregaAgenda : null)
+    opagenda: (typeof carregaAgenda === 'function' ? carregaAgenda : null),
+    cmleads: (typeof carregaCmLeads === 'function' ? carregaCmLeads : null),
+    cmagenda: (typeof carregaCmAgenda === 'function' ? carregaCmAgenda : null),
+    cmatendimento: (typeof carregaCmAtendimento === 'function' ? carregaCmAtendimento : null),
+    cmsimulacoes: (typeof carregaSimulacoes === 'function' ? carregaSimulacoes : null)
   };
   marcaGrupoAtivo();
   if (carregar[b.dataset.aba]) carregar[b.dataset.aba]();

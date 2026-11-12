@@ -289,7 +289,13 @@ const DB = {
 
   broadcasts: [],
   panel_users: [],
-  audit_log: []
+  audit_log: [],
+
+  // MODULO COMERCIAL — simulacoes. Nascem vazias: o espelho nao
+  // inventa participante nem lead, senao o teste comeca contando
+  // numero que ninguem cadastrou.
+  sim_participantes: [],
+  sim_leads: []
 };
 
 /* ---------------- defaults por tabela ---------------- */
@@ -328,7 +334,14 @@ const DEFAULTS = {
   panel_users: function () { return { id: uuid(), role: 'leitura', active: true, must_change: true, password_hash: null, password_salt: null, last_login_at: null, created_by: null, created_at: agora(), updated_at: agora() }; },
   audit_log: function () { return { id: seq('audit_log'), detail: {}, created_at: agora() }; },
   broadcasts: function () { return { id: uuid(), total: 0, sent: 0, failed: 0, detail: {}, created_at: agora() }; },
-  collaborators: function () { return { id: uuid(), token: uuid().replace(/-/g, ''), active: true, source: 'formulario', work_mode: null, welcomed_at: null, notes: null, accessibility: null, accessibility_detail: null, accessibility_support: null, created_at: agora(), updated_at: agora() }; }
+  collaborators: function () { return { id: uuid(), token: uuid().replace(/-/g, ''), active: true, source: 'formulario', work_mode: null, welcomed_at: null, notes: null, accessibility: null, accessibility_detail: null, accessibility_support: null, created_at: agora(), updated_at: agora() }; },
+  sim_participantes: function () { return { id: uuid(), funcao: 'sdr', user_id: null, ativo: true, observacao: null, created_at: agora(), updated_at: agora() }; },
+  sim_leads: function () {
+    return { id: uuid(), contato: null, cidade: null, cnpj: null, nicho: null,
+      agendado: false, agendado_em: null, comparecimento: 'aguardando',
+      observacoes: null, qualificacao: 'pendente', excluido_em: null,
+      created_at: agora(), updated_at: agora() };
+  }
 };
 
 const contadores = {};
@@ -525,6 +538,12 @@ const server = http.createServer(function (req, res) {
         play_spins: function (r) { return r.client_token ? 'giro|' + r.client_token : null; },
         // um gestor por nome; um cliente do Financeiro em uma carteira so
         op_gestores: function (r) { return 'gestor|' + String(r.nome || '').trim().toLowerCase(); },
+        // COMERCIAL: um usuario do painel vira UM participante ativo so.
+        // Indice parcial igual ao do banco: desativado libera a vaga.
+        sim_participantes: function (r) {
+          if (!r.user_id || r.ativo === false) return null;
+          return 'simpart|' + r.user_id;
+        },
         op_clientes: function (r) {
           if (r.excluido_em || !r.customer_id) return null;
           return 'opcli|' + r.customer_id;

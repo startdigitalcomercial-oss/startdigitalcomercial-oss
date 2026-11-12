@@ -1086,6 +1086,23 @@ async function escondeFinanceiroSeNaoPode() {
       if (op) op.style.display = 'none';
     }
 
+    // Comercial: aparece para quem gerencia a simulação OU para quem
+    // foi cadastrado como participante dela. É por isso que aqui não
+    // basta olhar o papel, como nos outros grupos: um SDR com acesso
+    // de Leitura precisa achar o próprio painel.
+    COMERCIAL = r.comercial || { gerente: false, participante: null };
+    if (!COMERCIAL.gerente && !COMERCIAL.participante) {
+      const cm = document.querySelector('#abas .nav-grupo[data-grupo="comercial"]');
+      if (cm) cm.style.display = 'none';
+    } else if (!COMERCIAL.gerente) {
+      // Participante sem cargo de gestão só tem o que fazer em
+      // Simulações. Leads, Agenda e Atendimento são do gestor.
+      ['cmleads', 'cmagenda', 'cmatendimento'].forEach(function (aba) {
+        const b = document.querySelector('#abas button[data-aba="' + aba + '"]');
+        if (b) b.style.display = 'none';
+      });
+    }
+
     // START PLAY: quem nao cuida do time nao precisa ver a roleta
     if (Array.isArray(r.menu) && r.menu.indexOf('play') < 0) {
       const bp = document.querySelector('#abas button[data-aba="play"]');
