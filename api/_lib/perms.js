@@ -33,21 +33,27 @@ const DESCRICOES = {
 
 // O que cada papel PODE fazer, por area.
 // ver = enxergar a tela. mexer = alterar/criar/excluir. enviar = disparar mensagem.
+//
+// comercial_gerir = cadastrar participante e ver a simulacao dos OUTROS.
+// Quem nao tem isso ainda pode usar o modulo, mas so a propria carteira —
+// e quem decide isso e o api/comercial.js, olhando o dono do registro.
+// Papel sozinho nao resolve aqui: dois usuarios com o mesmo papel "leitura"
+// podem ser SDRs diferentes, cada um com os seus leads.
 const PODE = {
   dono:      { ver: '*', mexer: '*', enviar: true, usuarios: true, ajustes: true,
-               financeiro: true, financeiro_mexer: true },
+               financeiro: true, financeiro_mexer: true, comercial_gerir: true },
   rh:        { ver: '*', mexer: '*', enviar: true, usuarios: false, ajustes: true,
-               financeiro: true, financeiro_mexer: true },
+               financeiro: true, financeiro_mexer: true, comercial_gerir: true },
   avaliador: {
     ver: ['dashboard', 'candidatos', 'quiz', 'aulas', 'time'],
     mexer: ['quiz_nota', 'candidato_nota'],
     enviar: false, usuarios: false, ajustes: false,
-    financeiro: false, financeiro_mexer: false
+    financeiro: false, financeiro_mexer: false, comercial_gerir: false
   },
   // Leitura ve quase tudo, mas dinheiro nao. Valor de contrato e
   // telefone de cliente nao sao coisa de "so olhar".
   leitura:   { ver: '*', mexer: [], enviar: false, usuarios: false, ajustes: false,
-               financeiro: false, financeiro_mexer: false }
+               financeiro: false, financeiro_mexer: false, comercial_gerir: false }
 };
 
 // Cada acao da API declara o que exige.
@@ -103,6 +109,18 @@ const ACOES = {
   pl_painel: 'ver', pl_historico: 'ver',
   pl_premio_salvar: 'mexer', pl_ordem: 'mexer',
 
+  // --- COMERCIAL / SIMULACOES ---
+  // Marcadas como 'livre' DE PROPOSITO, e nao por descuido: 'livre' aqui
+  // quer dizer "o papel sozinho nao decide". A porta ja exigiu um cracha
+  // valido antes de chegar neste ponto; quem decide o que a pessoa ve e
+  // o que ela pode mexer e o api/comercial.js, que olha de quem e o
+  // registro. Um SDR mexe na carteira dele e em mais nenhuma.
+  cm_participantes: 'livre', cm_painel: 'livre', cm_dashboard: 'livre',
+  cm_lead_salvar: 'livre', cm_lead_campo: 'livre', cm_lead_excluir: 'livre',
+  cm_participante_salvar: 'comercial_gerir',
+  cm_participante_excluir: 'comercial_gerir',
+  cm_usuarios: 'comercial_gerir',
+
   // --- Space Colaborador: libera dinheiro de verdade, mesma tranca ---
   sp_painel: 'financeiro',
   sp_voucher_salvar: 'financeiro_mexer', sp_liberar: 'financeiro_mexer',
@@ -125,6 +143,7 @@ function permite(papel, acao) {
   if (exige === 'ajustes') return regra.ajustes === true;
   if (exige === 'financeiro') return regra.financeiro === true;
   if (exige === 'financeiro_mexer') return regra.financeiro_mexer === true;
+  if (exige === 'comercial_gerir') return regra.comercial_gerir === true;
 
   if (exige === 'ver') {
     return regra.ver === '*' || (Array.isArray(regra.ver) && regra.ver.length > 0);
@@ -144,6 +163,9 @@ function recado(papel, acao) {
   if (exige === 'financeiro' || exige === 'financeiro_mexer') {
     return 'O seu acesso (' + nome + ') não enxerga o financeiro.';
   }
+  if (exige === 'comercial_gerir') {
+    return 'Só o Dono ou o RH podem cadastrar participantes e ver a simulação dos outros.';
+  }
   if (exige === 'enviar') return 'O seu acesso (' + nome + ') não permite disparar mensagens.';
   if (exige === 'ajustes') return 'O seu acesso (' + nome + ') não permite mudar as configurações.';
   return 'O seu acesso (' + nome + ') é só de consulta — esta ação não é permitida.';
@@ -156,12 +178,14 @@ function menuDoPapel(papel) {
     return ['dashboard', 'vagas', 'triagem', 'candidatos', 'prequalificacao', 'aurea', 'preonboarding',
       'colaboradores', 'avisos', 'space', 'play', 'conteudo', 'quiz', 'mensagens',
       'opdash', 'opgestores', 'oponboarding', 'opagenda',
+      'cmleads', 'cmagenda', 'cmatendimento', 'cmsimulacoes',
       'financeiro', 'finclientes', 'findash', 'fingastos', 'findre', 'ajustes', 'usuarios'];
   }
   if (papel === 'rh') {
     return ['dashboard', 'vagas', 'triagem', 'candidatos', 'prequalificacao', 'aurea', 'preonboarding',
       'colaboradores', 'avisos', 'space', 'play', 'conteudo', 'quiz', 'mensagens',
       'opdash', 'opgestores', 'oponboarding', 'opagenda',
+      'cmleads', 'cmagenda', 'cmatendimento', 'cmsimulacoes',
       'financeiro', 'finclientes', 'findash', 'fingastos', 'findre', 'ajustes'];
   }
   if (papel === 'avaliador') {
