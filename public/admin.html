@@ -854,6 +854,104 @@
     #ag-miolo { transition: none; }
   }
 
+  /* ============================================================
+     COMERCIAL — SIMULACOES
+     Reaproveita o que ja existe (op-kpi, op-pino, tbl, card) e
+     acrescenta so o que e proprio daqui: o cartao de participante,
+     a etiqueta que tambem e seletor, e o cabecalho do perfil.
+     ============================================================ */
+  .cm-abas { width: fit-content; }
+
+  .cm-sec { display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    padding: 18px 20px 14px; border-bottom: 1px solid var(--hairline); }
+  .cm-sec h3, .cm-sec-fora h3 { margin: 0 0 2px; font-size: 15.5px; font-weight: 600;
+    letter-spacing: -.016em; }
+  .cm-sec > div:first-child { min-width: 0; }
+  .cm-sec > select { margin-left: auto; }
+  .cm-sec-fora { display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    margin: 22px 0 12px; }
+  .cm-nada { text-align: center; padding: 44px 24px; }
+
+  .cm-tab td { font-size: 13.5px; }
+  /* telefone nao quebra no meio: "(13) 99103-" numa linha e "5566" na
+     outra nao e um telefone, e dois pedacos de texto */
+  .cm-tab td.cm-fone { white-space: nowrap; }
+  .cm-n { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .cm-bom { color: var(--green); }
+  .cm-ruim { color: var(--red); }
+  .cm-zero { color: var(--label-3); font-weight: 500; }
+  /* O nome do SDR na tabela e um botao, mas tem que PARECER um link.
+     A classe do visual e separada da classe do clique de proposito:
+     `.cm-abrir` diz o que o botao FAZ (e o gancho do javascript) e
+     `.cm-link` diz como ele SE PARECE. Quando as duas eram a mesma,
+     o botao "Abrir painel" do cartao de participante — que tambem
+     precisa do gancho — herdava "sem fundo, sem borda" e virava um
+     texto solto do lado de um botao de verdade. */
+  .cm-link { background: none; border: 0; padding: 0; font-family: inherit;
+    font-size: 13.5px; font-weight: 600; color: var(--label); cursor: pointer;
+    text-align: left; border-radius: 6px;
+    transition: color var(--t-rapido); }
+  .cm-link:hover { color: var(--accent-soft); text-decoration: underline; }
+  .cm-link:focus-visible { outline: none; box-shadow: var(--glow-forte); }
+
+  /* ---- os cartoes de participante ---- */
+  .cm-grade { display: grid; gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(252px, 1fr)); }
+  .cm-cartao { background: var(--surface); border: 1px solid var(--hairline);
+    border-radius: var(--r-card); padding: 16px 16px 12px; display: flex;
+    flex-direction: column; transition: border-color var(--t-rapido), transform var(--t-rapido); }
+  .cm-cartao:hover { border-color: var(--hairline-strong); transform: translateY(-2px); }
+  .cm-cartao-topo { display: flex; align-items: center; gap: 11px; }
+  .cm-nome { font-size: 14.5px; font-weight: 600; letter-spacing: -.012em; margin-bottom: 5px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cm-cartao-pe { display: flex; gap: 8px; margin-top: auto; padding-top: 14px; }
+  .cm-cartao-pe .btn { flex: 1; }
+
+  .cm-ini { display: flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px; flex: none; border-radius: 50%;
+    background: var(--accent-grad); color: var(--accent-on);
+    font-size: 13.5px; font-weight: 600; letter-spacing: .01em; }
+  .cm-ini.grande { width: 50px; height: 50px; font-size: 17px; }
+  .cm-ini.pequeno { width: 30px; height: 30px; font-size: 11.5px; }
+
+  .cm-mini { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+    margin: 14px 0 2px; }
+  .cm-mini > div { text-align: center; }
+  .cm-mini b { display: block; font-size: 17px; font-weight: 700;
+    font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .cm-mini span { display: block; font-size: 10.5px; color: var(--label-3);
+    text-transform: uppercase; letter-spacing: .05em; margin-top: 1px; }
+
+  /* ---- o cabecalho do painel individual ---- */
+  .cm-perfil { display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
+    margin-bottom: 18px; }
+  .cm-origem { display: flex; align-items: center; gap: 11px; background: var(--fill-1);
+    border: 1px solid var(--hairline); border-radius: var(--r-ctl); padding: 12px 14px; }
+
+  /* ---- a etiqueta que TAMBEM e seletor ----
+     O <select> fica por cima, invisivel, ocupando a etiqueta
+     inteira. Assim a aparencia e a de uma etiqueta e o
+     comportamento e o de um campo de verdade — com teclado,
+     leitor de tela e o seletor do celular funcionando. */
+  .cm-pino-sel { position: relative; cursor: pointer; padding-right: 20px; }
+  .cm-pino-sel::after { content: ''; position: absolute; right: 8px; top: 50%;
+    width: 0; height: 0; margin-top: -1.5px;
+    border-left: 3.5px solid transparent; border-right: 3.5px solid transparent;
+    border-top: 4px solid currentColor; opacity: .7; }
+  .cm-pino-sel select { position: absolute; inset: 0; width: 100%; height: 100%;
+    opacity: 0; cursor: pointer; border: 0; padding: 0; margin: 0;
+    background: none; box-shadow: none; min-width: 0; }
+  .cm-pino-sel select:focus-visible + .cm-pino-txt { text-decoration: underline; }
+  .cm-pino-sel:hover { filter: brightness(1.25); }
+  .cm-pino-sel.salvando { opacity: .55; }
+
+  @media (max-width: 640px) {
+    .cm-grade { grid-template-columns: 1fr; }
+    .cm-sec, .cm-sec-fora { padding-left: 14px; padding-right: 14px; }
+    .cm-sec-fora { padding-left: 0; padding-right: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) { .cm-cartao:hover { transform: none; } }
+
   /* ---- Onboarding: o quadro ---- */
   .ob-quadro { display: grid; gap: 12px; align-items: start;
     grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
@@ -1105,6 +1203,18 @@
       <button data-aba="oponboarding"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M6.4 4.4h11.2a1.6 1.6 0 0 1 1.6 1.6v13.6l-3-2-2.6 2-2.6-2-2.6 2-3-2V6a1.6 1.6 0 0 1 1.6-1.6z"/><path d="m9.4 10.6 1.8 1.8 3.6-3.6"/></svg><span>Onboarding</span></button>
       <button data-aba="opagenda"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3.6" y="5.4" width="16.8" height="14.2" rx="2"/><path d="M3.6 9.8h16.8M8.4 3.4v3.4M15.6 3.4v3.4"/><path d="M8.2 13.4h2M8.2 16.4h2M13.8 13.4h2M13.8 16.4h2"/></svg><span>Agenda</span></button>
 </div></div></div>
+      <!-- COMERCIAL. Fica logo depois de Operação: um cuida de quem já
+           é cliente, o outro de quem ainda não é. A Agenda daqui é a
+           COMERCIAL, de prospecção — não é a Agenda da Operação, que
+           continua onde sempre esteve, no grupo de cima. -->
+      <div class="nav-grupo" data-grupo="comercial">
+      <button type="button" class="nav-cab">Comercial<svg class="seta" width="12" height="12" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
+      <div class="nav-itens"><div>
+      <button data-aba="cmleads"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M3.6 6.4h16.8M6.2 11.2h11.6M9 16h6"/><circle cx="12" cy="20" r="1.1"/></svg><span>Leads</span></button>
+      <button data-aba="cmagenda"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3.6" y="5.4" width="16.8" height="14.2" rx="2"/><path d="M3.6 9.8h16.8M8.4 3.4v3.4M15.6 3.4v3.4"/><path d="m9.6 14.2 1.8 1.8 3.4-3.6"/></svg><span>Agenda</span></button>
+      <button data-aba="cmatendimento"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M20.4 11.6a8.4 8.4 0 0 1-8.4 8.4c-1.5 0-2.9-.4-4.1-1L3.4 20l1.1-4.4a8.4 8.4 0 1 1 15.9-4z"/></svg><span>Atendimento</span></button>
+      <button data-aba="cmsimulacoes"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M4 19.6h16"/><path d="M7.2 19.6v-6.4M12 19.6V8.4M16.8 19.6v-9"/><circle cx="16.8" cy="6.2" r="1.6"/></svg><span>Simulações</span></button>
+</div></div></div>
       <div class="nav-grupo" data-grupo="conteudo">
       <button type="button" class="nav-cab">Start Academy<svg class="seta" width="12" height="12" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
       <div class="nav-itens"><div>
@@ -1136,6 +1246,12 @@
 
   <main class="conteudo">
     <header class="pagina-cab"><h1 id="titulo-pagina">Dashboard</h1></header>
+
+    <!-- ---------- COMERCIAL ---------- -->
+    <section data-painel="cmleads" style="display:none"><div id="painel-cmleads"></div></section>
+    <section data-painel="cmagenda" style="display:none"><div id="painel-cmagenda"></div></section>
+    <section data-painel="cmatendimento" style="display:none"><div id="painel-cmatendimento"></div></section>
+    <section data-painel="cmsimulacoes" style="display:none"><div id="painel-cmsimulacoes"></div></section>
 
     <!-- ---------- QUADRO ---------- -->
     <section data-painel="triagem" style="display:none">
@@ -1358,6 +1474,7 @@
 <script src="/js/admin-operacao.js"></script>
 <script src="/js/admin-onboarding.js"></script>
 <script src="/js/admin-agenda.js"></script>
+<script src="/js/admin-comercial.js"></script>
 <script src="/js/admin-inicio.js"></script>
 </body>
 </html>
