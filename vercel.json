@@ -103,6 +103,22 @@
     {
       "source": "/startplay",
       "destination": "/play.html"
+    },
+    {
+      "source": "/termos",
+      "destination": "/termos.html"
+    },
+    {
+      "source": "/termo",
+      "destination": "/termos.html"
+    },
+    {
+      "source": "/privacidade",
+      "destination": "/privacidade.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/privacidade.html"
     }
   ],
   "headers": [
