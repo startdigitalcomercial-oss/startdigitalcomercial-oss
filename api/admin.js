@@ -291,10 +291,29 @@ module.exports = async function handler(req, res) {
       // campo de e-mail vazio. Isso vai sempre, mesmo com a dica desligada.
       let primeiro = false;
       try { primeiro = await senhaMestraVale(await usuariosAtivos()); } catch (e) { }
-      if (!u.mostrarSenhaNoLogin()) return u.ok(res, { mostrar: false, primeiro_acesso: primeiro });
+
+      // O link de "Suporte" no rodape do login. Sai do MESMO numero que
+      // voce ja configurou na landing de vagas — assim, trocou o numero
+      // la, trocou aqui junto, sem ninguem precisar mexer em codigo.
+      // Nao tem numero salvo? O link cai no e-mail. Nada aqui e segredo:
+      // esse numero ja aparece na pagina publica de vagas.
+      let suporte = '';
+      try {
+        const zap = String(((await getSetting('landing', {})) || {}).whatsapp || '')
+          .replace(/\D/g, '');
+        if (zap.length >= 10) {
+          suporte = 'https://wa.me/' + (zap.length <= 11 ? '55' + zap : zap) +
+            '?text=' + encodeURIComponent('Ola! Preciso de ajuda para entrar no painel da StartDigital.');
+        }
+      } catch (e) { /* sem numero, o rodape usa o e-mail */ }
+
+      if (!u.mostrarSenhaNoLogin()) {
+        return u.ok(res, { mostrar: false, primeiro_acesso: primeiro, suporte: suporte });
+      }
       return u.ok(res, {
         mostrar: true,
         primeiro_acesso: primeiro,
+        suporte: suporte,
         senha: process.env.ADMIN_PASSWORD || process.env.ADMIN_SECRET || ''
       });
     }
