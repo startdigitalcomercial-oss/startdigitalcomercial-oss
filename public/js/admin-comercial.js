@@ -49,8 +49,8 @@ async function apiCm(action, opts) {
    A ORDEM aqui não é a ordem em que os números foram pedidos: é a
    ordem em que eles contam a história. Total, depois os que
    avançaram (agendou, veio, qualificou), e por último o que se
-   perdeu. Isso tem um efeito colateral bom: \"Compareceram\" (verde)
-   e \"Não compareceram\" (vermelho) deixam de ficar coladas uma na
+   perdeu. Isso tem um efeito colateral bom: "Compareceram" (verde)
+   e "Não compareceram" (vermelho) deixam de ficar coladas uma na
    outra. Para quem não distingue verde de vermelho — uns 8% dos
    homens — duas barras vizinhas nessas duas cores são a MESMA
    barra. Medimos: lado a lado davam 4,6 de separação; separadas
@@ -59,25 +59,25 @@ async function apiCm(action, opts) {
    ============================================================ */
 const CM_MEDIDAS = [
   // Duas cores para o mesmo numero, de proposito. No grafico de cima
-  // \"Total de Leads\" e a REGUA — tem que ser neutro, senao compete
+  // "Total de Leads" e a REGUA — tem que ser neutro, senao compete
   // com as barras que ele serve de medida. No grafico por SDR ele
   // vira uma comparacao como qualquer outra, e barra cinza ali
   // parece dado desligado.
   { chave: 'leads', rotulo: 'Total de Leads', curto: 'Leads',
     cor: 'var(--label-2)', corSdr: 'var(--cyan)', classe: '', pe: 'cadastrados na simulação',
-    ico: '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\"><path d=\"M3.8 6.6h16.4M6.6 11.4h10.8M9.4 16.2h5.2\"/></svg>' },
+    ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3.8 6.6h16.4M6.6 11.4h10.8M9.4 16.2h5.2"/></svg>' },
   { chave: 'agendados', rotulo: 'Agendados', curto: 'Agendados',
     cor: 'var(--blue)', classe: 'agenda', pe: 'com reunião marcada',
-    ico: '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\"><rect x=\"3.8\" y=\"5.6\" width=\"16.4\" height=\"13.8\" rx=\"2\"/><path d=\"M3.8 9.8h16.4M8.6 3.6v3.4M15.4 3.6v3.4\"/></svg>' },
+    ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3.8" y="5.6" width="16.4" height="13.8" rx="2"/><path d="M3.8 9.8h16.4M8.6 3.6v3.4M15.4 3.6v3.4"/></svg>' },
   { chave: 'compareceram', rotulo: 'Compareceram', curto: 'Compareceram',
     cor: 'var(--green)', classe: 'bom', pe: 'reunião aconteceu',
-    ico: '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\"><circle cx=\"12\" cy=\"12\" r=\"8.4\"/><path d=\"m8.4 12.3 2.4 2.4 4.8-5.4\"/></svg>' },
+    ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8.4"/><path d="m8.4 12.3 2.4 2.4 4.8-5.4"/></svg>' },
   { chave: 'qualificados', rotulo: 'Qualificados', curto: 'Qualificados',
     cor: 'var(--purple)', classe: 'qualif', pe: 'com perfil para avançar',
-    ico: '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\"><path d=\"m12 4.4 2.3 4.8 5.2.7-3.8 3.7.9 5.2-4.6-2.5-4.6 2.5.9-5.2L4.5 9.9l5.2-.7z\"/></svg>' },
+    ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m12 4.4 2.3 4.8 5.2.7-3.8 3.7.9 5.2-4.6-2.5-4.6 2.5.9-5.2L4.5 9.9l5.2-.7z"/></svg>' },
   { chave: 'nao_compareceram', rotulo: 'Não compareceram', curto: 'Faltaram',
     cor: 'var(--red)', classe: 'ruim', pe: 'marcaram e faltaram',
-    ico: '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\"><circle cx=\"12\" cy=\"12\" r=\"8.4\"/><path d=\"m9.2 9.2 5.6 5.6M14.8 9.2l-5.6 5.6\"/></svg>' }
+    ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8.4"/><path d="m9.2 9.2 5.6 5.6M14.8 9.2l-5.6 5.6"/></svg>' }
 ];
 
 function cmMedida(chave) {
@@ -126,7 +126,7 @@ function cmDataValor(iso) {
 /* ---------------- entrada ---------------- */
 async function carregaSimulacoes() {
   const alvo = document.getElementById('painel-cmsimulacoes');
-  if (!CM) alvo.innerHTML = '<div class=\"spinner\"></div>';
+  if (!CM) alvo.innerHTML = '<div class="spinner"></div>';
   try {
     // Quem não gerencia não tem Dashboard geral para ver: vai direto
     // para a própria carteira.
@@ -137,7 +137,7 @@ async function carregaSimulacoes() {
     await cmBusca();
     cmDesenha();
   } catch (e) {
-    alvo.innerHTML = '<div class=\"alert alert-erro\">' + esc(e.message) + '</div>';
+    alvo.innerHTML = '<div class="alert alert-erro">' + esc(e.message) + '</div>';
   }
 }
 
@@ -167,7 +167,7 @@ async function cmRemonta() {
   try {
     await cmBusca();
     miolo.innerHTML = cmMiolo();
-    // os números nascem em \"0\" e sobem contando. Sem esta linha, um
+    // os números nascem em "0" e sobem contando. Sem esta linha, um
     // miolo trocado ficava com cinco zeros parados na tela enquanto
     // os leads estavam logo abaixo — o pior tipo de erro, o que
     // parece certo até alguém conferir.
@@ -184,19 +184,19 @@ function cmDesenha() {
   const gerente = !!(CM && CM.gerente) || !!(COMERCIAL && COMERCIAL.gerente);
 
   document.getElementById('painel-cmsimulacoes').innerHTML =
-    '<div class=\"op\">' +
+    '<div class="op">' +
 
-    '<div class=\"op-cab op-entra\">' +
-      '<div><div class=\"small muted\">Gestão de participantes e acompanhamento de resultados.</div></div>' +
-      '<div class=\"op-filtros\">' +
+    '<div class="op-cab op-entra">' +
+      '<div><div class="small muted">Gestão de participantes e acompanhamento de resultados.</div></div>' +
+      '<div class="op-filtros">' +
         cmFiltroPeriodo() +
-        (gerente ? '<button class=\"btn btn-sm\" id=\"cm-novo-part\">+ Novo Participante</button>' : '') +
+        (gerente ? '<button class="btn btn-sm" id="cm-novo-part">+ Novo Participante</button>' : '') +
       '</div>' +
     '</div>' +
 
     (gerente ? cmAbas() : '') +
 
-    '<div class=\"op-entra\" id=\"cm-miolo\" style=\"animation-delay:60ms\">' + cmMiolo() + '</div>' +
+    '<div class="op-entra" id="cm-miolo" style="animation-delay:60ms">' + cmMiolo() + '</div>' +
     '</div>';
 
   opAnima('painel-cmsimulacoes');
@@ -205,13 +205,13 @@ function cmDesenha() {
 }
 
 function cmAbas() {
-  return '<div class=\"fd2-filtro cm-abas\" id=\"cm-vista\" style=\"margin-bottom:16px\">' +
+  return '<div class="fd2-filtro cm-abas" id="cm-vista" style="margin-bottom:16px">' +
     [['dashboard', 'Dashboard'], ['participantes', 'Participantes']].map(function (o) {
-      return '<button type=\"button\" data-v=\"' + o[0] + '\"' +
-        (CM_VISTA === o[0] ? ' class=\"on\"' : '') + '>' + o[1] + '</button>';
+      return '<button type="button" data-v="' + o[0] + '"' +
+        (CM_VISTA === o[0] ? ' class="on"' : '') + '>' + o[1] + '</button>';
     }).join('') +
     (CM_VISTA === 'painel'
-      ? '<button type=\"button\" data-v=\"painel\" class=\"on\">' +
+      ? '<button type="button" data-v="painel" class="on">' +
         esc((CM && CM.participante && CM.participante.nome) || 'Painel') + '</button>'
       : '') +
     '</div>';
@@ -220,13 +220,13 @@ function cmAbas() {
 function cmFiltroPeriodo() {
   const faixas = [['tudo', 'Tudo'], ['hoje', 'Hoje'], ['semana', 'Esta semana'],
     ['mes', 'Este mês'], ['personalizado', 'Período…']];
-  return '<select id=\"cm-faixa\" aria-label=\"Período\">' +
+  return '<select id="cm-faixa" aria-label="Período">' +
     faixas.map(function (f) {
-      return '<option value=\"' + f[0] + '\"' + (CM_FAIXA === f[0] ? ' selected' : '') + '>' + f[1] + '</option>';
+      return '<option value="' + f[0] + '"' + (CM_FAIXA === f[0] ? ' selected' : '') + '>' + f[1] + '</option>';
     }).join('') + '</select>' +
     (CM_FAIXA === 'personalizado'
-      ? '<input type=\"date\" id=\"cm-de\" value=\"' + esc(CM_DE) + '\" aria-label=\"De\">' +
-        '<input type=\"date\" id=\"cm-ate\" value=\"' + esc(CM_ATE) + '\" aria-label=\"Até\">'
+      ? '<input type="date" id="cm-de" value="' + esc(CM_DE) + '" aria-label="De">' +
+        '<input type="date" id="cm-ate" value="' + esc(CM_ATE) + '" aria-label="Até">'
       : '');
 }
 
@@ -242,19 +242,19 @@ function cmDashboard() {
   const t = CM.total || {};
   const vazio = !(CM.por_sdr || []).length;
 
-  // Zero nao ganha cor. Um \"0\" verde em Qualificados parece elogio,
-  // e um \"0\" vermelho em Nao compareceram parece alerta — quando e
+  // Zero nao ganha cor. Um "0" verde em Qualificados parece elogio,
+  // e um "0" vermelho em Nao compareceram parece alerta — quando e
   // justamente o melhor numero possivel ali. Cor so quando ha o que
   // mostrar.
   const kpi = function (m) {
     const valor = t[m.chave] || 0;
-    return '<div class=\"op-kpi ' + (valor ? m.classe : '') + '\">' +
-      '<div class=\"rot\">' + m.rotulo + m.ico + '</div>' +
-      '<div class=\"num\" data-ate=\"' + valor + '\">0</div>' +
-      '<div class=\"pe\">' + m.pe + '</div></div>';
+    return '<div class="op-kpi ' + (valor ? m.classe : '') + '">' +
+      '<div class="rot">' + m.rotulo + m.ico + '</div>' +
+      '<div class="num" data-ate="' + valor + '">0</div>' +
+      '<div class="pe">' + m.pe + '</div></div>';
   };
 
-  return '<div class=\"op-kpis\" style=\"grid-template-columns:repeat(auto-fit,minmax(172px,1fr))\">' +
+  return '<div class="op-kpis" style="grid-template-columns:repeat(auto-fit,minmax(172px,1fr))">' +
       CM_MEDIDAS.map(kpi).join('') +
     '</div>' +
 
@@ -262,25 +262,25 @@ function cmDashboard() {
     // só ocupam a tela. Os cinco cartões zerados já dizem tudo.
     ((vazio || !(t.leads || 0)) ? '' : cmGraficoKpis() + cmGraficoSdr()) +
 
-    '<div class=\"card\" style=\"padding:0;overflow:hidden\">' +
-      '<div class=\"cm-sec\">' +
+    '<div class="card" style="padding:0;overflow:hidden">' +
+      '<div class="cm-sec">' +
         '<div><h3>Desempenho por SDR</h3>' +
-        '<div class=\"small muted\">Clique no nome para abrir a carteira dele.</div></div>' +
+        '<div class="small muted">Clique no nome para abrir a carteira dele.</div></div>' +
         (CM.sdrs && CM.sdrs.length > 1 ? cmFiltroSdr() : '') +
       '</div>' +
       (vazio
-        ? '<div class=\"cm-nada\">' +
-            '<div style=\"font-size:15px;font-weight:600;margin-bottom:6px\">Nenhum SDR na simulação ainda</div>' +
-            '<div class=\"small muted\">Use <strong>+ Novo Participante</strong> para começar.</div></div>'
-        : '<div style=\"overflow-x:auto\"><table class=\"tbl cm-tab\" style=\"min-width:680px\"><thead><tr>' +
-            '<th style=\"padding-left:18px\">SDR</th><th>Leads</th><th>Agendados</th>' +
+        ? '<div class="cm-nada">' +
+            '<div style="font-size:15px;font-weight:600;margin-bottom:6px">Nenhum SDR na simulação ainda</div>' +
+            '<div class="small muted">Use <strong>+ Novo Participante</strong> para começar.</div></div>'
+        : '<div style="overflow-x:auto"><table class="tbl cm-tab" style="min-width:680px"><thead><tr>' +
+            '<th style="padding-left:18px">SDR</th><th>Leads</th><th>Agendados</th>' +
             '<th>Compareceram</th><th>Não compareceram</th><th>Qualificados</th></tr></thead><tbody>' +
           CM.por_sdr.map(function (s) {
             return '<tr>' +
-              '<td style=\"padding-left:18px\"><button type=\"button\" class=\"cm-abrir cm-link\" data-id=\"' + esc(s.id) + '\">' +
+              '<td style="padding-left:18px"><button type="button" class="cm-abrir cm-link" data-id="' + esc(s.id) + '">' +
                 esc(s.nome) + '</button></td>' +
-              '<td class=\"cm-n\">' + s.leads + '</td>' +
-              '<td class=\"cm-n\">' + s.agendados + '</td>' +
+              '<td class="cm-n">' + s.leads + '</td>' +
+              '<td class="cm-n">' + s.agendados + '</td>' +
               cmCel(s.compareceram, 'cm-bom') +
               cmCel(s.nao_compareceram, 'cm-ruim') +
               cmCel(s.qualificados, 'cm-bom') +
@@ -290,7 +290,7 @@ function cmDashboard() {
     '</div>' +
 
     ((CM.closers || []).length
-      ? '<div class=\"small muted\" style=\"margin-top:12px\">' +
+      ? '<div class="small muted" style="margin-top:12px">' +
         '<strong>' + CM.closers.length + ' Closer(s)</strong> na simulação — ' +
         esc(CM.closers.map(function (x) { return x.nome; }).join(', ')) +
         '. Os números acima são de prospecção, então não misturam as duas funções.</div>'
@@ -302,13 +302,13 @@ function cmDashboard() {
 
    Os cartoes dizem QUANTO. O grafico diz QUANTO COMPARADO COM O
    QUE — que e outra pergunta, e e a que interessa num treino:
-   \"agendei 7\" nao significa nada sozinho; \"agendei 7 dos 9 que
-   prospectei\" significa.
+   "agendei 7" nao significa nada sozinho; "agendei 7 dos 9 que
+   prospectei" significa.
 
    Por isso a regua nao e a maior barra, e o TOTAL DE LEADS. Todos
    os outros numeros sao recortes dele, entao a largura de cada
    barra ja e a fatia que aquele numero representa do todo. Se a
-   regua fosse a maior barra, \"Agendados\" encostaria na direita
+   regua fosse a maior barra, "Agendados" encostaria na direita
    mesmo quando fossem 7 de 900, e o grafico mentiria bonito.
    ============================================================ */
 function cmGraficoKpis() {
@@ -316,25 +316,25 @@ function cmGraficoKpis() {
   const total = t.leads || 0;
   if (!total) return '';
 
-  return '<div class=\"card cm-grafico\">' +
-    '<div class=\"cm-g-cab\">' +
+  return '<div class="card cm-grafico">' +
+    '<div class="cm-g-cab">' +
       '<div><h3>Os números lado a lado</h3>' +
-      '<div class=\"small muted\">Cada barra é a fatia dos ' + total +
+      '<div class="small muted">Cada barra é a fatia dos ' + total +
         (total === 1 ? ' lead' : ' leads') + ' da simulação.</div></div>' +
     '</div>' +
-    '<div class=\"cm-barras\">' +
+    '<div class="cm-barras">' +
       CM_MEDIDAS.map(function (m) {
         const v = t[m.chave] || 0;
         const pct = total ? Math.round((v / total) * 1000) / 10 : 0;
-        return '<div class=\"op-barra\" title=\"' + esc(m.rotulo + ': ' + v + ' de ' + total) + '\">' +
-          '<div class=\"topo\">' +
-            '<b class=\"cm-g-rot\"><i class=\"cm-g-ico\" style=\"color:' + m.cor + '\">' + m.ico + '</i>' +
+        return '<div class="op-barra" title="' + esc(m.rotulo + ': ' + v + ' de ' + total) + '">' +
+          '<div class="topo">' +
+            '<b class="cm-g-rot"><i class="cm-g-ico" style="color:' + m.cor + '">' + m.ico + '</i>' +
               esc(m.rotulo) + '</b>' +
             '<span><b>' + v + '</b>' +
               (m.chave === 'leads' ? '' : ' · ' + cmPct(pct)) + '</span>' +
           '</div>' +
-          '<div class=\"op-trilho\"><div class=\"op-fita\" data-pct=\"' + pct + '\" ' +
-            'style=\"background:' + m.cor + '\"></div></div>' +
+          '<div class="op-trilho"><div class="op-fita" data-pct="' + pct + '" ' +
+            'style="background:' + m.cor + '"></div></div>' +
         '</div>';
       }).join('') +
     '</div></div>';
@@ -353,11 +353,11 @@ function cmPct(p) {
    Uma medida por vez, escolhida no seletor. Cinco medidas × seis
    SDRs numa tela so daria trinta barras: ninguem compara trinta
    barras, so olha para elas. Uma medida por vez responde a
-   pergunta que a pessoa tem na cabeca naquele momento — \"quem
-   agendou mais?\" — e responde de relance.
+   pergunta que a pessoa tem na cabeca naquele momento — "quem
+   agendou mais?" — e responde de relance.
 
    A cor das barras acompanha a medida escolhida, a mesma do
-   cartao e do grafico de cima. Escolheu \"Compareceram\", tudo
+   cartao e do grafico de cima. Escolheu "Compareceram", tudo
    fica verde: o olho liga as tres coisas sem ninguem explicar.
    ============================================================ */
 function cmGraficoSdr() {
@@ -375,37 +375,37 @@ function cmGraficoSdr() {
     return (b[m.chave] || 0) - (a[m.chave] || 0) || a.nome.localeCompare(b.nome);
   });
 
-  return '<div class=\"card cm-grafico\">' +
-    '<div class=\"cm-g-cab\">' +
+  return '<div class="card cm-grafico">' +
+    '<div class="cm-g-cab">' +
       '<div><h3>Comparando os SDRs</h3>' +
-      '<div class=\"small muted\">Clique numa barra para abrir a carteira do SDR.</div></div>' +
-      '<div class=\"fd2-filtro cm-g-medidas\" id=\"cm-metrica\">' +
+      '<div class="small muted">Clique numa barra para abrir a carteira do SDR.</div></div>' +
+      '<div class="fd2-filtro cm-g-medidas" id="cm-metrica">' +
         CM_MEDIDAS.map(function (x) {
-          return '<button type=\"button\" data-m=\"' + x.chave + '\"' +
-            (CM_METRICA === x.chave ? ' class=\"on\"' : '') + '>' + esc(x.curto) + '</button>';
+          return '<button type="button" data-m="' + x.chave + '"' +
+            (CM_METRICA === x.chave ? ' class="on"' : '') + '>' + esc(x.curto) + '</button>';
         }).join('') +
       '</div>' +
     '</div>' +
     (maior === 0
-      ? '<div class=\"cm-g-zero\">Nenhum SDR tem ' +
+      ? '<div class="cm-g-zero">Nenhum SDR tem ' +
         esc(m.rotulo.toLowerCase()) + ' no período escolhido.</div>'
-      : '<div class=\"cm-barras\">' +
+      : '<div class="cm-barras">' +
         ordenado.map(function (x) {
           const v = x[m.chave] || 0;
           const pct = maior ? Math.round((v / maior) * 1000) / 10 : 0;
           const doTotal = x.leads ? Math.round((v / x.leads) * 100) : 0;
-          return '<button type=\"button\" class=\"op-barra cm-abrir\" data-id=\"' + esc(x.id) + '\" ' +
-            'title=\"' + esc(x.nome + ' · ' + m.rotulo + ': ' + v +
-              (m.chave === 'leads' ? '' : ' de ' + x.leads + ' leads')) + '\">' +
-            '<div class=\"topo\">' +
+          return '<button type="button" class="op-barra cm-abrir" data-id="' + esc(x.id) + '" ' +
+            'title="' + esc(x.nome + ' · ' + m.rotulo + ': ' + v +
+              (m.chave === 'leads' ? '' : ' de ' + x.leads + ' leads')) + '">' +
+            '<div class="topo">' +
               '<b>' + esc(x.nome) + '</b>' +
               '<span><b>' + v + '</b>' +
                 (m.chave === 'leads' || !x.leads ? ''
-                  : ' · ' + doTotal + '%<em class=\"cm-g-de\"> dos leads dele</em>') +
+                  : ' · ' + doTotal + '%<em class="cm-g-de"> dos leads dele</em>') +
               '</span>' +
             '</div>' +
-            '<div class=\"op-trilho\"><div class=\"op-fita\" data-pct=\"' + pct + '\" ' +
-              'style=\"background:' + cor + '\"></div></div>' +
+            '<div class="op-trilho"><div class="op-fita" data-pct="' + pct + '" ' +
+              'style="background:' + cor + '"></div></div>' +
           '</button>';
         }).join('') +
       '</div>') +
@@ -414,14 +414,14 @@ function cmGraficoSdr() {
 
 /* mesma regra da tela de cima: zero fica sem cor */
 function cmCel(n, classe) {
-  return '<td class=\"cm-n ' + (n ? classe : 'cm-zero') + '\">' + (n || 0) + '</td>';
+  return '<td class="cm-n ' + (n ? classe : 'cm-zero') + '">' + (n || 0) + '</td>';
 }
 
 function cmFiltroSdr() {
-  return '<select id=\"cm-sdr\" aria-label=\"SDR\" style=\"height:36px;font-size:13.5px;width:auto;min-width:150px\">' +
-    '<option value=\"\">Todos os SDRs</option>' +
+  return '<select id="cm-sdr" aria-label="SDR" style="height:36px;font-size:13.5px;width:auto;min-width:150px">' +
+    '<option value="">Todos os SDRs</option>' +
     (CM.sdrs || []).map(function (s) {
-      return '<option value=\"' + esc(s.id) + '\"' + (CM_SDR === s.id ? ' selected' : '') + '>' + esc(s.nome) + '</option>';
+      return '<option value="' + esc(s.id) + '"' + (CM_SDR === s.id ? ' selected' : '') + '>' + esc(s.nome) + '</option>';
     }).join('') + '</select>';
 }
 
@@ -429,35 +429,35 @@ function cmFiltroSdr() {
 function cmParticipantes() {
   const lista = CM.participantes || [];
   if (!lista.length) {
-    return '<div class=\"card\" style=\"text-align:center;padding:48px 24px\">' +
-      '<div style=\"font-size:15.5px;font-weight:600;margin-bottom:6px\">Nenhum participante ainda</div>' +
-      '<div class=\"small muted\" style=\"max-width:420px;margin:0 auto;line-height:1.6\">' +
+    return '<div class="card" style="text-align:center;padding:48px 24px">' +
+      '<div style="font-size:15.5px;font-weight:600;margin-bottom:6px">Nenhum participante ainda</div>' +
+      '<div class="small muted" style="max-width:420px;margin:0 auto;line-height:1.6">' +
       'Use <strong>+ Novo Participante</strong> para colocar alguém na simulação. ' +
       'O acesso continua sendo o do painel — aqui só se diz quem joga e em que posição.</div></div>';
   }
-  return '<div class=\"cm-grade\">' +
+  return '<div class="cm-grade">' +
     lista.map(function (p) {
       const n = p.numeros || {};
-      return '<div class=\"cm-cartao\">' +
-        '<div class=\"cm-cartao-topo\">' +
-          '<span class=\"cm-ini\">' + esc(cmIniciais(p.nome)) + '</span>' +
-          '<div style=\"min-width:0\">' +
-            '<div class=\"cm-nome\">' + esc(p.nome) + '</div>' +
-            '<span class=\"op-pino ' + (p.funcao === 'sdr' ? 'agendada' : 'ativo') + '\">' +
+      return '<div class="cm-cartao">' +
+        '<div class="cm-cartao-topo">' +
+          '<span class="cm-ini">' + esc(cmIniciais(p.nome)) + '</span>' +
+          '<div style="min-width:0">' +
+            '<div class="cm-nome">' + esc(p.nome) + '</div>' +
+            '<span class="op-pino ' + (p.funcao === 'sdr' ? 'agendada' : 'ativo') + '">' +
               esc(p.funcao_nome) + '</span>' +
           '</div>' +
         '</div>' +
         (p.funcao === 'sdr'
-          ? '<div class=\"cm-mini\">' +
+          ? '<div class="cm-mini">' +
               cmMini('Leads', n.leads) + cmMini('Agend.', n.agendados) +
               cmMini('Vieram', n.compareceram) + cmMini('Qualif.', n.qualificados) +
             '</div>'
-          : '<div class=\"small muted\" style=\"margin:12px 0 2px;line-height:1.5\">' +
+          : '<div class="small muted" style="margin:12px 0 2px;line-height:1.5">' +
             'Perfil de fechamento. Os indicadores de prospecção são dos SDRs.</div>') +
-        '<div class=\"cm-cartao-pe\">' +
-          '<button type=\"button\" class=\"btn btn-sm btn-ghost cm-abrir\" data-id=\"' + esc(p.id) + '\">Abrir painel</button>' +
+        '<div class="cm-cartao-pe">' +
+          '<button type="button" class="btn btn-sm btn-ghost cm-abrir" data-id="' + esc(p.id) + '">Abrir painel</button>' +
           (CM.gerente
-            ? '<button type=\"button\" class=\"btn btn-sm btn-ghost cm-editar-part\" data-id=\"' + esc(p.id) + '\">Editar</button>'
+            ? '<button type="button" class="btn btn-sm btn-ghost cm-editar-part" data-id="' + esc(p.id) + '">Editar</button>'
             : '') +
         '</div>' +
       '</div>';
@@ -468,7 +468,7 @@ function cmMini(rot, n) {
   return '<div><b>' + (n || 0) + '</b><span>' + rot + '</span></div>';
 }
 function cmIniciais(nome) {
-  const p = String(nome || '').trim().split(/\\s+/).filter(Boolean);
+  const p = String(nome || '').trim().split(/\s+/).filter(Boolean);
   if (!p.length) return '?';
   if (p.length === 1) return p[0].slice(0, 2).toUpperCase();
   return (p[0][0] + p[p.length - 1][0]).toUpperCase();
@@ -480,35 +480,35 @@ function cmPainel() {
   const n = CM.numeros || {};
   const eSdr = p.funcao === 'sdr';
 
-  return '<div class=\"cm-perfil\">' +
-      '<span class=\"cm-ini grande\">' + esc(cmIniciais(p.nome)) + '</span>' +
-      '<div style=\"min-width:0;flex:1\">' +
-        '<h2 style=\"margin:0;font-size:20px;letter-spacing:-.022em\">' + esc(p.nome) + '</h2>' +
-        '<div class=\"small muted\" style=\"margin-top:3px\">Função: <strong>' + esc(p.funcao_nome) + '</strong></div>' +
+  return '<div class="cm-perfil">' +
+      '<span class="cm-ini grande">' + esc(cmIniciais(p.nome)) + '</span>' +
+      '<div style="min-width:0;flex:1">' +
+        '<h2 style="margin:0;font-size:20px;letter-spacing:-.022em">' + esc(p.nome) + '</h2>' +
+        '<div class="small muted" style="margin-top:3px">Função: <strong>' + esc(p.funcao_nome) + '</strong></div>' +
       '</div>' +
       (eSdr && CM.posso_mexer
-        ? '<button class=\"btn btn-sm\" id=\"cm-novo-lead\">+ Novo Lead</button>' : '') +
+        ? '<button class="btn btn-sm" id="cm-novo-lead">+ Novo Lead</button>' : '') +
     '</div>' +
 
     (eSdr
-      ? '<div class=\"op-kpis\" style=\"grid-template-columns:repeat(auto-fit,minmax(150px,1fr))\">' +
+      ? '<div class="op-kpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">' +
           cmKpiSimples('Leads', n.leads, '') +
           cmKpiSimples('Agendados', n.agendados, 'agenda') +
           cmKpiSimples('Compareceram', n.compareceram, 'bom') +
           cmKpiSimples('Não compareceram', n.nao_compareceram, 'atencao') +
           cmKpiSimples('Qualificados', n.qualificados, 'bom') +
         '</div>' + cmListaLeads()
-      : '<div class=\"card\" style=\"text-align:center;padding:44px 24px\">' +
-        '<div style=\"font-size:15px;font-weight:600;margin-bottom:6px\">Perfil de Closer</div>' +
-        '<div class=\"small muted\" style=\"max-width:440px;margin:0 auto;line-height:1.6\">' +
+      : '<div class="card" style="text-align:center;padding:44px 24px">' +
+        '<div style="font-size:15px;font-weight:600;margin-bottom:6px">Perfil de Closer</div>' +
+        '<div class="small muted" style="max-width:440px;margin:0 auto;line-height:1.6">' +
         'O perfil está criado e o acesso à simulação, liberado. A simulação de hoje é de ' +
         'prospecção — quem cadastra lead é o SDR.</div></div>');
 }
 
 function cmKpiSimples(rot, valor, classe) {
-  return '<div class=\"op-kpi ' + (valor ? classe : '') + '\">' +
-    '<div class=\"rot\">' + rot + '</div>' +
-    '<div class=\"num\" data-ate=\"' + (valor || 0) + '\">0</div></div>';
+  return '<div class="op-kpi ' + (valor ? classe : '') + '">' +
+    '<div class="rot">' + rot + '</div>' +
+    '<div class="num" data-ate="' + (valor || 0) + '">0</div></div>';
 }
 
 /* ---------------- a fila de leads ---------------- */
@@ -531,38 +531,38 @@ function cmLeadsFiltrados() {
 function cmListaLeads() {
   const todos = CM.leads || [];
   if (!todos.length) {
-    return '<div class=\"card\" style=\"text-align:center;padding:44px 24px\">' +
-      '<div style=\"font-size:15px;font-weight:600;margin-bottom:6px\">Nenhum lead nesta simulação</div>' +
-      '<div class=\"small muted\">' +
+    return '<div class="card" style="text-align:center;padding:44px 24px">' +
+      '<div style="font-size:15px;font-weight:600;margin-bottom:6px">Nenhum lead nesta simulação</div>' +
+      '<div class="small muted">' +
       (CM.posso_mexer ? 'Use <strong>+ Novo Lead</strong> para cadastrar o primeiro.'
                       : 'Este SDR ainda não cadastrou leads no período.') + '</div></div>';
   }
   const lista = cmLeadsFiltrados();
 
-  return '<div class=\"cm-sec-fora\">' +
-      '<h3 style=\"margin:0\">Meus Leads</h3>' +
-      '<div class=\"op-filtros\" style=\"margin-left:auto\">' +
+  return '<div class="cm-sec-fora">' +
+      '<h3 style="margin:0">Meus Leads</h3>' +
+      '<div class="op-filtros" style="margin-left:auto">' +
         buscaHtml('cm-busca', 'Buscar pelo nome…', CM_BUSCA) +
-        '<select id=\"cm-f-comp\" aria-label=\"Comparecimento\"><option value=\"\">Todo comparecimento</option>' +
+        '<select id="cm-f-comp" aria-label="Comparecimento"><option value="">Todo comparecimento</option>' +
           (CM.comparecimento || []).map(function (k) {
-            return '<option value=\"' + k + '\"' + (CM_F_COMP === k ? ' selected' : '') + '>' +
+            return '<option value="' + k + '"' + (CM_F_COMP === k ? ' selected' : '') + '>' +
               esc(CM.comparecimento_nome[k]) + '</option>';
           }).join('') + '</select>' +
-        '<select id=\"cm-f-qual\" aria-label=\"Qualificação\"><option value=\"\">Toda qualificação</option>' +
+        '<select id="cm-f-qual" aria-label="Qualificação"><option value="">Toda qualificação</option>' +
           (CM.qualificacao || []).map(function (k) {
-            return '<option value=\"' + k + '\"' + (CM_F_QUAL === k ? ' selected' : '') + '>' +
+            return '<option value="' + k + '"' + (CM_F_QUAL === k ? ' selected' : '') + '>' +
               esc(CM.qualificacao_nome[k]) + '</option>';
           }).join('') + '</select>' +
       '</div>' +
-      '<span class=\"small muted\" id=\"cm-conta\">' + cmFrase(lista.length) + '</span>' +
+      '<span class="small muted" id="cm-conta">' + cmFrase(lista.length) + '</span>' +
     '</div>' +
 
-    '<div class=\"card\" style=\"padding:0;overflow:hidden\"><div style=\"overflow-x:auto\">' +
-      '<table class=\"tbl cm-tab\" style=\"min-width:1080px\"><thead><tr>' +
-        '<th style=\"padding-left:18px\">Lead</th><th>Contato</th><th>Cidade</th><th>CNPJ</th>' +
+    '<div class="card" style="padding:0;overflow:hidden"><div style="overflow-x:auto">' +
+      '<table class="tbl cm-tab" style="min-width:1080px"><thead><tr>' +
+        '<th style="padding-left:18px">Lead</th><th>Contato</th><th>Cidade</th><th>CNPJ</th>' +
         '<th>Nicho</th><th>Origem</th><th>Agendamento</th><th>Comparecimento</th>' +
         '<th>Qualificação</th><th></th>' +
-      '</tr></thead><tbody id=\"cm-corpo\">' + cmLinhas(lista) + '</tbody></table>' +
+      '</tr></thead><tbody id="cm-corpo">' + cmLinhas(lista) + '</tbody></table>' +
     '</div></div>';
 }
 
@@ -570,25 +570,25 @@ function cmFrase(n) { return n + (n === 1 ? ' lead' : ' leads'); }
 
 function cmLinhas(lista) {
   if (!lista.length) {
-    return '<tr><td colspan=\"10\" style=\"padding:26px\" class=\"muted\">Nenhum lead com esses filtros.</td></tr>';
+    return '<tr><td colspan="10" style="padding:26px" class="muted">Nenhum lead com esses filtros.</td></tr>';
   }
   const mexe = CM.posso_mexer;
   return lista.map(function (l) {
-    return '<tr data-lead=\"' + esc(l.id) + '\">' +
-      '<td style=\"padding-left:18px;font-weight:600\">' + esc(l.nome) + '</td>' +
-      '<td class=\"small cm-fone\">' + (l.contato ? esc(l.contato) : '<span class=\"muted\">—</span>') + '</td>' +
-      '<td class=\"small\">' + (l.cidade ? esc(l.cidade) : '<span class=\"muted\">—</span>') + '</td>' +
-      '<td class=\"small\" style=\"white-space:nowrap\">' +
-        (l.cnpj_bonito ? esc(l.cnpj_bonito) : '<span class=\"muted\">—</span>') + '</td>' +
-      '<td class=\"small\">' + (l.nicho ? esc(l.nicho) : '<span class=\"muted\">—</span>') + '</td>' +
-      '<td class=\"small\" style=\"white-space:nowrap\">' + esc(l.sdr) + ' — SDR</td>' +
-      '<td class=\"small\" style=\"white-space:nowrap\">' +
-        (l.agendado ? esc(cmQuando(l.agendado_em)) : '<span class=\"muted\">Sem reunião</span>') + '</td>' +
+    return '<tr data-lead="' + esc(l.id) + '">' +
+      '<td style="padding-left:18px;font-weight:600">' + esc(l.nome) + '</td>' +
+      '<td class="small cm-fone">' + (l.contato ? esc(l.contato) : '<span class="muted">—</span>') + '</td>' +
+      '<td class="small">' + (l.cidade ? esc(l.cidade) : '<span class="muted">—</span>') + '</td>' +
+      '<td class="small" style="white-space:nowrap">' +
+        (l.cnpj_bonito ? esc(l.cnpj_bonito) : '<span class="muted">—</span>') + '</td>' +
+      '<td class="small">' + (l.nicho ? esc(l.nicho) : '<span class="muted">—</span>') + '</td>' +
+      '<td class="small" style="white-space:nowrap">' + esc(l.sdr) + ' — SDR</td>' +
+      '<td class="small" style="white-space:nowrap">' +
+        (l.agendado ? esc(cmQuando(l.agendado_em)) : '<span class="muted">Sem reunião</span>') + '</td>' +
       '<td>' + cmSeletor('comp', l, mexe) + '</td>' +
       '<td>' + cmSeletor('qual', l, mexe) + '</td>' +
-      '<td style=\"text-align:right;padding-right:14px;white-space:nowrap\">' +
+      '<td style="text-align:right;padding-right:14px;white-space:nowrap">' +
         (mexe
-          ? '<button class=\"btn btn-sm btn-ghost cm-editar-lead\" data-id=\"' + esc(l.id) + '\">Editar</button>'
+          ? '<button class="btn btn-sm btn-ghost cm-editar-lead" data-id="' + esc(l.id) + '">Editar</button>'
           : '') + '</td>' +
     '</tr>';
   }).join('');
@@ -604,19 +604,19 @@ function cmSeletor(qual, l, mexe) {
   const nome = comp ? l.comparecimento_nome : l.qualificacao_nome;
 
   if (!mexe || (comp && !l.agendado)) {
-    return '<span class=\"op-pino ' + classe + '\">' + esc(comp && !l.agendado ? 'Sem reunião' : nome) + '</span>';
+    return '<span class="op-pino ' + classe + '">' + esc(comp && !l.agendado ? 'Sem reunião' : nome) + '</span>';
   }
   const opcoes = comp
     ? [['aguardando', 'Aguardando'], ['compareceu', 'Compareceu'], ['nao_compareceu', 'Não compareceu']]
     : [['pendente', 'Pendente'], ['sim', 'Qualificado'], ['nao', 'Não qualificado']];
 
-  return '<span class=\"cm-pino-sel op-pino ' + classe + '\">' +
-    '<select class=\"cm-troca\" data-campo=\"' + (comp ? 'comparecimento' : 'qualificacao') + '\" ' +
-      'data-id=\"' + esc(l.id) + '\" aria-label=\"' + (comp ? 'Comparecimento' : 'Qualificação') + '\">' +
+  return '<span class="cm-pino-sel op-pino ' + classe + '">' +
+    '<select class="cm-troca" data-campo="' + (comp ? 'comparecimento' : 'qualificacao') + '" ' +
+      'data-id="' + esc(l.id) + '" aria-label="' + (comp ? 'Comparecimento' : 'Qualificação') + '">' +
       opcoes.map(function (o) {
-        return '<option value=\"' + o[0] + '\"' + (valor === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+        return '<option value="' + o[0] + '"' + (valor === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
       }).join('') +
-    '</select><span class=\"cm-pino-txt\">' + esc(cmCurto(qual, valor)) + '</span></span>';
+    '</select><span class="cm-pino-txt">' + esc(cmCurto(qual, valor)) + '</span></span>';
 }
 
 function cmCurto(qual, v) {
@@ -801,48 +801,48 @@ async function cmFichaParticipante(p) {
     ? 'Quem entra na simulação, e em que posição.'
     : 'Edite o nome, a função ou a conta de acesso.';
 
-  document.getElementById('g-corpo').innerHTML = '<div class=\"spinner\"></div>';
+  document.getElementById('g-corpo').innerHTML = '<div class="spinner"></div>';
   document.getElementById('gaveta').style.display = 'flex';
 
   let contas = [];
   try { contas = (await apiCm('cm_usuarios')).usuarios || []; } catch (e) { /* segue sem a lista */ }
 
   document.getElementById('g-corpo').innerHTML =
-    '<div class=\"field\"><label for=\"cmp-nome\">Nome do participante</label>' +
-      '<input id=\"cmp-nome\" maxlength=\"80\" value=\"' + esc(novo ? '' : (p.nome || '')) + '\" placeholder=\"João\"></div>' +
+    '<div class="field"><label for="cmp-nome">Nome do participante</label>' +
+      '<input id="cmp-nome" maxlength="80" value="' + esc(novo ? '' : (p.nome || '')) + '" placeholder="João"></div>' +
 
-    '<div class=\"field\" style=\"margin-top:14px\"><label for=\"cmp-funcao\">Função comercial</label>' +
-      '<select id=\"cmp-funcao\">' +
-        '<option value=\"sdr\"' + (novo || p.funcao === 'sdr' ? ' selected' : '') + '>SDR — prospecção e agendamento</option>' +
-        '<option value=\"closer\"' + (!novo && p.funcao === 'closer' ? ' selected' : '') + '>Closer — fechamento</option>' +
+    '<div class="field" style="margin-top:14px"><label for="cmp-funcao">Função comercial</label>' +
+      '<select id="cmp-funcao">' +
+        '<option value="sdr"' + (novo || p.funcao === 'sdr' ? ' selected' : '') + '>SDR — prospecção e agendamento</option>' +
+        '<option value="closer"' + (!novo && p.funcao === 'closer' ? ' selected' : '') + '>Closer — fechamento</option>' +
       '</select></div>' +
 
-    '<div class=\"field\" style=\"margin-top:14px\"><label for=\"cmp-user\">Usuário vinculado</label>' +
-      '<span class=\"hint\">A conta com que a pessoa entra no painel. É por ela que o sistema sabe ' +
+    '<div class="field" style="margin-top:14px"><label for="cmp-user">Usuário vinculado</label>' +
+      '<span class="hint">A conta com que a pessoa entra no painel. É por ela que o sistema sabe ' +
         'de quem é cada lead. Para criar uma conta nova, use <strong>RH → Usuários</strong>: ' +
         'o acesso é um só no sistema inteiro.</span>' +
-      '<select id=\"cmp-user\"><option value=\"\">Sem conta vinculada (só aparece no painel)</option>' +
+      '<select id="cmp-user"><option value="">Sem conta vinculada (só aparece no painel)</option>' +
         contas.map(function (c) {
           const meu = !novo && p.user_id === c.id;
           const bloqueado = c.ja_participa && !meu;
-          return '<option value=\"' + esc(c.id) + '\"' + (meu ? ' selected' : '') +
+          return '<option value="' + esc(c.id) + '"' + (meu ? ' selected' : '') +
             (bloqueado ? ' disabled' : '') + '>' +
             esc(c.nome) + ' · ' + esc(c.papel_nome) +
             (bloqueado ? ' — já é ' + esc(c.ja_participa) : '') + '</option>';
         }).join('') +
       '</select></div>' +
 
-    '<div class=\"field\" style=\"margin-top:14px\"><label for=\"cmp-obs\">Observação</label>' +
-      '<textarea id=\"cmp-obs\" maxlength=\"500\" style=\"min-height:70px\" ' +
-      'placeholder=\"Opcional.\">' + esc(novo ? '' : (p.observacao || '')) + '</textarea></div>' +
+    '<div class="field" style="margin-top:14px"><label for="cmp-obs">Observação</label>' +
+      '<textarea id="cmp-obs" maxlength="500" style="min-height:70px" ' +
+      'placeholder="Opcional.">' + esc(novo ? '' : (p.observacao || '')) + '</textarea></div>' +
 
-    '<div id=\"cmp-saida\"></div>' +
+    '<div id="cmp-saida"></div>' +
 
-    '<div class=\"row row-wrap\" style=\"gap:10px;margin-top:22px\">' +
-      '<button class=\"btn\" id=\"cmp-salvar\">' + (novo ? 'Cadastrar participante' : 'Salvar') + '</button>' +
-      '<button class=\"btn btn-ghost\" id=\"cmp-fechar\">Cancelar</button>' +
-      (novo ? '' : '<span style=\"flex:1\"></span>' +
-        '<button class=\"btn btn-danger btn-sm\" id=\"cmp-tirar\">Tirar da simulação</button>') +
+    '<div class="row row-wrap" style="gap:10px;margin-top:22px">' +
+      '<button class="btn" id="cmp-salvar">' + (novo ? 'Cadastrar participante' : 'Salvar') + '</button>' +
+      '<button class="btn btn-ghost" id="cmp-fechar">Cancelar</button>' +
+      (novo ? '' : '<span style="flex:1"></span>' +
+        '<button class="btn btn-danger btn-sm" id="cmp-tirar">Tirar da simulação</button>') +
     '</div>';
 
   document.getElementById('cmp-fechar').addEventListener('click', fechaGaveta);
@@ -855,7 +855,7 @@ async function cmFichaParticipante(p) {
       observacao: document.getElementById('cmp-obs').value
     };
     if (!corpo.nome.trim()) { toast('Escreva o nome', true); return; }
-    this.disabled = true; this.innerHTML = '<span class=\"spinner\"></span> Salvando…';
+    this.disabled = true; this.innerHTML = '<span class="spinner"></span> Salvando…';
     try {
       await apiCm('cm_participante_salvar', { body: corpo });
       toast(novo ? 'Participante cadastrado' : 'Participante salvo');
@@ -864,7 +864,7 @@ async function cmFichaParticipante(p) {
       carregaSimulacoes();
     } catch (e) {
       document.getElementById('cmp-saida').innerHTML =
-        '<div class=\"alert alert-erro\" style=\"margin-top:14px\">' + esc(e.message) + '</div>';
+        '<div class="alert alert-erro" style="margin-top:14px">' + esc(e.message) + '</div>';
       this.disabled = false; this.textContent = novo ? 'Cadastrar participante' : 'Salvar';
     }
   });
@@ -895,96 +895,96 @@ function cmFichaLead(l) {
   document.getElementById('g-sub').textContent = 'Simulação de ' + (p.nome || '') + ' — SDR';
 
   document.getElementById('g-corpo').innerHTML =
-    '<div class=\"field\"><label for=\"cml-nome\">Nome do lead</label>' +
-      '<input id=\"cml-nome\" maxlength=\"160\" value=\"' + esc(novo ? '' : (l.nome || '')) + '\" ' +
-      'placeholder=\"Empresa ABC ou João da Silva\"></div>' +
+    '<div class="field"><label for="cml-nome">Nome do lead</label>' +
+      '<input id="cml-nome" maxlength="160" value="' + esc(novo ? '' : (l.nome || '')) + '" ' +
+      'placeholder="Empresa ABC ou João da Silva"></div>' +
 
-    '<div class=\"grid grid-2\" style=\"margin-top:14px\">' +
-      '<div class=\"field\"><label for=\"cml-contato\">Contato</label>' +
-        '<span class=\"hint\">Telefone ou WhatsApp.</span>' +
-        '<input id=\"cml-contato\" maxlength=\"40\" value=\"' + esc(novo ? '' : (l.contato || '')) + '\" ' +
-        'placeholder=\"(13) 99999-9999\"></div>' +
-      '<div class=\"field\"><label for=\"cml-cidade\">Cidade</label>' +
-        '<input id=\"cml-cidade\" maxlength=\"80\" value=\"' + esc(novo ? '' : (l.cidade || '')) + '\" ' +
-        'placeholder=\"Praia Grande\"></div>' +
+    '<div class="grid grid-2" style="margin-top:14px">' +
+      '<div class="field"><label for="cml-contato">Contato</label>' +
+        '<span class="hint">Telefone ou WhatsApp.</span>' +
+        '<input id="cml-contato" maxlength="40" value="' + esc(novo ? '' : (l.contato || '')) + '" ' +
+        'placeholder="(13) 99999-9999"></div>' +
+      '<div class="field"><label for="cml-cidade">Cidade</label>' +
+        '<input id="cml-cidade" maxlength="80" value="' + esc(novo ? '' : (l.cidade || '')) + '" ' +
+        'placeholder="Praia Grande"></div>' +
     '</div>' +
 
-    '<div class=\"grid grid-2\" style=\"margin-top:4px\">' +
-      '<div class=\"field\"><label for=\"cml-cnpj\">CNPJ</label>' +
-        '<span class=\"hint\">Opcional. Se preencher, tem que ser um CNPJ de verdade.</span>' +
-        '<input id=\"cml-cnpj\" inputmode=\"numeric\" maxlength=\"18\" ' +
-        'value=\"' + esc(novo ? '' : (l.cnpj_bonito || '')) + '\" placeholder=\"00.000.000/0000-00\"></div>' +
-      '<div class=\"field\"><label for=\"cml-nicho\">Nicho</label>' +
-        '<span class=\"hint\">Escreva qualquer um; a lista é só atalho.</span>' +
-        '<input id=\"cml-nicho\" maxlength=\"80\" list=\"cml-nichos\" ' +
-        'value=\"' + esc(novo ? '' : (l.nicho || '')) + '\" placeholder=\"Advocacia\">' +
-        '<datalist id=\"cml-nichos\">' +
+    '<div class="grid grid-2" style="margin-top:4px">' +
+      '<div class="field"><label for="cml-cnpj">CNPJ</label>' +
+        '<span class="hint">Opcional. Se preencher, tem que ser um CNPJ de verdade.</span>' +
+        '<input id="cml-cnpj" inputmode="numeric" maxlength="18" ' +
+        'value="' + esc(novo ? '' : (l.cnpj_bonito || '')) + '" placeholder="00.000.000/0000-00"></div>' +
+      '<div class="field"><label for="cml-nicho">Nicho</label>' +
+        '<span class="hint">Escreva qualquer um; a lista é só atalho.</span>' +
+        '<input id="cml-nicho" maxlength="80" list="cml-nichos" ' +
+        'value="' + esc(novo ? '' : (l.nicho || '')) + '" placeholder="Advocacia">' +
+        '<datalist id="cml-nichos">' +
           ['Advocacia', 'Imobiliária', 'Estética', 'Odontologia', 'Academia',
            'Restaurante', 'Educação', 'Saúde', 'Varejo', 'Serviços']
-            .map(function (n) { return '<option value=\"' + n + '\">'; }).join('') +
+            .map(function (n) { return '<option value="' + n + '">'; }).join('') +
         '</datalist></div>' +
     '</div>' +
 
-    '<div class=\"field\" style=\"margin-top:4px\"><label>Origem</label>' +
-      '<div class=\"cm-origem\">' +
-        '<span class=\"cm-ini pequeno\">' + esc(cmIniciais(p.nome)) + '</span>' +
+    '<div class="field" style="margin-top:4px"><label>Origem</label>' +
+      '<div class="cm-origem">' +
+        '<span class="cm-ini pequeno">' + esc(cmIniciais(p.nome)) + '</span>' +
         '<div><strong>' + esc(p.nome) + ' — SDR</strong>' +
-        '<div class=\"small muted\">A origem é a carteira em que você está. Não dá para digitar ' +
+        '<div class="small muted">A origem é a carteira em que você está. Não dá para digitar ' +
         'outro nome aqui — é assim que o lead nunca cai no SDR errado.</div></div>' +
       '</div></div>' +
 
-    '<hr class=\"sep\">' +
+    '<hr class="sep">' +
 
-    '<div class=\"field\"><label for=\"cml-agendado\">Lead agendado?</label>' +
-      '<select id=\"cml-agendado\">' +
-        '<option value=\"nao\"' + (novo || !l.agendado ? ' selected' : '') + '>Não</option>' +
-        '<option value=\"sim\"' + (!novo && l.agendado ? ' selected' : '') + '>Sim</option>' +
+    '<div class="field"><label for="cml-agendado">Lead agendado?</label>' +
+      '<select id="cml-agendado">' +
+        '<option value="nao"' + (novo || !l.agendado ? ' selected' : '') + '>Não</option>' +
+        '<option value="sim"' + (!novo && l.agendado ? ' selected' : '') + '>Sim</option>' +
       '</select></div>' +
 
-    '<div class=\"grid grid-2\" id=\"cml-quando\" style=\"margin-top:14px' +
-      (novo || !l.agendado ? ';display:none' : '') + '\">' +
-      '<div class=\"field\"><label for=\"cml-data\">Data da reunião</label>' +
-        '<input type=\"date\" id=\"cml-data\" value=\"' + esc(novo ? '' : cmDataValor(l.agendado_em)) + '\"></div>' +
-      '<div class=\"field\"><label for=\"cml-hora\">Horário</label>' +
-        '<input type=\"time\" id=\"cml-hora\" value=\"' + esc(novo ? '' : cmHoraValor(l.agendado_em)) + '\"></div>' +
+    '<div class="grid grid-2" id="cml-quando" style="margin-top:14px' +
+      (novo || !l.agendado ? ';display:none' : '') + '">' +
+      '<div class="field"><label for="cml-data">Data da reunião</label>' +
+        '<input type="date" id="cml-data" value="' + esc(novo ? '' : cmDataValor(l.agendado_em)) + '"></div>' +
+      '<div class="field"><label for="cml-hora">Horário</label>' +
+        '<input type="time" id="cml-hora" value="' + esc(novo ? '' : cmHoraValor(l.agendado_em)) + '"></div>' +
     '</div>' +
 
-    '<div class=\"field\" style=\"margin-top:4px\" id=\"cml-comp-campo\"' +
-      (novo || !l.agendado ? ' hidden' : '') + '><label for=\"cml-comp\">Comparecimento</label>' +
-      '<select id=\"cml-comp\">' +
+    '<div class="field" style="margin-top:4px" id="cml-comp-campo"' +
+      (novo || !l.agendado ? ' hidden' : '') + '><label for="cml-comp">Comparecimento</label>' +
+      '<select id="cml-comp">' +
         ['aguardando|Aguardando reunião', 'compareceu|Compareceu', 'nao_compareceu|Não compareceu']
           .map(function (o) {
             const v = o.split('|');
-            return '<option value=\"' + v[0] + '\"' +
+            return '<option value="' + v[0] + '"' +
               (!novo && l.comparecimento === v[0] ? ' selected' : '') + '>' + v[1] + '</option>';
           }).join('') +
       '</select></div>' +
 
-    '<hr class=\"sep\">' +
+    '<hr class="sep">' +
 
-    '<div class=\"field\"><label for=\"cml-obs\">Observações de qualificação</label>' +
-      '<span class=\"hint\">O que você descobriu na conversa. Este texto é para gente ler — ' +
+    '<div class="field"><label for="cml-obs">Observações de qualificação</label>' +
+      '<span class="hint">O que você descobriu na conversa. Este texto é para gente ler — ' +
         'quem conta o indicador é o campo abaixo.</span>' +
-      '<textarea id=\"cml-obs\" maxlength=\"4000\" style=\"min-height:130px\" ' +
-      'placeholder=\"Tem interesse no serviço. Tem orçamento. Precisa falar com o sócio antes de decidir.\">' +
+      '<textarea id="cml-obs" maxlength="4000" style="min-height:130px" ' +
+      'placeholder="Tem interesse no serviço. Tem orçamento. Precisa falar com o sócio antes de decidir.">' +
       esc(novo ? '' : (l.observacoes || '')) + '</textarea></div>' +
 
-    '<div class=\"field\" style=\"margin-top:4px\"><label for=\"cml-qual\">Lead qualificado?</label>' +
-      '<select id=\"cml-qual\">' +
+    '<div class="field" style="margin-top:4px"><label for="cml-qual">Lead qualificado?</label>' +
+      '<select id="cml-qual">' +
         ['pendente|Pendente de avaliação', 'sim|Sim', 'nao|Não'].map(function (o) {
           const v = o.split('|');
-          return '<option value=\"' + v[0] + '\"' +
+          return '<option value="' + v[0] + '"' +
             (!novo && l.qualificacao === v[0] ? ' selected' : '') + '>' + v[1] + '</option>';
         }).join('') +
       '</select></div>' +
 
-    '<div id=\"cml-saida\"></div>' +
+    '<div id="cml-saida"></div>' +
 
-    '<div class=\"row row-wrap\" style=\"gap:10px;margin-top:22px\">' +
-      '<button class=\"btn\" id=\"cml-salvar\">' + (novo ? 'Criar Novo Lead' : 'Salvar lead') + '</button>' +
-      '<button class=\"btn btn-ghost\" id=\"cml-fechar\">Cancelar</button>' +
-      (novo ? '' : '<span style=\"flex:1\"></span>' +
-        '<button class=\"btn btn-danger btn-sm\" id=\"cml-excluir\">Excluir</button>') +
+    '<div class="row row-wrap" style="gap:10px;margin-top:22px">' +
+      '<button class="btn" id="cml-salvar">' + (novo ? 'Criar Novo Lead' : 'Salvar lead') + '</button>' +
+      '<button class="btn btn-ghost" id="cml-fechar">Cancelar</button>' +
+      (novo ? '' : '<span style="flex:1"></span>' +
+        '<button class="btn btn-danger btn-sm" id="cml-excluir">Excluir</button>') +
     '</div>';
 
   document.getElementById('gaveta').style.display = 'flex';
@@ -992,7 +992,7 @@ function cmFichaLead(l) {
   // a máscara do CNPJ, enquanto digita
   const cnpj = document.getElementById('cml-cnpj');
   cnpj.addEventListener('input', function () {
-    const n = this.value.replace(/\\D/g, '').slice(0, 14);
+    const n = this.value.replace(/\D/g, '').slice(0, 14);
     let saida = n;
     if (n.length > 2) saida = n.slice(0, 2) + '.' + n.slice(2);
     if (n.length > 5) saida = n.slice(0, 2) + '.' + n.slice(2, 5) + '.' + n.slice(5);
@@ -1033,7 +1033,7 @@ function cmFichaLead(l) {
     };
     if (!corpo.nome.trim()) { toast('Escreva o nome do lead', true); return; }
 
-    this.disabled = true; this.innerHTML = '<span class=\"spinner\"></span> Salvando…';
+    this.disabled = true; this.innerHTML = '<span class="spinner"></span> Salvando…';
     try {
       await apiCm('cm_lead_salvar', { body: corpo });
       toast(novo ? 'Lead cadastrado' : 'Lead salvo');
@@ -1041,7 +1041,7 @@ function cmFichaLead(l) {
       cmRemonta();                        // só o miolo; a tela não recarrega
     } catch (e) {
       document.getElementById('cml-saida').innerHTML =
-        '<div class=\"alert alert-erro\" style=\"margin-top:14px\">' + esc(e.message) + '</div>';
+        '<div class="alert alert-erro" style="margin-top:14px">' + esc(e.message) + '</div>';
       this.disabled = false; this.textContent = novo ? 'Criar Novo Lead' : 'Salvar lead';
     }
   });
@@ -1070,10 +1070,10 @@ function cmFichaLead(l) {
    finge ser um produto.
    ============================================================ */
 function cmEmBreve(titulo, texto, atalho) {
-  return '<div class=\"card op-entra\" style=\"text-align:center;padding:52px 26px\">' +
-    '<div style=\"font-size:16px;font-weight:600;margin-bottom:8px\">' + titulo + '</div>' +
-    '<div class=\"small muted\" style=\"max-width:470px;margin:0 auto;line-height:1.65\">' + texto + '</div>' +
-    (atalho ? '<div style=\"margin-top:20px\">' + atalho + '</div>' : '') +
+  return '<div class="card op-entra" style="text-align:center;padding:52px 26px">' +
+    '<div style="font-size:16px;font-weight:600;margin-bottom:8px">' + titulo + '</div>' +
+    '<div class="small muted" style="max-width:470px;margin:0 auto;line-height:1.65">' + texto + '</div>' +
+    (atalho ? '<div style="margin-top:20px">' + atalho + '</div>' : '') +
     '</div>';
 }
 
@@ -1083,7 +1083,7 @@ function carregaCmLeads() {
     'Aqui vai ficar a carteira de leads de verdade do comercial. Ela ainda não existe — ' +
     'e os leads de <strong>Simulações</strong> são de treino, então não entram aqui ' +
     'nem por acidente: são tabelas separadas.',
-    '<button class=\"btn btn-sm btn-ghost\" onclick=\"document.querySelector(\\'#abas button[data-aba=&quot;cmsimulacoes&quot;]\\').click()\">Ir para Simulações</button>'
+    '<button class="btn btn-sm btn-ghost" onclick="document.querySelector(\'#abas button[data-aba=&quot;cmsimulacoes&quot;]\').click()">Ir para Simulações</button>'
   );
 }
 
