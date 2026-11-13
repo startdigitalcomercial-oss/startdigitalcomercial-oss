@@ -661,6 +661,10 @@
   .op-kpi.bom .num { color: var(--green); }
   /* o numero combina com a etiqueta: agendada e azul nos dois lugares */
   .op-kpi.agenda .num { color: var(--blue); }
+  /* Qualificados sai do verde e vai para o roxo. Nao e gosto: no
+     grafico, "Compareceram" e "Qualificados" sao duas barras, e duas
+     barras verdes do lado uma da outra sao uma barra so. */
+  .op-kpi.qualif .num { color: var(--purple); }
   .op-kpi.atencao .num { color: var(--orange); }
   .op-kpi.ruim .num { color: var(--red); }
 
@@ -699,7 +703,11 @@
   .op-barra .topo span { color: var(--label-3); font-size: 12.5px; font-variant-numeric: tabular-nums; }
   .op-barra .topo span b { color: var(--label); font-weight: 600; font-size: 13.5px; }
   .op-trilho { height: 8px; border-radius: 999px; background: var(--fill-1); overflow: hidden; }
-  .op-fita { height: 100%; border-radius: 999px; width: 0;
+  /* display:block nao e redundante. Largura e altura nao valem em
+     elemento inline — uma fita escrita com <i> em vez de <div>
+     nascia com zero de largura, barra invisivel e nenhum erro em
+     lugar nenhum. A regra agora protege a peca de quem a usar. */
+  .op-fita { display: block; height: 100%; border-radius: 999px; width: 0;
     transition: width .9s cubic-bezier(.22,1,.36,1); }
   button.op-barra { display: block; width: 100%; text-align: left; background: none;
     border: none; font-family: inherit; color: var(--label); cursor: pointer; padding: 4px 2px; }
@@ -861,6 +869,50 @@
      a etiqueta que tambem e seletor, e o cabecalho do perfil.
      ============================================================ */
   .cm-abas { width: fit-content; }
+
+  /* ---- os dois graficos de barra ----
+     Reaproveitam .op-barra / .op-trilho / .op-fita, que ja existiam
+     na Operacao: mesma espessura, mesmo raio, mesma animacao de
+     largura. Barra de comparacao tem que ter a mesma cara no
+     sistema inteiro, senao cada tela parece de um produto. */
+  .cm-grafico { padding: 0; overflow: hidden; margin-bottom: 14px; }
+  .cm-g-cab { display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    padding: 18px 20px 14px; border-bottom: 1px solid var(--hairline); }
+  .cm-g-cab > div:first-child { min-width: 0; flex: 1; }
+  .cm-g-cab h3 { margin: 0 0 2px; font-size: 15.5px; font-weight: 600; letter-spacing: -.016em; }
+  .cm-g-medidas { flex: none; }
+  .cm-g-medidas button { font-size: 12px; padding: 5px 10px; }
+  .cm-barras { padding: 18px 20px 20px; }
+  .cm-barras .op-barra { margin-bottom: 15px; }
+  .cm-barras .op-barra:last-child { margin-bottom: 0; }
+  .cm-g-zero { padding: 30px 20px; text-align: center; color: var(--label-3); font-size: 13.5px; }
+
+  /* O icone ao lado do rotulo nao e enfeite: e a SEGUNDA pista.
+     Quem nao distingue verde de vermelho le o visto e o xis. */
+  .cm-g-rot { display: inline-flex; align-items: center; gap: 7px; }
+  .cm-g-ico { display: inline-flex; flex: none; }
+  .cm-g-ico svg { width: 14px; height: 14px; display: block; }
+
+  /* a barra inteira e clicavel no grafico por SDR */
+  button.op-barra.cm-abrir { display: block; width: 100%; text-align: left;
+    background: none; border: 0; padding: 0; font-family: inherit;
+    color: var(--label); cursor: pointer; border-radius: 8px;
+    transition: background var(--t-rapido); }
+  button.op-barra.cm-abrir:hover { background: var(--fill-1); }
+  button.op-barra.cm-abrir:focus-visible { outline: none; box-shadow: var(--glow-forte); }
+  .cm-barras button.op-barra { padding: 6px 8px; margin: 0 -8px 9px; width: calc(100% + 16px); }
+  .cm-barras button.op-barra:last-child { margin-bottom: -6px; }
+
+  /* "50% dos leads dele" nao cabe em 390px: a frase encosta na
+     borda. No celular fica so "50%", que e o numero — a frase
+     inteira volta assim que houver espaco para ela. */
+  .cm-g-de { font-style: normal; }
+  @media (max-width: 620px) { .cm-g-de { display: none; } }
+  @media (max-width: 560px) {
+    .cm-g-cab { padding: 15px 14px 12px; }
+    .cm-barras { padding: 15px 14px 16px; }
+    .cm-g-medidas { width: 100%; overflow-x: auto; }
+  }
 
   .cm-sec { display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
     padding: 18px 20px 14px; border-bottom: 1px solid var(--hairline); }

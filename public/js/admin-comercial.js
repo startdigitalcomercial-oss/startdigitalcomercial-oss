@@ -21,6 +21,7 @@ let CM_QUEM = null;            // id do participante aberto no painel
 let CM_FAIXA = 'tudo';         // tudo | hoje | semana | mes | personalizado
 let CM_DE = '', CM_ATE = '';
 let CM_SDR = '';               // filtro do dashboard
+let CM_METRICA = 'leads';      // qual número o gráfico por SDR compara
 let CM_BUSCA = '', CM_F_COMP = '', CM_F_QUAL = '';
 
 async function apiCm(action, opts) {
@@ -35,6 +36,52 @@ async function apiCm(action, opts) {
   if (res.status === 401) { sair(); throw new Error('sessao expirada'); }
   if (!data.ok) throw new Error(data.error || 'erro');
   return data;
+}
+
+/* ============================================================
+   AS CINCO MEDIDAS
+
+   Uma lista só, usada pelos cartões, pelos dois gráficos e pelo
+   seletor. Antes de existir esta lista, o rótulo e a cor de cada
+   indicador estavam escritos em três lugares — é assim que um dia
+   o cartão fica verde e a barra do mesmo número fica azul.
+
+   A ORDEM aqui não é a ordem em que os números foram pedidos: é a
+   ordem em que eles contam a história. Total, depois os que
+   avançaram (agendou, veio, qualificou), e por último o que se
+   perdeu. Isso tem um efeito colateral bom: "Compareceram" (verde)
+   e "Não compareceram" (vermelho) deixam de ficar coladas uma na
+   outra. Para quem não distingue verde de vermelho — uns 8% dos
+   homens — duas barras vizinhas nessas duas cores são a MESMA
+   barra. Medimos: lado a lado davam 4,6 de separação; separadas
+   pela roxa, 17,6. O rótulo e o ícone de cada linha já tornariam
+   a cor dispensável, mas de graça é melhor não depender deles.
+   ============================================================ */
+const CM_MEDIDAS = [
+  // Duas cores para o mesmo numero, de proposito. No grafico de cima
+  // "Total de Leads" e a REGUA — tem que ser neutro, senao compete
+  // com as barras que ele serve de medida. No grafico por SDR ele
+  // vira uma comparacao como qualquer outra, e barra cinza ali
+  // parece dado desligado.
+  { chave: 'leads', rotulo: 'Total de Leads', curto: 'Leads',
+    cor: 'var(--label-2)', corSdr: 'var(--cyan)', classe: '', pe: 'cadastrados na simulação',
+    ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3.8 6.6h16.4M6.6 11.4h10.8M9.4 16.2h5.2"/></svg>' },
+  { chave: 'agendados', rotulo: 'Agendados', curto: 'Agendados',
+    cor: 'var(--blue)', classe: 'agenda', pe: 'com reunião marcada',
+    ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3.8" y="5.6" width="16.4" height="13.8" rx="2"/><path d="M3.8 9.8h16.4M8.6 3.6v3.4M15.4 3.6v3.4"/></svg>' },
+  { chave: 'compareceram', rotulo: 'Compareceram', curto: 'Compareceram',
+    cor: 'var(--green)', classe: 'bom', pe: 'reunião aconteceu',
+    ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8.4"/><path d="m8.4 12.3 2.4 2.4 4.8-5.4"/></svg>' },
+  { chave: 'qualificados', rotulo: 'Qualificados', curto: 'Qualificados',
+    cor: 'var(--purple)', classe: 'qualif', pe: 'com perfil para avançar',
+    ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m12 4.4 2.3 4.8 5.2.7-3.8 3.7.9 5.2-4.6-2.5-4.6 2.5.9-5.2L4.5 9.9l5.2-.7z"/></svg>' },
+  { chave: 'nao_compareceram', rotulo: 'Não compareceram', curto: 'Faltaram',
+    cor: 'var(--red)', classe: 'ruim', pe: 'marcaram e faltaram',
+    ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8.4"/><path d="m9.2 9.2 5.6 5.6M14.8 9.2l-5.6 5.6"/></svg>' }
+];
+
+function cmMedida(chave) {
+  return CM_MEDIDAS.filter(function (m) { return m.chave === chave; })[0] || CM_MEDIDAS[0];
 }
 
 /* o período vira parâmetros de busca */
@@ -195,31 +242,25 @@ function cmDashboard() {
   const t = CM.total || {};
   const vazio = !(CM.por_sdr || []).length;
 
-  const I = {
-    leads: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3.8 6.6h16.4M6.6 11.4h10.8M9.4 16.2h5.2"/></svg>',
-    agenda: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3.8" y="5.6" width="16.4" height="13.8" rx="2"/><path d="M3.8 9.8h16.4M8.6 3.6v3.4M15.4 3.6v3.4"/></svg>',
-    veio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8.4"/><path d="m8.4 12.3 2.4 2.4 4.8-5.4"/></svg>',
-    faltou: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8.4"/><path d="m9.2 9.2 5.6 5.6M14.8 9.2l-5.6 5.6"/></svg>',
-    estrela: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m12 4.4 2.3 4.8 5.2.7-3.8 3.7.9 5.2-4.6-2.5-4.6 2.5.9-5.2L4.5 9.9l5.2-.7z"/></svg>'
-  };
   // Zero nao ganha cor. Um "0" verde em Qualificados parece elogio,
-  // e um "0" laranja em Nao compareceram parece alerta — quando e
+  // e um "0" vermelho em Nao compareceram parece alerta — quando e
   // justamente o melhor numero possivel ali. Cor so quando ha o que
   // mostrar.
-  const kpi = function (rot, valor, pe, ico, classe) {
-    return '<div class="op-kpi ' + (valor ? (classe || '') : '') + '">' +
-      '<div class="rot">' + rot + ico + '</div>' +
-      '<div class="num" data-ate="' + (valor || 0) + '">0</div>' +
-      '<div class="pe">' + pe + '</div></div>';
+  const kpi = function (m) {
+    const valor = t[m.chave] || 0;
+    return '<div class="op-kpi ' + (valor ? m.classe : '') + '">' +
+      '<div class="rot">' + m.rotulo + m.ico + '</div>' +
+      '<div class="num" data-ate="' + valor + '">0</div>' +
+      '<div class="pe">' + m.pe + '</div></div>';
   };
 
   return '<div class="op-kpis" style="grid-template-columns:repeat(auto-fit,minmax(172px,1fr))">' +
-      kpi('Total de Leads', t.leads, 'cadastrados na simulação', I.leads, '') +
-      kpi('Agendados', t.agendados, 'com reunião marcada', I.agenda, 'agenda') +
-      kpi('Compareceram', t.compareceram, 'reunião aconteceu', I.veio, 'bom') +
-      kpi('Não compareceram', t.nao_compareceram, 'marcaram e faltaram', I.faltou, 'atencao') +
-      kpi('Qualificados', t.qualificados, 'com perfil para avançar', I.estrela, 'bom') +
+      CM_MEDIDAS.map(kpi).join('') +
     '</div>' +
+
+    // Sem nenhum lead não há o que comparar, e dois gráficos vazios
+    // só ocupam a tela. Os cinco cartões zerados já dizem tudo.
+    ((vazio || !(t.leads || 0)) ? '' : cmGraficoKpis() + cmGraficoSdr()) +
 
     '<div class="card" style="padding:0;overflow:hidden">' +
       '<div class="cm-sec">' +
@@ -254,6 +295,121 @@ function cmDashboard() {
         esc(CM.closers.map(function (x) { return x.nome; }).join(', ')) +
         '. Os números acima são de prospecção, então não misturam as duas funções.</div>'
       : '');
+}
+
+/* ============================================================
+   GRAFICO 1 — OS CINCO NUMEROS LADO A LADO
+
+   Os cartoes dizem QUANTO. O grafico diz QUANTO COMPARADO COM O
+   QUE — que e outra pergunta, e e a que interessa num treino:
+   "agendei 7" nao significa nada sozinho; "agendei 7 dos 9 que
+   prospectei" significa.
+
+   Por isso a regua nao e a maior barra, e o TOTAL DE LEADS. Todos
+   os outros numeros sao recortes dele, entao a largura de cada
+   barra ja e a fatia que aquele numero representa do todo. Se a
+   regua fosse a maior barra, "Agendados" encostaria na direita
+   mesmo quando fossem 7 de 900, e o grafico mentiria bonito.
+   ============================================================ */
+function cmGraficoKpis() {
+  const t = CM.total || {};
+  const total = t.leads || 0;
+  if (!total) return '';
+
+  return '<div class="card cm-grafico">' +
+    '<div class="cm-g-cab">' +
+      '<div><h3>Os números lado a lado</h3>' +
+      '<div class="small muted">Cada barra é a fatia dos ' + total +
+        (total === 1 ? ' lead' : ' leads') + ' da simulação.</div></div>' +
+    '</div>' +
+    '<div class="cm-barras">' +
+      CM_MEDIDAS.map(function (m) {
+        const v = t[m.chave] || 0;
+        const pct = total ? Math.round((v / total) * 1000) / 10 : 0;
+        return '<div class="op-barra" title="' + esc(m.rotulo + ': ' + v + ' de ' + total) + '">' +
+          '<div class="topo">' +
+            '<b class="cm-g-rot"><i class="cm-g-ico" style="color:' + m.cor + '">' + m.ico + '</i>' +
+              esc(m.rotulo) + '</b>' +
+            '<span><b>' + v + '</b>' +
+              (m.chave === 'leads' ? '' : ' · ' + cmPct(pct)) + '</span>' +
+          '</div>' +
+          '<div class="op-trilho"><div class="op-fita" data-pct="' + pct + '" ' +
+            'style="background:' + m.cor + '"></div></div>' +
+        '</div>';
+      }).join('') +
+    '</div></div>';
+}
+
+/* 7,0% fica feio; 7% e o mesmo numero. So mostra a casa decimal
+   quando ela diz alguma coisa. */
+function cmPct(p) {
+  const txt = (Math.round(p * 10) % 10 === 0) ? String(Math.round(p)) : String(p).replace('.', ',');
+  return txt + '%';
+}
+
+/* ============================================================
+   GRAFICO 2 — OS SDRs LADO A LADO
+
+   Uma medida por vez, escolhida no seletor. Cinco medidas × seis
+   SDRs numa tela so daria trinta barras: ninguem compara trinta
+   barras, so olha para elas. Uma medida por vez responde a
+   pergunta que a pessoa tem na cabeca naquele momento — "quem
+   agendou mais?" — e responde de relance.
+
+   A cor das barras acompanha a medida escolhida, a mesma do
+   cartao e do grafico de cima. Escolheu "Compareceram", tudo
+   fica verde: o olho liga as tres coisas sem ninguem explicar.
+   ============================================================ */
+function cmGraficoSdr() {
+  const lista = CM.por_sdr || [];
+  if (lista.length < 1) return '';
+
+  const m = cmMedida(CM_METRICA);
+  const cor = m.corSdr || m.cor;
+  const valores = lista.map(function (x) { return x[m.chave] || 0; });
+  const maior = Math.max.apply(null, valores.concat([0]));
+
+  // do maior para o menor NA MEDIDA ESCOLHIDA: um ranking que muda
+  // de assunto junto com o seletor
+  const ordenado = lista.slice().sort(function (a, b) {
+    return (b[m.chave] || 0) - (a[m.chave] || 0) || a.nome.localeCompare(b.nome);
+  });
+
+  return '<div class="card cm-grafico">' +
+    '<div class="cm-g-cab">' +
+      '<div><h3>Comparando os SDRs</h3>' +
+      '<div class="small muted">Clique numa barra para abrir a carteira do SDR.</div></div>' +
+      '<div class="fd2-filtro cm-g-medidas" id="cm-metrica">' +
+        CM_MEDIDAS.map(function (x) {
+          return '<button type="button" data-m="' + x.chave + '"' +
+            (CM_METRICA === x.chave ? ' class="on"' : '') + '>' + esc(x.curto) + '</button>';
+        }).join('') +
+      '</div>' +
+    '</div>' +
+    (maior === 0
+      ? '<div class="cm-g-zero">Nenhum SDR tem ' +
+        esc(m.rotulo.toLowerCase()) + ' no período escolhido.</div>'
+      : '<div class="cm-barras">' +
+        ordenado.map(function (x) {
+          const v = x[m.chave] || 0;
+          const pct = maior ? Math.round((v / maior) * 1000) / 10 : 0;
+          const doTotal = x.leads ? Math.round((v / x.leads) * 100) : 0;
+          return '<button type="button" class="op-barra cm-abrir" data-id="' + esc(x.id) + '" ' +
+            'title="' + esc(x.nome + ' · ' + m.rotulo + ': ' + v +
+              (m.chave === 'leads' ? '' : ' de ' + x.leads + ' leads')) + '">' +
+            '<div class="topo">' +
+              '<b>' + esc(x.nome) + '</b>' +
+              '<span><b>' + v + '</b>' +
+                (m.chave === 'leads' || !x.leads ? ''
+                  : ' · ' + doTotal + '%<em class="cm-g-de"> dos leads dele</em>') +
+              '</span>' +
+            '</div>' +
+            '<div class="op-trilho"><div class="op-fita" data-pct="' + pct + '" ' +
+              'style="background:' + cor + '"></div></div>' +
+          '</button>';
+        }).join('') +
+      '</div>') +
+    '</div>';
 }
 
 /* mesma regra da tela de cima: zero fica sem cor */
@@ -539,6 +695,21 @@ function cmLigaMiolo() {
 
   const sdr = b('cm-sdr');
   if (sdr) sdr.addEventListener('change', function () { CM_SDR = this.value; cmRemonta(); });
+
+  // Trocar a medida do gráfico não vai ao servidor: os cinco números
+  // de cada SDR já estão na memória. Repinta só o gráfico.
+  document.querySelectorAll('#cm-metrica button').forEach(function (bt) {
+    bt.addEventListener('click', function () {
+      if (CM_METRICA === bt.dataset.m) return;
+      CM_METRICA = bt.dataset.m;
+      const caixa = bt.closest('.cm-grafico');
+      const novo = document.createElement('div');
+      novo.innerHTML = cmGraficoSdr();
+      caixa.replaceWith(novo.firstElementChild);
+      opAnima('painel-cmsimulacoes');
+      cmLigaMiolo();
+    });
+  });
 
   const novoLead = b('cm-novo-lead');
   if (novoLead) novoLead.addEventListener('click', function () { cmFichaLead(null); });
