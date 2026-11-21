@@ -257,7 +257,7 @@ function centavosDe(v) {
 
   let s = String(v).trim();
   if (!s) return null;
-  s = s.replace(/R\$/gi, '').replace(/[\s ]/g, '');
+  s = s.replace(/R\$/gi, '').replace(/[\s\u00a0]/g, '');
   if (!s || !/^-?[0-9.,]+$/.test(s)) return null;
 
   const temVirgula = s.indexOf(',') >= 0;
