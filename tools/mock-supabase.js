@@ -367,7 +367,7 @@ function seq(t) {
    "Clientes" nasce vazia no espelho local. */
 (function backfillClientes() {
   const chave = function (nome) {
-    return String(nome || '').normalize('NFD').replace(/[\u005cu0300-\u005cu036f]/g, '')
+    return String(nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .toLowerCase().replace(/\s+/g, ' ').trim();
   };
   const porChave = {};
