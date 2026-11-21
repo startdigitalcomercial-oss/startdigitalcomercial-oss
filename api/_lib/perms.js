@@ -121,6 +121,22 @@ const ACOES = {
   cm_participante_excluir: 'comercial_gerir',
   cm_usuarios: 'comercial_gerir',
 
+  // --- META EM TEMPO REAL ---
+  // O placar entra dinheiro de verdade, entao usa a MESMA tranca do
+  // Financeiro, que e onde dinheiro ja mora. Nao inventamos papel
+  // novo: 'financeiro' e 'financeiro_mexer' hoje sao true so para
+  // Dono e RH, que e exatamente quem o Clovis escolheu para lancar.
+  // Se um dia nascer o papel "Comercial", ele herda isto sozinho.
+  //
+  // mt_tv NAO esta nesta lista de proposito: a tela da televisao nao
+  // tem login nenhum, ela entra por um codigo secreto e e conferida
+  // antes da porta, dentro do api/comercial.js.
+  mt_placar: 'financeiro',
+  mt_lista: 'financeiro',
+  mt_salvar: 'financeiro_mexer',
+  mt_excluir: 'financeiro_mexer',
+  mt_config: 'financeiro_mexer',
+
   // --- Space Colaborador: libera dinheiro de verdade, mesma tranca ---
   sp_painel: 'financeiro',
   sp_voucher_salvar: 'financeiro_mexer', sp_liberar: 'financeiro_mexer',
@@ -178,14 +194,14 @@ function menuDoPapel(papel) {
     return ['dashboard', 'vagas', 'triagem', 'candidatos', 'prequalificacao', 'aurea', 'preonboarding',
       'colaboradores', 'avisos', 'space', 'play', 'conteudo', 'quiz', 'mensagens',
       'opdash', 'opgestores', 'oponboarding', 'opagenda',
-      'cmleads', 'cmagenda', 'cmatendimento', 'cmsimulacoes',
+      'cmleads', 'cmagenda', 'cmatendimento', 'cmsimulacoes', 'meta', 'metagerente',
       'financeiro', 'finclientes', 'findash', 'fingastos', 'findre', 'ajustes', 'usuarios'];
   }
   if (papel === 'rh') {
     return ['dashboard', 'vagas', 'triagem', 'candidatos', 'prequalificacao', 'aurea', 'preonboarding',
       'colaboradores', 'avisos', 'space', 'play', 'conteudo', 'quiz', 'mensagens',
       'opdash', 'opgestores', 'oponboarding', 'opagenda',
-      'cmleads', 'cmagenda', 'cmatendimento', 'cmsimulacoes',
+      'cmleads', 'cmagenda', 'cmatendimento', 'cmsimulacoes', 'meta', 'metagerente',
       'financeiro', 'finclientes', 'findash', 'fingastos', 'findre', 'ajustes'];
   }
   if (papel === 'avaliador') {

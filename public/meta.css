@@ -1,0 +1,473 @@
+/* ============================================================
+   META EM TEMPO REAL — o placar
+
+   Fica num arquivo separado, e não dentro do ui.css, por um motivo
+   simples: o ui.css é a base de onze páginas. Mexer nele para
+   atender uma tela só é a forma mais rápida de quebrar as outras
+   dez. Aqui dentro só existe o que é do placar.
+
+   Todas as cores vêm dos tokens do START NEO DARK UI. Não há um
+   único #hex de cor neste arquivo fora das sombras e brilhos, que
+   precisam de transparência. Quando o tema muda, o placar muda com
+   ele, de graça.
+
+   O tamanho do número principal é em vw (largura da tela), preso
+   entre um mínimo e um máximo pelo clamp(). Numa TV Full HD ele
+   chega perto de 140px; num celular, encolhe para 48px e continua
+   legível. Ninguém precisa de duas telas.
+   ============================================================ */
+
+.mt {
+  --mt-num: clamp(48px, 7.3vw, 150px);
+  --mt-rot: clamp(11px, 1.05vw, 19px);
+  --mt-sub: clamp(26px, 3.1vw, 58px);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(14px, 1.8vh, 30px);
+}
+
+/* ---------------------------------------------- cabeçalho */
+.mt-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--e4);
+  flex-wrap: wrap;
+}
+.mt-titulo {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: var(--mt-rot);
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--label-2);
+}
+.mt-titulo b {
+  color: var(--label);
+  letter-spacing: .1em;
+}
+.mt-acoes { display: flex; align-items: center; gap: var(--e2); }
+
+/* O estado da conexão. Discreto de propósito: quando está tudo
+   certo ele não deve chamar atenção nenhuma — é só a confirmação
+   de que o placar está vivo, não um aviso. */
+.mt-ao-vivo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: clamp(10px, .78vw, 14px);
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--label-3);
+  padding: 6px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-pill);
+  background: var(--fill-1);
+  transition: color var(--t-medio), border-color var(--t-medio);
+}
+.mt-bolha {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 4px rgba(52, 211, 153, .16);
+}
+.mt-ao-vivo.caiu { color: var(--orange-soft); border-color: var(--orange-tint); }
+.mt-ao-vivo.caiu .mt-bolha {
+  background: var(--orange);
+  box-shadow: 0 0 0 4px rgba(251, 191, 36, .16);
+  animation: mt-pisca 1.1s ease-in-out infinite;
+}
+@keyframes mt-pisca { 50% { opacity: .35; } }
+
+.mt-botao {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label-2);
+  background: var(--fill-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-ctl);
+  cursor: pointer;
+  transition: background var(--t-rapido), color var(--t-rapido), border-color var(--t-rapido);
+}
+.mt-botao:hover { background: var(--fill-2); color: var(--label); border-color: var(--hairline-strong); }
+.mt-botao svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---------------------------------------------- o número principal */
+.mt-palco {
+  position: relative;
+  text-align: center;
+  padding: clamp(18px, 3.2vh, 54px) var(--e5);
+  border: 1px solid var(--hairline);
+  border-radius: clamp(16px, 1.5vw, 28px);
+  background:
+    radial-gradient(120% 150% at 50% -20%, rgba(79, 124, 255, .16), transparent 62%),
+    var(--surface);
+  box-shadow: var(--shadow-2);
+  overflow: hidden;
+}
+
+/* O brilho de cima. É a licença que o documento deu para a tela da
+   TV ser "um pouco mais marcante": luz, não neon. Fica preso no
+   topo do palco e não anima — animação contínua numa tela que fica
+   ligada doze horas é consumo de bateria do prédio. */
+.mt-palco::before {
+  content: '';
+  position: absolute;
+  inset: -40% 10% auto;
+  height: 70%;
+  background: radial-gradient(60% 100% at 50% 100%, rgba(139, 92, 246, .22), transparent 70%);
+  pointer-events: none;
+}
+.mt-palco > * { position: relative; }
+
+.mt-rotulo {
+  font-size: var(--mt-rot);
+  font-weight: 700;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--label-3);
+  margin-bottom: clamp(4px, .8vh, 14px);
+}
+
+.mt-valor {
+  display: block;
+  font-size: var(--mt-num);
+  font-weight: 800;
+  line-height: .98;
+  letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(176deg, var(--label) 18%, var(--accent-soft) 128%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* Se o navegador não souber recortar o texto no gradiente, o
+     -webkit-text-fill-color não se aplica e o color: transparent
+     deixaria o número invisível. Esta linha é o paraquedas. */
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 60px rgba(79, 124, 255, .18);
+}
+@supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+  .mt-valor { color: var(--label); -webkit-text-fill-color: var(--label); }
+}
+/* Os centavos existem porque dinheiro tem centavos, mas não
+   disputam atenção com os reais. */
+.mt-cent { font-size: .42em; font-weight: 700; letter-spacing: 0; opacity: .5; }
+.mt-moeda { font-size: .36em; font-weight: 700; letter-spacing: 0; opacity: .55; margin-right: .12em; vertical-align: .34em; }
+
+/* ---------------------------------------------- barra de progresso */
+.mt-barra-fora {
+  margin: clamp(14px, 2.2vh, 30px) auto 0;
+  max-width: min(900px, 86%);
+}
+.mt-trilho {
+  height: clamp(10px, .85vw, 16px);
+  border-radius: var(--r-pill);
+  background: var(--fill-2);
+  border: 1px solid var(--hairline);
+  overflow: hidden;
+}
+.mt-fita {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: var(--r-pill);
+  background: var(--accent-grad);
+  box-shadow: 0 0 22px rgba(79, 124, 255, .45);
+  transition: width 1.1s cubic-bezier(.32, .72, 0, 1);
+}
+.mt-fita.bateu { background: linear-gradient(104deg, var(--green) 0%, var(--cyan) 100%); box-shadow: 0 0 24px rgba(52, 211, 153, .45); }
+.mt-barra-pe {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--e4);
+  margin-top: 10px;
+  font-size: clamp(11px, 1vw, 17px);
+  font-weight: 600;
+  color: var(--label-2);
+}
+.mt-barra-pe b { color: var(--label); }
+.mt-barra-pe .ok { color: var(--green-soft); }
+
+/* ---------------------------------------------- as duas metades */
+.mt-duo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(12px, 1.4vw, 24px);
+}
+.mt-meia {
+  padding: clamp(14px, 2vh, 28px) clamp(16px, 1.6vw, 30px);
+  border: 1px solid var(--hairline);
+  border-radius: clamp(14px, 1.2vw, 22px);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+.mt-meia-cab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: clamp(11px, .95vw, 16px);
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--label-2);
+  margin-bottom: clamp(6px, 1vh, 14px);
+}
+.mt-pingo { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
+.mt-meia.cm .mt-pingo { background: var(--accent); }
+.mt-meia.op .mt-pingo { background: var(--purple); }
+.mt-meia-valor {
+  font-size: var(--mt-sub);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--label);
+}
+.mt-meia.cm .mt-meia-valor { color: var(--blue-soft); }
+.mt-meia.op .mt-meia-valor { color: var(--purple-soft); }
+.mt-meia-pe {
+  margin-top: 6px;
+  font-size: clamp(11px, .9vw, 15px);
+  color: var(--label-3);
+}
+
+/* ---------------------------------------------- rodapé */
+.mt-pe {
+  display: flex;
+  justify-content: center;
+  gap: clamp(10px, 1.6vw, 28px);
+  flex-wrap: wrap;
+  font-size: clamp(11px, .9vw, 15px);
+  color: var(--label-3);
+}
+.mt-pe b { color: var(--label-2); font-weight: 600; }
+
+/* ---------------------------------------------- a celebração */
+.mt-confete {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 70;
+}
+
+.mt-pop {
+  position: fixed;
+  right: clamp(16px, 2vw, 40px);
+  bottom: clamp(16px, 2.4vh, 44px);
+  z-index: 80;
+  width: min(430px, calc(100vw - 32px));
+  padding: clamp(14px, 1.3vw, 22px) clamp(16px, 1.5vw, 26px);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-card);
+  background: var(--vidro);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  box-shadow: var(--shadow-3), var(--glow);
+  /* Nasce invisível e um pouco menor. A classe .on faz a entrada —
+     e sem ela a caixa nunca aparece, nem se o JS falhar no meio. */
+  opacity: 0;
+  transform: translateY(16px) scale(.94);
+  transition: opacity 220ms cubic-bezier(.32, .72, 0, 1), transform 220ms cubic-bezier(.32, .72, 0, 1);
+  pointer-events: none;
+}
+.mt-pop.on { opacity: 1; transform: none; }
+.mt-pop-cab {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: clamp(13px, 1.05vw, 18px);
+  font-weight: 700;
+  color: var(--label);
+  margin-bottom: 4px;
+}
+.mt-pop-foguete { font-size: 1.15em; line-height: 1; }
+.mt-pop-valor {
+  font-size: clamp(26px, 2.3vw, 40px);
+  font-weight: 800;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--green-soft);
+  line-height: 1.05;
+}
+.mt-pop.op .mt-pop-valor { color: var(--purple-soft); }
+.mt-pop-pe {
+  margin-top: 3px;
+  font-size: clamp(12px, .95vw, 16px);
+  color: var(--label-2);
+}
+.mt-pop-pe .sep { color: var(--label-3); margin: 0 6px; }
+
+/* Quem pediu menos movimento no sistema operacional recebe a
+   informação sem o espetáculo: a caixa aparece, o número troca,
+   e nada voa pela tela. */
+@media (prefers-reduced-motion: reduce) {
+  .mt-pop { transition: opacity 120ms linear; transform: none; }
+  .mt-pop.on { transform: none; }
+  .mt-fita { transition: none; }
+  .mt-ao-vivo.caiu .mt-bolha { animation: none; }
+}
+
+/* ---------------------------------------------- a TV
+   A página da televisão usa estas regras; dentro do painel elas não
+   existem, e o placar se comporta como qualquer outro cartão. */
+.mt-tv {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(14px, 2vh, 30px);
+  padding: clamp(18px, 2.6vw, 54px);
+  box-sizing: border-box;
+}
+.mt-tv .mt { flex: 0 0 auto; }
+
+.mt-marca { display: flex; align-items: center; gap: 12px; }
+.mt-marca svg { height: clamp(16px, 1.5vw, 26px); width: auto; color: var(--label); }
+
+/* Aviso de link inválido / sem conexão na TV */
+.mt-aviso {
+  max-width: 560px;
+  margin: 0 auto;
+  text-align: center;
+  padding: var(--e7) var(--e6);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-card);
+  background: var(--surface);
+}
+.mt-aviso h1 { font-size: 22px; margin: 0 0 10px; color: var(--label); }
+.mt-aviso p { margin: 0; color: var(--label-2); line-height: 1.6; }
+
+/* ---------------------------------------------- celular e tablet */
+@media (max-width: 700px) {
+  .mt-duo { grid-template-columns: 1fr; }
+  .mt-topo { gap: 10px; }
+  .mt-pop { left: 16px; right: 16px; width: auto; }
+}
+
+/* ============================================================
+   GERENCIADOR DE META — o formulário e o histórico
+   ============================================================ */
+.mg-abas {
+  display: inline-flex;
+  padding: 4px;
+  gap: 4px;
+  background: var(--fill-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-pill);
+  margin-bottom: var(--e5);
+}
+.mg-abas button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 18px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--label-2);
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  transition: background var(--t-rapido), color var(--t-rapido);
+}
+.mg-abas button:hover { color: var(--label); }
+.mg-abas button.on { background: var(--surface-3); color: var(--label); box-shadow: var(--shadow-1); }
+.mg-abas button .mt-pingo { width: 9px; height: 9px; }
+.mg-abas button[data-tipo="comercial"] .mt-pingo { background: var(--accent); }
+.mg-abas button[data-tipo="operacional"] .mt-pingo { background: var(--purple); }
+
+.mg-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: var(--e4);
+}
+.mg-grade .largo { grid-column: 1 / -1; }
+
+.mg-linha-valor { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+.mg-linha-valor.cm { color: var(--blue-soft); }
+.mg-linha-valor.op { color: var(--purple-soft); }
+
+.mg-selo {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+}
+.mg-selo.cm { color: var(--blue-soft); background: var(--blue-tint); }
+.mg-selo.op { color: var(--purple-soft); background: var(--purple-tint); }
+
+.mg-tv {
+  display: flex;
+  align-items: center;
+  gap: var(--e3);
+  flex-wrap: wrap;
+}
+.mg-link {
+  flex: 1 1 320px;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  color: var(--label-2);
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-ctl);
+  padding: 10px 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   ORBIT NA TELEVISÃO
+
+   O ORBIT é a marca visual da entrada do sistema, e traz o placar
+   para dentro da mesma família. Mas na TV ele fica PARADO: a
+   versão do login gira num ciclo de quase um minuto, e animação
+   contínua numa tela que fica ligada doze horas por dia é consumo
+   de energia e de GPU sem ninguém olhando. Aqui ele é só a luz, de
+   graça e para sempre.
+   ============================================================ */
+.orbit-tv .orbit-luz {
+  opacity: .16;
+  animation: none;
+}
+.orbit-tv .orbit-anel { opacity: .35; }
+.orbit-tv .orbit-anel:nth-child(3)::before { display: none; }
+
+/* A marca no alto, discreta, fora do placar. */
+.mt-tv .mt-marca {
+  position: absolute;
+  top: clamp(16px, 2vw, 38px);
+  left: clamp(18px, 2.6vw, 54px);
+  z-index: 2;
+  font-size: clamp(12px, 1vw, 17px);
+}
+
+/* Televisão sem ninguém por perto: os botões desbotam para não
+   competir com o número. Qualquer movimento os traz de volta. */
+.mt-quieto .mt-acoes { opacity: .22; }
+.mt-acoes { transition: opacity 600ms ease; }
+.mt-quieto .mt-acoes:hover { opacity: 1; }
+
+/* Em tela cheia o navegador tira as bordas, então o placar pode
+   respirar um pouco mais. */
+.mt-tv:fullscreen, html:fullscreen .mt-tv { padding: clamp(24px, 3.4vw, 72px); }

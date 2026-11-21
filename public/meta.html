@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Meta — StartDigital</title>
+<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<!-- Esta pagina NAO le a preferencia de tema, de proposito: e um
+     telao numa parede, e telao e sempre escuro. Sem o trecho que
+     le o localStorage, ela ja nasce escura e nunca pisca branco. -->
+<link rel="stylesheet" href="/ui.css">
+<link rel="stylesheet" href="/meta.css">
+</head>
+<body class="mt-tv">
+
+<div class="orbit orbit-tv" aria-hidden="true">
+  <i class="orbit-luz"></i>
+  <i class="orbit-anel"></i><i class="orbit-anel"></i><i class="orbit-anel"></i>
+</div>
+
+<div class="mt-marca">
+  <img src="/favicon-32.png" alt="" width="22" height="22">
+  <span style="font-weight:700;letter-spacing:.02em;color:var(--label)">StartDigital</span>
+</div>
+
+<!-- O placar inteiro e desenhado aqui pelo meta-placar.js -->
+<div class="mt" id="placar">
+  <div class="mt-aviso">
+    <h1>Abrindo o placar…</h1>
+    <p>Se esta mensagem ficar na tela, confira se o link tem o código da TV no fim.</p>
+  </div>
+</div>
+
+<!-- A celebracao vive FORA do placar: assim redesenhar os numeros
+     nunca apaga um confete no meio do voo. -->
+<canvas class="mt-confete" id="confete" aria-hidden="true"></canvas>
+<div class="mt-pop" id="pop" role="status" aria-live="polite"></div>
+
+<script src="/js/meta-placar.js"></script>
+<script>
+/* ============================================================
+   A TELA DA TELEVISAO
+
+   Ela nao faz login. Entra com o codigo que o Gerenciador de Meta
+   sorteou e so consegue LER o placar — nao existe caminho daqui
+   para o Financeiro, para os Clientes nem para nada do painel.
+
+   Se o codigo estiver errado ou tiver sido trocado, a propria tela
+   explica o que fazer, em portugues, em vez de mostrar "403".
+   ============================================================ */
+(function () {
+  'use strict';
+
+  var codigo = new URLSearchParams(location.search).get('tv') || '';
+  var placar = document.getElementById('placar');
+
+  function recado(titulo, texto) {
+    placar.innerHTML = '<div class="mt-aviso"><h1></h1><p></p></div>';
+    placar.querySelector('h1').textContent = titulo;
+    placar.querySelector('p').textContent = texto;
+  }
+
+  if (!codigo) {
+    recado('Falta o código da TV',
+      'Abra o painel em Comercial → Gerenciador de Meta, copie o link da televisão e use ele aqui.');
+    return;
+  }
+
+  // Busca os dados. Manda o selo que ja temos: quando nada mudou, o
+  // servidor responde "igual" em vez de repetir a lista inteira.
+  async function buscar(selo) {
+    var qs = new URLSearchParams({ action: 'mt_tv', tv: codigo });
+    if (selo) qs.set('selo', selo);
+
+    var res = await fetch('/api/comercial?' + qs.toString(), { cache: 'no-store' });
+    var data = await res.json().catch(function () { return null; });
+
+    if (res.status === 403) {
+      // Codigo invalido nao e falha de rede: insistir nao resolve.
+      // A tela explica e o laco para aqui.
+      recado('Esse link da TV não vale mais',
+        'Alguém gerou um código novo. Abra Comercial → Gerenciador de Meta no painel, ' +
+        'copie o link atualizado e use ele nesta televisão.');
+      if (vivo && vivo.para) vivo.para();
+      throw new Error('codigo invalido');
+    }
+    if (!data || !data.ok) throw new Error((data && data.error) || 'sem resposta');
+    return data;
+  }
+
+  var vivo = MetaPlacar.monta(placar, {
+    buscar: buscar,
+    canvas: document.getElementById('confete'),
+    pop: document.getElementById('pop'),
+    comSom: true,
+    comTela: true
+  });
+
+  // Numa TV ninguem mexe no mouse. Depois de dez segundos parados os
+  // dois botoes (som e tela cheia) desbotam, e voltam ao primeiro
+  // sinal de vida. O placar fica limpo, mas os botoes continuam la
+  // para quem chegar perto.
+  var somem = null;
+  function acorda() {
+    document.body.classList.remove('mt-quieto');
+    clearTimeout(somem);
+    somem = setTimeout(function () { document.body.classList.add('mt-quieto'); }, 10000);
+  }
+  ['mousemove', 'keydown', 'touchstart', 'click'].forEach(function (ev) {
+    document.addEventListener(ev, acorda, { passive: true });
+  });
+  acorda();
+})();
+</script>
+</body>
+</html>
