@@ -309,7 +309,8 @@ module.exports = async function handler(req, res) {
           tv_criado_em: cfg.tv_criado_em || null,
           pode_lancar: perms.permite(aberta.papel, 'mt_salvar'),
           eu_nome: euNome,
-          tipos: meta.TIPOS, tipos_nome: meta.TIPOS_NOME
+          tipos: meta.TIPOS, tipos_nome: meta.TIPOS_NOME,
+          som: cfg.som, sons: meta.SONS
         }));
       }
 
@@ -344,6 +345,11 @@ module.exports = async function handler(req, res) {
           if (c > meta.TETO_CENTAVOS) return u.fail(res, 400, 'Esse alvo passa de R$ 10 milhões. Confira os zeros.');
           patch.alvo_centavos = c;
         }
+        if (body.som !== undefined) {
+          const qual = String(body.som || '');
+          if (!meta.SONS[qual]) return u.fail(res, 400, 'Esse som não existe.');
+          patch.som = qual;
+        }
         // Gerar código novo mata o link antigo na hora: é assim que se
         // "tira o acesso da TV" sem precisar de tabela de sessões.
         if (body.novo_codigo === true) {
@@ -356,7 +362,8 @@ module.exports = async function handler(req, res) {
         return u.ok(res, {
           alvo_centavos: cfg.alvo_centavos,
           tv_codigo: cfg.tv_codigo || '',
-          tv_criado_em: cfg.tv_criado_em || null
+          tv_criado_em: cfg.tv_criado_em || null,
+          som: cfg.som
         });
       }
 

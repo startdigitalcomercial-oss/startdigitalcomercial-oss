@@ -89,55 +89,70 @@ var MetaPlacar = (function () {
   }
 
   /* ------------------------------------------------------------
-     O SINO
+     O SOM DA VENDA
 
-     Três senoides afinadas em oitava e quinta (880, 1320 e 2640 Hz)
-     caindo juntas. É a receita mais simples de "sino": o agudo
-     some rápido, o grave sustenta. O total dá pouco mais de um
-     segundo e para sozinho — nada fica tocando.
+     Cinco segundos de verdade, montados na hora pelo meta-som.js.
+     Não existe arquivo de áudio neste sistema — o porquê está
+     explicado lá, com a receita de cada som.
+
+     Aqui ficam só os dois cuidados de quem CHAMA o som:
+
+     1. O NAVEGADOR BLOQUEIA ÁUDIO AUTOMÁTICO, e é regra boa:
+        imagine abrir uma aba e ela gritar. O botão "Ativar som"
+        vale como o clique que o navegador exige, e a partir dali
+        a televisão toca sozinha a cada venda.
+
+     2. SE NÃO DER PARA TOCAR, A VENDA NÃO PASSA MUDA. Navegador
+        velho sem WebAudio, áudio ainda bloqueado, qualquer coisa:
+        entra o sino simples, feito com três senoides. Som pior é
+        muito melhor que silêncio no dia em que a equipe fechou a
+        maior venda do mês.
      ------------------------------------------------------------ */
-  var ctxAudio = null;
+  var ctxReserva = null;
 
-  function contexto() {
-    if (ctxAudio) return ctxAudio;
+  function contextoReserva() {
+    if (ctxReserva) return ctxReserva;
     var AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
-    try { ctxAudio = new AC(); } catch (e) { ctxAudio = null; }
-    return ctxAudio;
+    try { ctxReserva = new AC(); } catch (e) { ctxReserva = null; }
+    return ctxReserva;
   }
 
-  function tocaSino() {
-    var ctx = contexto();
-    if (!ctx) return;
-    // O navegador pode ter deixado o contexto "suspenso" (aba que
-    // ficou escondida). Acordar é barato e não dá erro se já estava
-    // acordado.
-    if (ctx.state === 'suspended') { try { ctx.resume(); } catch (e) { } }
+  /* O SINO DE EMERGÊNCIA
 
-    var t0 = ctx.currentTime + 0.01;
-    var partes = [
-      { hz: 880, vol: 0.30, dur: 1.5 },
-      { hz: 1320, vol: 0.16, dur: 1.1 },
-      { hz: 2640, vol: 0.07, dur: 0.6 }
-    ];
+     Três senoides afinadas em oitava e quinta (880, 1320 e 2640 Hz)
+     caindo juntas: a receita mais simples de "sino". O agudo some
+     rápido, o grave sustenta. Não é o hit e nem tenta ser — é o que
+     garante que uma venda nunca passe despercebida. */
+  function sinoSimples() {
+    var c = contextoReserva();
+    if (!c) return;
+    if (c.state === 'suspended') { try { c.resume(); } catch (e) { } }
 
-    partes.forEach(function (p) {
-      var osc = ctx.createOscillator();
-      var g = ctx.createGain();
+    var t0 = c.currentTime + 0.01;
+    [{ hz: 880, vol: 0.30, dur: 1.5 },
+     { hz: 1320, vol: 0.16, dur: 1.1 },
+     { hz: 2640, vol: 0.07, dur: 0.6 }].forEach(function (p) {
+      var osc = c.createOscillator();
+      var g = c.createGain();
       osc.type = 'sine';
       osc.frequency.value = p.hz;
-
       // Ataque curtíssimo e queda exponencial: é isso que faz o
       // ouvido entender "badalada" em vez de "apito".
       g.gain.setValueAtTime(0.0001, t0);
       g.gain.exponentialRampToValueAtTime(p.vol, t0 + 0.012);
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + p.dur);
-
-      osc.connect(g);
-      g.connect(ctx.destination);
-      osc.start(t0);
-      osc.stop(t0 + p.dur + 0.05);
+      osc.connect(g); g.connect(c.destination);
+      osc.start(t0); osc.stop(t0 + p.dur + 0.05);
     });
+  }
+
+  function tocaHit(qual) {
+    var deu = false;
+    if (window.MetaSom) {
+      try { deu = MetaSom.toca(qual || 'fanfarra'); } catch (e) { deu = false; }
+    }
+    if (!deu) sinoSimples();
   }
 
   /* ------------------------------------------------------------
@@ -165,13 +180,22 @@ var MetaPlacar = (function () {
 
     var cores = ['#4F7CFF', '#8B5CF6', '#38BDF8', '#34D399', '#E9EDFB'];
     var pecas = [];
-    for (var i = 0; i < 110; i++) {
+    for (var i = 0; i < 150; i++) {
       pecas.push({
-        x: L * (0.1 + Math.random() * 0.8),
+        x: L * (0.06 + Math.random() * 0.88),
         // Nascem logo acima da borda, não meia tela acima: espalhar
         // demais faz metade do confete gastar a vida inteira voando
         // num lugar onde ninguém vê.
         y: -14 - Math.random() * A * 0.16,
+        // CADA PAPEL TEM A SUA HORA.
+        //
+        // Soltando todos de uma vez, a chuva acaba em um segundo e
+        // meio e sobram três segundos e meio de som tocando numa
+        // tela parada. Espalhando o nascimento (com peso para o
+        // começo, pelo quadrado do sorteio), a primeira leva cai
+        // forte e as retardatárias seguram o espetáculo até o som
+        // terminar.
+        nasce: Math.pow(Math.random(), 2) * 2100,
         l: 5 + Math.random() * 5,
         a: 8 + Math.random() * 7,
         vx: (Math.random() - 0.5) * 1.7,
@@ -184,7 +208,10 @@ var MetaPlacar = (function () {
 
     var inicio = null;
     var anterior = null;
-    var VIDA = 2600;
+    // Dura quase tanto quanto o som. Confete que acaba em dois
+    // segundos com um hit de cinco tocando faz a festa parecer que
+    // deu defeito no meio.
+    var VIDA = 4600;
     var pedido = 0;
 
     function quadro(agora) {
@@ -214,6 +241,7 @@ var MetaPlacar = (function () {
 
       for (var i = 0; i < pecas.length; i++) {
         var p = pecas[i];
+        if (passado < p.nasce) continue;      // esse ainda não foi solto
         p.x += p.vx * dt;
         p.y += p.vy * dt;
         p.vy += 0.035 * dt;                // gravidade
@@ -398,6 +426,7 @@ var MetaPlacar = (function () {
       celebrando: false,
       fila: [],
       som: false,
+      qualSom: 'fanfarra',          // qual som tocar, escolhido no Gerenciador
       vivo: true,
       falhas: 0,
       passo: 0,
@@ -425,6 +454,12 @@ var MetaPlacar = (function () {
     function atualiza(d) {
       var antes = estado.d;
       estado.d = d;
+
+      // Qual som tocar vem junto com o placar: a televisão não tem
+      // login para perguntar isso ao painel. Trocar o som no
+      // Gerenciador vale a partir da próxima pergunta — ou seja, em
+      // poucos segundos, sem ninguém mexer na TV.
+      if (d.som && d.som !== estado.qualSom) estado.qualSom = d.som;
 
       if (!antes) { desenha(d); return; }
 
@@ -487,10 +522,14 @@ var MetaPlacar = (function () {
           try { localStorage.setItem(LS_SOM, estado.som ? '1' : '0'); } catch (e) { }
 
           // Ligar o som é o clique que o navegador estava esperando.
-          // Aproveitamos ELE para acordar o áudio e tocar o sino uma
-          // vez — assim a pessoa confere o volume da TV na hora, em
-          // vez de descobrir na próxima venda que estava mudo.
-          if (estado.som) { var c = contexto(); if (c && c.state === 'suspended') { try { c.resume(); } catch (e) { } } tocaSino(); }
+          // Aproveitamos ELE para tocar o hit inteiro uma vez: assim a
+          // pessoa ajusta o volume da TV na hora, ouvindo exatamente o
+          // que vai tocar na próxima venda, em vez de descobrir que
+          // estava baixo demais no momento errado.
+          if (estado.som) {
+            if (window.MetaSom) { try { MetaSom.acorda(); } catch (e) { } }
+            tocaHit(estado.qualSom);
+          }
           pintaSom();
         });
         pintaSom();
@@ -554,7 +593,7 @@ var MetaPlacar = (function () {
       var l = estado.fila.shift();
       popup(opts.pop, l);
       confete(opts.canvas);
-      if (estado.som) tocaSino();
+      if (estado.som) tocaHit(estado.qualSom);
 
       setTimeout(function () {
         if (opts.pop) opts.pop.classList.remove('on');
@@ -682,7 +721,8 @@ var MetaPlacar = (function () {
     moeda: moeda,
     moedaCurta: moedaCurta,
     moedaRica: moedaRica,
-    tocaSino: tocaSino,
+    tocaHit: tocaHit,
+    sinoSimples: sinoSimples,
     confete: confete,
     html: html
   };

@@ -316,6 +316,13 @@ function ajustesGerente(d) {
       '<button class="btn btn-sm" id="mg-alvo-salvar" style="align-self:flex-end">Salvar alvo</button>' +
     '</div>' +
 
+    '<h2 style="margin-top:28px">Som da venda</h2>' +
+    '<p class="sub">O que toca na televisão quando um valor entra. São cinco segundos — ' +
+      'a ideia é a sala inteira ouvir. Clique em <strong>Ouvir</strong> para testar antes de escolher.</p>' +
+    '<div class="mg-sons">' +
+      Object.keys(d.sons || {}).map(function (k) { return cartaoSom(k, d.sons[k], d.som); }).join('') +
+    '</div>' +
+
     '<h2 style="margin-top:28px">Link da televisão</h2>' +
     '<p class="sub">Abre só o placar, sem login, em tela cheia. Quem tiver este link vê o ' +
       'placar e <strong>nada mais</strong> — nem Financeiro, nem Clientes, nem Usuários. ' +
@@ -332,6 +339,22 @@ function ajustesGerente(d) {
             esc(dataCurta(d.tv_criado_em)) + '.</p>'
           : '')
       : '<button class="btn btn-sm" id="mg-novo-codigo">Gerar link da TV</button>') +
+    '</div>';
+}
+
+function cartaoSom(chave, som, escolhido) {
+  const on = chave === escolhido;
+  return '<div class="mg-som' + (on ? ' on' : '') + '" data-som="' + esc(chave) + '">' +
+    '<div class="mg-som-cab">' +
+      '<span class="mg-som-bola"></span>' +
+      '<strong>' + esc(som.nome) + '</strong>' +
+      (on ? '<span class="mg-som-tag">tocando hoje</span>' : '') +
+    '</div>' +
+    '<p>' + esc(som.descricao) + '</p>' +
+    '<div class="row" style="gap:8px">' +
+      '<button class="btn btn-sm btn-ghost mg-ouvir" data-som="' + esc(chave) + '">Ouvir</button>' +
+      (on ? '' : '<button class="btn btn-sm mg-usar" data-som="' + esc(chave) + '">Usar este</button>') +
+    '</div>' +
     '</div>';
 }
 
@@ -397,6 +420,51 @@ function ligaGerente() {
 
   const btNovo = document.getElementById('mg-novo-codigo');
   if (btNovo) btNovo.addEventListener('click', function () { geraCodigo(btNovo); });
+
+  // OUVIR: toca o arquivo de verdade, aqui no painel. O clique no
+  // botão é também o que libera o áudio neste navegador — então,
+  // depois de ouvir uma vez, o placar desta aba já toca sozinho.
+  document.querySelectorAll('.mg-ouvir').forEach(function (bt) {
+    bt.addEventListener('click', function () { ouveSom(bt); });
+  });
+  document.querySelectorAll('.mg-usar').forEach(function (bt) {
+    bt.addEventListener('click', function () { escolheSom(bt); });
+  });
+}
+
+let MG_PREVIA = null;
+
+function ouveSom(bt) {
+  if (!window.MetaSom) { toast('O seu navegador não toca o som da venda.', true); return; }
+
+  // O clique neste botão é também o gesto que libera áudio neste
+  // navegador. Depois de ouvir uma vez, o placar desta aba toca
+  // sozinho — não é truque, é como o navegador funciona.
+  const deu = MetaSom.acorda() && MetaSom.toca(bt.dataset.som);
+  if (!deu) { toast('O navegador bloqueou o som. Clique de novo.', true); return; }
+
+  // Um de cada vez na aparência: o botão avisa que está tocando e
+  // volta sozinho quando o som acaba.
+  if (MG_PREVIA) clearTimeout(MG_PREVIA);
+  document.querySelectorAll('.mg-ouvir').forEach(function (x) { x.textContent = 'Ouvir'; });
+  bt.textContent = 'Tocando…';
+  MG_PREVIA = setTimeout(function () { bt.textContent = 'Ouvir'; },
+    MetaSom.duracao(bt.dataset.som) * 1000);
+}
+
+async function escolheSom(bt) {
+  bt.disabled = true;
+  bt.textContent = 'Salvando…';
+  try {
+    await apiMt('mt_config', { body: { som: bt.dataset.som } });
+    toast('Som trocado. A televisão pega o novo sozinha.');
+    MG = await apiMt('mt_lista');
+    desenhaGerente();
+  } catch (e) {
+    toast(e.message, true);
+    bt.disabled = false;
+    bt.textContent = 'Usar este';
+  }
 }
 
 function erroForm(msg) {
