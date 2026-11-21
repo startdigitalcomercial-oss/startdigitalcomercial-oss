@@ -639,7 +639,7 @@ function guarda(r) {
   check('1.234.567,89 -> 123456789', meta.centavosDe('1.234.567,89') === 123456789);
   check('3,500.00 (jeito americano) -> 350000', meta.centavosDe('3,500.00') === 350000);
   check('espaco invisivel colado no numero nao estraga',
-    meta.centavosDe(' 3.500,00 ') === 350000);
+    meta.centavosDe('\u00a03.500,00\u00a0') === 350000);
   check('letras dao null, nao zero', meta.centavosDe('abc') === null);
   check('vazio da null, nao zero', meta.centavosDe('') === null);
   check('null continua null', meta.centavosDe(null) === null);
