@@ -471,3 +471,58 @@
 /* Em tela cheia o navegador tira as bordas, então o placar pode
    respirar um pouco mais. */
 .mt-tv:fullscreen, html:fullscreen .mt-tv { padding: clamp(24px, 3.4vw, 72px); }
+
+/* ============================================================
+   O SELETOR DE SOM
+
+   Três cartões lado a lado. O escolhido fica marcado com a cor de
+   destaque e uma etiqueta — e perde o botão "Usar este", porque
+   não existe "usar o que já está em uso".
+   ============================================================ */
+.mg-sons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: var(--e3);
+}
+.mg-som {
+  padding: var(--e4);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-ctl);
+  background: var(--fill-1);
+  transition: border-color var(--t-rapido), background var(--t-rapido);
+}
+.mg-som:hover { border-color: var(--hairline-strong); }
+.mg-som.on { border-color: var(--accent); background: var(--accent-tint); }
+.mg-som-cab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  color: var(--label);
+}
+.mg-som-bola {
+  width: 14px; height: 14px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 2px solid var(--label-3);
+  transition: border-color var(--t-rapido), box-shadow var(--t-rapido);
+}
+.mg-som.on .mg-som-bola {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 3px var(--accent);
+}
+.mg-som-tag {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: var(--accent-soft);
+  white-space: nowrap;
+}
+.mg-som p {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--label-2);
+}

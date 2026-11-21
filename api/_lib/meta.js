@@ -36,6 +36,28 @@ const db = require('./db');
 const TIPOS = ['comercial', 'operacional'];
 const TIPOS_NOME = { comercial: 'Comercial', operacional: 'Operacional' };
 
+/* ------------------------------------------------------------
+   O SOM DA VENDA
+
+   Tres opcoes, escolhidas no Gerenciador. A lista vive AQUI e nao
+   na tela: a televisao precisa saber qual tocar, e ela nao tem
+   login para perguntar ao painel. O nome vem junto com o placar.
+
+   Nao existe MP3: o som e montado no navegador na hora de tocar
+   (public/js/meta-som.js). Nada para baixar, nada de licenca de
+   banco de audio tocando o dia inteiro na parede da empresa, e o
+   sistema continua sem uma unica dependencia.
+   ------------------------------------------------------------ */
+const SONS = {
+  fanfarra: { nome: 'Fanfarra', segundos: 5.2,
+    descricao: 'Cha-ching e um acorde maior que abre. O mais festivo.' },
+  conquista: { nome: 'Conquista', segundos: 5.2,
+    descricao: 'Murro, subida e segundo golpe. O mais impactante.' },
+  pregao: { nome: 'Pregão', segundos: 5.4,
+    descricao: 'Badalada de abertura de bolsa. O mais sóbrio.' }
+};
+const SOM_PADRAO = 'fanfarra';
+
 // Teto de sanidade: R$ 10 milhões num único lançamento. Não é regra
 // de negócio, é cinto de segurança contra dedo escorregando no
 // teclado — "3500000000" digitado sem querer não vira meta batida.
@@ -164,7 +186,10 @@ async function config() {
     // mostra só o acumulado, sem barra de progresso.
     alvo_centavos: Number(v.alvo_centavos) > 0 ? Math.round(Number(v.alvo_centavos)) : 0,
     tv_codigo: typeof v.tv_codigo === 'string' ? v.tv_codigo : '',
-    tv_criado_em: v.tv_criado_em || null
+    tv_criado_em: v.tv_criado_em || null,
+    // Um som que foi apagado do servidor não pode derrubar a TV:
+    // nome desconhecido volta para o padrão.
+    som: SONS[v.som] ? v.som : SOM_PADRAO
   };
 }
 
@@ -300,6 +325,7 @@ async function placar(params, opts) {
     mes_nome: nomeDoMes(ym),
     ano: ym.slice(0, 4),
     alvo_centavos: cfg.alvo_centavos,
+    som: cfg.som,
     comercial: soma.comercial,
     operacional: soma.operacional,
     total: total,
@@ -482,7 +508,7 @@ function sorteiaCodigo() {
 }
 
 module.exports = {
-  TIPOS, TIPOS_NOME, TETO_CENTAVOS,
+  TIPOS, TIPOS_NOME, TETO_CENTAVOS, SONS, SOM_PADRAO,
   hojeSP, mesDe, nomeDoMes, mesAnterior, inicioDoMes, inicioDoProximo,
   centavosDe, seloDe, valida,
   config, salvaConfig, placar, historico,
