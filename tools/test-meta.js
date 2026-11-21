@@ -381,9 +381,49 @@ function guarda(r) {
     alvoZero.ok === true && alvoZero.alvo_centavos === 0, alvoZero);
 
   /* ============================================================
+     O SOM DA VENDA
+     ============================================================ */
+  console.log('\n-- o som da venda --');
+  const comSons = await mt('mt_lista');
+  check('o Gerenciador oferece os tres sons',
+    comSons.sons && Object.keys(comSons.sons).length === 3, Object.keys(comSons.sons || {}));
+  check('cada som tem nome, descricao e duracao',
+    Object.keys(comSons.sons).every(function (k) {
+      const x = comSons.sons[k];
+      return x.nome && x.descricao && Number(x.segundos) >= 5;
+    }), comSons.sons);
+  check('todos duram pelo menos cinco segundos, como foi pedido',
+    Object.keys(comSons.sons).every(function (k) { return comSons.sons[k].segundos >= 5; }),
+    Object.keys(comSons.sons).map(function (k) { return comSons.sons[k].segundos; }));
+  check('comeca com a Fanfarra', comSons.som === 'fanfarra', comSons.som);
+
+  const placarSom = await mt('mt_placar');
+  check('o placar diz QUAL som tocar (a TV nao tem login para perguntar)',
+    placarSom.som === 'fanfarra', placarSom.som);
+
+  const trocaSom = await mt('mt_config', { som: 'conquista' });
+  check('da para trocar o som', trocaSom.ok === true && trocaSom.som === 'conquista', trocaSom);
+  check('e o placar passa a mandar o som novo',
+    (await mt('mt_placar')).som === 'conquista');
+  const somInventado = await mt('mt_config', { som: 'funk-do-escritorio' });
+  check('som que nao existe e barrado', somInventado.ok === false, somInventado.error);
+  check('e o som de verdade continua no lugar',
+    (await mt('mt_lista')).som === 'conquista');
+
+  // Se alguem apagar o arquivo do servidor e o nome ficar gravado,
+  // a TV nao pode ficar muda nem quebrar: volta para o padrao.
+  const metaLib = require('../api/_lib/meta.js');
+  check('nome de som desconhecido no banco cai no padrao, em vez de quebrar',
+    metaLib.SONS[metaLib.SOM_PADRAO] !== undefined && metaLib.SOM_PADRAO === 'fanfarra');
+
+  await mt('mt_config', { som: 'fanfarra' });
+  check('voltou para a Fanfarra', (await mt('mt_lista')).som === 'fanfarra');
+
+  /* ============================================================
      TESTES 6, 7, 8 — A TELEVISAO
      ============================================================ */
   console.log('\n-- testes 6, 7 e 8: a televisao --');
+  const metaLibTv = require('../api/_lib/meta.js');
   const semCodigo = await mt('mt_tv', null, {}, '');
   check('a TV sem codigo nao entra', semCodigo.ok === false, semCodigo.error);
   const codigoErrado = await mt('mt_tv', null, { tv: 'CODIGOINVENTADO' }, '');
@@ -403,6 +443,8 @@ function guarda(r) {
     naTv.total === comAlvo.total, [naTv.total, comAlvo.total]);
   check('a TV ve os dois lados separados',
     naTv.comercial === comAlvo.comercial && naTv.operacional === comAlvo.operacional);
+  check('a TV recebe qual som tocar, sem precisar de login',
+    !!naTv.som && metaLibTv.SONS[naTv.som] !== undefined, naTv.som);
   check('a TV tambem economiza com o selo',
     (await mt('mt_tv', null, { tv: gerou.tv_codigo, selo: naTv.selo }, '')).igual === true);
 
