@@ -105,6 +105,14 @@
       "destination": "/play.html"
     },
     {
+      "source": "/meta",
+      "destination": "/meta.html"
+    },
+    {
+      "source": "/placar",
+      "destination": "/meta.html"
+    },
+    {
       "source": "/termos",
       "destination": "/termos.html"
     },

@@ -53,6 +53,8 @@ const ROTAS = {
   '/colaborador': '/equipe.html',
   '/play': '/play.html',
   '/startplay': '/play.html',
+  '/meta': '/meta.html',
+  '/placar': '/meta.html',
   '/termos': '/termos.html',
   '/termo': '/termos.html',
   '/privacidade': '/privacidade.html',

@@ -14,6 +14,7 @@
   try { if (localStorage.getItem('tema') === 'claro') document.documentElement.setAttribute('data-tema', 'claro'); } catch (e) {}
 </script>
 <link rel="stylesheet" href="/ui.css">
+<link rel="stylesheet" href="/meta.css">
 <style>
   html, body { background: var(--canvas); min-height: 100%; }
 
@@ -1266,6 +1267,8 @@
       <button data-aba="cmagenda"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><rect x="3.6" y="5.4" width="16.8" height="14.2" rx="2"/><path d="M3.6 9.8h16.8M8.4 3.4v3.4M15.6 3.4v3.4"/><path d="m9.6 14.2 1.8 1.8 3.4-3.6"/></svg><span>Agenda</span></button>
       <button data-aba="cmatendimento"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M20.4 11.6a8.4 8.4 0 0 1-8.4 8.4c-1.5 0-2.9-.4-4.1-1L3.4 20l1.1-4.4a8.4 8.4 0 1 1 15.9-4z"/></svg><span>Atendimento</span></button>
       <button data-aba="cmsimulacoes"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M4 19.6h16"/><path d="M7.2 19.6v-6.4M12 19.6V8.4M16.8 19.6v-9"/><circle cx="16.8" cy="6.2" r="1.6"/></svg><span>Simulações</span></button>
+      <button data-aba="meta"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4"/><circle cx="12" cy="12" r="4.4"/><circle cx="12" cy="12" r="1.1" fill="currentColor"/></svg><span>Meta</span></button>
+      <button data-aba="metagerente"><svg class="ico" width="17" height="17" viewBox="0 0 24 24"><path d="M12 4.2v15.6M7.8 8.2h6a2.4 2.4 0 0 1 0 4.8h-3.6a2.4 2.4 0 0 0 0 4.8h6"/></svg><span>Gerenciador de Meta</span></button>
 </div></div></div>
       <div class="nav-grupo" data-grupo="conteudo">
       <button type="button" class="nav-cab">Start Academy<svg class="seta" width="12" height="12" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
@@ -1304,6 +1307,8 @@
     <section data-painel="cmagenda" style="display:none"><div id="painel-cmagenda"></div></section>
     <section data-painel="cmatendimento" style="display:none"><div id="painel-cmatendimento"></div></section>
     <section data-painel="cmsimulacoes" style="display:none"><div id="painel-cmsimulacoes"></div></section>
+    <section data-painel="meta" style="display:none"><div id="painel-meta"></div></section>
+    <section data-painel="metagerente" style="display:none"><div id="painel-metagerente"></div></section>
 
     <!-- ---------- QUADRO ---------- -->
     <section data-painel="triagem" style="display:none">
@@ -1507,6 +1512,15 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- A CELEBRACAO DA META
+     Vive aqui, fora de qualquer painel, por dois motivos: redesenhar
+     os numeros do placar nunca apaga um confete no meio do voo, e a
+     caixa de aviso fica por cima de tudo sem depender de onde o
+     placar foi desenhado. Enquanto nao ha venda, os dois sao
+     elementos transparentes parados, sem custo nenhum. -->
+<canvas class="mt-confete" id="confete-meta" aria-hidden="true"></canvas>
+<div class="mt-pop" id="pop-meta" role="status" aria-live="polite"></div>
+
 <script src="/js/tema.js"></script>
 <script src="/js/admin-core.js"></script>
 <script src="/js/admin-ui.js"></script>
@@ -1527,6 +1541,8 @@
 <script src="/js/admin-onboarding.js"></script>
 <script src="/js/admin-agenda.js"></script>
 <script src="/js/admin-comercial.js"></script>
+<script src="/js/meta-placar.js"></script>
+<script src="/js/admin-meta.js"></script>
 <script src="/js/admin-inicio.js"></script>
 </body>
 </html>

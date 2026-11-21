@@ -1103,6 +1103,16 @@ async function escondeFinanceiroSeNaoPode() {
       });
     }
 
+    // META: o placar mostra dinheiro, então segue a mesma regra do
+    // Financeiro — Dono e RH. Um SDR participante da simulação vê o
+    // grupo Comercial (acima), mas não estes dois itens.
+    if (Array.isArray(r.menu) && r.menu.indexOf('meta') < 0) {
+      ['meta', 'metagerente'].forEach(function (aba) {
+        const b = document.querySelector('#abas button[data-aba="' + aba + '"]');
+        if (b) b.style.display = 'none';
+      });
+    }
+
     // START PLAY: quem nao cuida do time nao precisa ver a roleta
     if (Array.isArray(r.menu) && r.menu.indexOf('play') < 0) {
       const bp = document.querySelector('#abas button[data-aba="play"]');

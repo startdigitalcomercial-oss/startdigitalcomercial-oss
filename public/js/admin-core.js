@@ -178,7 +178,8 @@ const TITULOS = {
   opdash: 'Dashboard Operacional', opgestores: 'Gestão',
   oponboarding: 'Onboarding', opagenda: 'Agenda',
   cmleads: 'Leads', cmagenda: 'Agenda Comercial',
-  cmatendimento: 'Atendimento', cmsimulacoes: 'Simulações Comerciais'
+  cmatendimento: 'Atendimento', cmsimulacoes: 'Simulações Comerciais',
+  meta: 'Meta em tempo real', metagerente: 'Gerenciador de Meta'
 };
 /* ---------------------------------------------- sanfona do menu
    Um grupo aberto por vez. O grupo da página em que você está abre
@@ -251,7 +252,9 @@ document.getElementById('abas').addEventListener('click', function (ev) {
     cmleads: (typeof carregaCmLeads === 'function' ? carregaCmLeads : null),
     cmagenda: (typeof carregaCmAgenda === 'function' ? carregaCmAgenda : null),
     cmatendimento: (typeof carregaCmAtendimento === 'function' ? carregaCmAtendimento : null),
-    cmsimulacoes: (typeof carregaSimulacoes === 'function' ? carregaSimulacoes : null)
+    cmsimulacoes: (typeof carregaSimulacoes === 'function' ? carregaSimulacoes : null),
+    meta: (typeof carregaMeta === 'function' ? carregaMeta : null),
+    metagerente: (typeof carregaMetaGerente === 'function' ? carregaMetaGerente : null)
   };
   marcaGrupoAtivo();
   if (carregar[b.dataset.aba]) carregar[b.dataset.aba]();
