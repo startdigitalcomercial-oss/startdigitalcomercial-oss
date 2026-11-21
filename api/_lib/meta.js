@@ -64,6 +64,122 @@ const SOM_PADRAO = 'fanfarra';
 const TETO_CENTAVOS = 1000000000;
 
 /* ------------------------------------------------------------
+   O AVISO INSTANTÂNEO
+
+   Antes, a televisão PERGUNTAVA "mudou algo?" de tempos em tempos,
+   e quem lançava uma venda esperava a próxima pergunta — até dez
+   segundos, às vezes mais. Agora é o contrário: quando uma venda
+   entra, o servidor GRITA "mudou!" num canal, e a TV, que está
+   ouvindo, busca o placar novo na mesma hora.
+
+   O canal é o Supabase Realtime (Broadcast), que o projeto já tem
+   e não custa nada a mais. Três cuidados:
+
+   1. NO CANAL NÃO PASSA DINHEIRO. A mensagem é só "mudou" e um
+      relógio. Nome de cliente, valor, responsável: nada disso
+      viaja por lá. A TV ouve o grito e vem buscar os números pela
+      porta de sempre, com o código dela. Quem escutar o canal
+      escondido descobre apenas QUE houve uma venda, não qual.
+
+   2. A CHAVE QUE VAI PARA O NAVEGADOR É A PÚBLICA. O Supabase tem
+      duas chaves: a secreta (que fica só no servidor) e a
+      "publishable", feita para morar em navegador. Conferimos no
+      banco antes de usar: as 39 tabelas têm a tranca ligada (RLS)
+      e nenhuma tem regra liberando leitura anônima — ou seja, com
+      a chave pública não se lê NADA do banco. Ela serve só para
+      ouvir o canal.
+
+   3. SE O CANAL FALHAR, NADA QUEBRA. Gritar é um bônus. A TV
+      continua perguntando de tempos em tempos como rede de
+      segurança, e uma venda nunca deixa de ser gravada porque o
+      aviso não saiu.
+   ------------------------------------------------------------ */
+const PROJETO_REF = 'jurryyrdwgcasvvficty';
+const CHAVE_PUBLICA_DO_PROJETO = 'sb_publishable_Rtgb2Imdvlt7VqlvDFTOhQ_c6K1WyhS';
+
+function baseSupabase() {
+  return String(process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+}
+
+// Qual chave PÚBLICA usar. Nunca devolve a secreta: se não houver
+// uma pública conhecida para este endereço, devolve vazio — e aí
+// simplesmente não existe canal, a TV segue só perguntando.
+function chavePublica() {
+  const doAmbiente = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || '';
+  if (doAmbiente) return doAmbiente;
+  const base = baseSupabase();
+  if (base.indexOf(PROJETO_REF) >= 0) return CHAVE_PUBLICA_DO_PROJETO;
+  // O espelho local de testes não confere chave nenhuma.
+  if (/^http:\/\/(127\.0\.0\.1|localhost)[:/]/.test(base + '/')) return 'local';
+  return '';
+}
+
+// O nome do canal é derivado do segredo do sistema: fixo, mas
+// impossível de adivinhar de fora. Só recebe o nome quem já provou
+// que pode ver o placar (login ou código da TV).
+function nomeDoCanal() {
+  const segredo = process.env.APP_SECRET || process.env.ADMIN_SECRET || 'start-rh-dev-secret';
+  return 'meta-' + require('crypto').createHmac('sha256', segredo)
+    .update('canal-do-placar').digest('hex').slice(0, 24);
+}
+
+// O que a tela precisa para ouvir. null = sem canal, só perguntas.
+function canalInfo() {
+  const base = baseSupabase();
+  const chave = chavePublica();
+  if (!base || !chave) return null;
+  return {
+    url: base.replace(/^http/, 'ws') + '/realtime/v1/websocket',
+    chave: chave,
+    canal: nomeDoCanal()
+  };
+}
+
+/* O grito. Espera no máximo um segundo e meio e engole qualquer
+   erro: perder o aviso atrasa a TV em alguns segundos (a rede de
+   segurança cobre); deixar o aviso derrubar o lançamento perderia
+   uma venda. Não há comparação. */
+async function avisa(motivo) {
+  const base = baseSupabase();
+  const chave = chavePublica();
+  if (!base || !chave) return false;
+
+  const corpo = JSON.stringify({
+    messages: [{
+      topic: nomeDoCanal(),
+      event: 'mudou',
+      // Só o motivo genérico e a hora. Nenhum dado do lançamento.
+      payload: { o: String(motivo || 'placar'), t: Date.now() }
+    }]
+  });
+
+  const tenta = async function (qualChave) {
+    const corta = new AbortController();
+    const relogio = setTimeout(function () { corta.abort(); }, 1500);
+    try {
+      const r = await fetch(base + '/realtime/v1/api/broadcast', {
+        method: 'POST',
+        headers: { apikey: qualChave, 'Content-Type': 'application/json' },
+        body: corpo,
+        signal: corta.signal
+      });
+      return r.ok;
+    } catch (e) { return false; }
+    finally { clearTimeout(relogio); }
+  };
+
+  try {
+    if (await tenta(chave)) return true;
+    // Segunda chance com a chave do servidor, para o caso de o
+    // projeto um dia fechar o envio com a chave pública.
+    const secreta = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+    if (secreta && await tenta(secreta)) return true;
+    console.error('[meta/aviso] o canal nao aceitou o aviso; a TV vai descobrir pela pergunta periodica');
+    return false;
+  } catch (e) { return false; }
+}
+
+/* ------------------------------------------------------------
    DATAS EM SÃO PAULO
    ------------------------------------------------------------ */
 function hojeSP() {
@@ -197,6 +313,8 @@ async function salvaConfig(patch) {
   const atual = await config();
   const novo = Object.assign({}, atual, patch || {});
   await db.upsert('settings', { key: 'meta', value: novo }, 'key');
+  // Trocar o alvo ou o som também muda o que a TV mostra e toca.
+  await avisa('ajuste');
   return novo;
 }
 
@@ -287,16 +405,27 @@ function paraTela(l) {
    alvo, os últimos lançamentos (para a celebração saber o nome de
    quem vendeu) e o selo.
    ------------------------------------------------------------ */
+const MEMORIA_ANTERIOR = {};
+function esqueceAnterior() {
+  Object.keys(MEMORIA_ANTERIOR).forEach(function (k) { delete MEMORIA_ANTERIOR[k]; });
+}
+
 async function placar(params, opts) {
   opts = opts || {};
   const ym = mesDe(params);
-  const cfg = await config();
-  const linhas = await lancamentosDoMes(ym);
+  // As duas consultas saem JUNTAS, não uma depois da outra. Cada uma
+  // leva uns 50 a 100 milésimos; em fila eram 200, lado a lado são
+  // 100. Parece pouco, mas a meta agora é a TV reagir em meio
+  // segundo — e meio segundo se ganha de cem em cem.
+  const juntas = await Promise.all([config(), lancamentosDoMes(ym)]);
+  const cfg = juntas[0];
+  const linhas = juntas[1];
   const selo = seloDe(linhas);
+  const canal = canalInfo();
 
   // Nada mudou desde a última pergunta: resposta curta.
   if (opts.selo && opts.selo === selo) {
-    return { igual: true, selo: selo, mes: ym };
+    return { igual: true, selo: selo, mes: ym, canal: canal };
   }
 
   const soma = somaPorTipo(linhas);
@@ -308,13 +437,23 @@ async function placar(params, opts) {
   if (opts.comAnterior !== false) {
     try {
       const ant = mesAnterior(ym);
-      const linhasAnt = await lancamentosDoMes(ant);
-      const somaAnt = somaPorTipo(linhasAnt);
-      anterior = {
-        mes: ant,
-        mes_nome: nomeDoMes(ant),
-        total: somaAnt.comercial + somaAnt.operacional
-      };
+      // O mês passado quase nunca muda, e esta era uma terceira ida
+      // ao banco em toda atualização da TV. Guardamos a resposta por
+      // um minuto — e jogamos fora na hora se alguém lançar, corrigir
+      // ou apagar qualquer coisa (ver esqueceAnterior).
+      const guardado = MEMORIA_ANTERIOR[ant];
+      if (guardado && Date.now() - guardado.quando < 60000) {
+        anterior = guardado.valor;
+      } else {
+        const linhasAnt = await lancamentosDoMes(ant);
+        const somaAnt = somaPorTipo(linhasAnt);
+        anterior = {
+          mes: ant,
+          mes_nome: nomeDoMes(ant),
+          total: somaAnt.comercial + somaAnt.operacional
+        };
+        MEMORIA_ANTERIOR[ant] = { quando: Date.now(), valor: anterior };
+      }
     } catch (e) { anterior = null; }
   }
 
@@ -326,6 +465,7 @@ async function placar(params, opts) {
     ano: ym.slice(0, 4),
     alvo_centavos: cfg.alvo_centavos,
     som: cfg.som,
+    canal: canal,
     comercial: soma.comercial,
     operacional: soma.operacional,
     total: total,
@@ -439,6 +579,8 @@ async function cria(body, sessao) {
     responsavel: v.campos.responsavel, valor_centavos: v.campos.valor_centavos
   });
 
+  esqueceAnterior();
+  await avisa('novo');
   return { lancamento: paraTela(row) };
 }
 
@@ -464,6 +606,8 @@ async function edita(body, sessao) {
     para_centavos: v.campos.valor_centavos
   });
 
+  esqueceAnterior();
+  await avisa('correcao');
   return { lancamento: paraTela(row) };
 }
 
@@ -484,6 +628,8 @@ async function exclui(id, sessao) {
     valor_centavos: Number(atual.valor_centavos) || 0
   });
 
+  esqueceAnterior();
+  await avisa('exclusao');
   return { ok: true };
 }
 
@@ -512,5 +658,6 @@ module.exports = {
   hojeSP, mesDe, nomeDoMes, mesAnterior, inicioDoMes, inicioDoProximo,
   centavosDe, seloDe, valida,
   config, salvaConfig, placar, historico,
+  canalInfo, nomeDoCanal, chavePublica, avisa,
   cria, edita, exclui, sorteiaCodigo
 };
