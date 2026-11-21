@@ -295,7 +295,11 @@ const DB = {
   // inventa participante nem lead, senao o teste comeca contando
   // numero que ninguem cadastrou.
   sim_participantes: [],
-  sim_leads: []
+  sim_leads: [],
+
+  // META EM TEMPO REAL — nasce vazia de proposito. Placar que
+  // comeca com dinheiro que ninguem lancou mente para a equipe.
+  meta_lancamentos: []
 };
 
 /* ---------------- defaults por tabela ---------------- */
@@ -340,6 +344,11 @@ const DEFAULTS = {
     return { id: uuid(), contato: null, cidade: null, cnpj: null, nicho: null,
       agendado: false, agendado_em: null, comparecimento: 'aguardando',
       observacoes: null, qualificacao: 'pendente', excluido_em: null,
+      created_at: agora(), updated_at: agora() };
+  },
+  meta_lancamentos: function () {
+    return { id: uuid(), tipo: 'comercial', servico: null, observacao: null,
+      user_id: null, user_nome: null, excluido_em: null,
       created_at: agora(), updated_at: agora() };
   }
 };
