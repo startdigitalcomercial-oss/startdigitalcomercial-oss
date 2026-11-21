@@ -471,6 +471,126 @@ function aplica(rows, params) {
   return out;
 }
 
+/* ---------------- Realtime de mentira ----------------
+   O Supabase Realtime fala WebSocket com um protocolo simples (o
+   "Phoenix"): o cliente manda phx_join para entrar num canal e um
+   heartbeat de tempos em tempos; o servidor responde phx_reply e
+   empurra mensagens "broadcast". Aqui esta o minimo disso, escrito
+   a mao porque o projeto nao tem dependencia nenhuma — nem no
+   espelho de testes.
+
+   Segue a documentacao do protocolo 1.0.0 (JSON em quadros de
+   texto). Se o cliente do placar conversa direito com isto, ele
+   esta mandando as mensagens no formato que a documentacao pede. */
+const RT = { clientes: [], quebrado: false, recusa: false, mudo: false, enviados: [] };
+
+function rtQuadro(texto) {
+  const dados = Buffer.from(texto, 'utf8');
+  let cab;
+  if (dados.length < 126) cab = Buffer.from([0x81, dados.length]);
+  else if (dados.length < 65536) {
+    cab = Buffer.alloc(4); cab[0] = 0x81; cab[1] = 126; cab.writeUInt16BE(dados.length, 2);
+  } else {
+    cab = Buffer.alloc(10); cab[0] = 0x81; cab[1] = 127;
+    cab.writeUInt32BE(0, 2); cab.writeUInt32BE(dados.length, 6);
+  }
+  return Buffer.concat([cab, dados]);
+}
+
+function rtManda(cli, obj) {
+  try { cli.socket.write(rtQuadro(JSON.stringify(obj))); } catch (e) { }
+}
+
+function rtEspalha(topico, evento, payload) {
+  if (RT.mudo) return;
+  RT.clientes.forEach(function (cli) {
+    if (!cli.topicos[topico]) return;
+    rtManda(cli, {
+      topic: topico, event: 'broadcast', ref: null,
+      payload: { type: 'broadcast', event: evento, payload: payload }
+    });
+  });
+}
+
+function rtDerrubaTodos() {
+  RT.clientes.slice().forEach(function (cli) { try { cli.socket.destroy(); } catch (e) { } });
+  RT.clientes = [];
+}
+
+function rtRecebe(cli, texto) {
+  // "Mudo": a conexao continua aberta, mas ninguem responde. E o que
+  // acontece quando o roteador perde a internet e o wi-fi segue
+  // ligado — o pior tipo de queda, porque nada avisa.
+  if (RT.mudo) return;
+  let m;
+  try { m = JSON.parse(texto); } catch (e) { return; }
+  if (m.event === 'heartbeat' && m.topic === 'phoenix') {
+    return rtManda(cli, { topic: 'phoenix', event: 'phx_reply', ref: m.ref,
+      payload: { status: 'ok', response: {} } });
+  }
+  if (m.event === 'phx_join') {
+    // O canal de verdade exige o prefixo "realtime:" e a configuracao.
+    // O espelho exige tambem, senao um cliente errado passaria aqui
+    // e quebraria la.
+    const certo = /^realtime:.+/.test(String(m.topic || '')) &&
+      m.payload && m.payload.config && m.ref && m.join_ref;
+    if (!certo) {
+      return rtManda(cli, { topic: m.topic, event: 'phx_reply', ref: m.ref,
+        payload: { status: 'error', response: { reason: 'join mal formado' } } });
+    }
+    cli.topicos[m.topic] = true;
+    return rtManda(cli, { topic: m.topic, event: 'phx_reply', ref: m.ref, join_ref: m.join_ref,
+      payload: { status: 'ok', response: { postgres_changes: [] } } });
+  }
+  if (m.event === 'phx_leave') { delete cli.topicos[m.topic]; }
+}
+
+function rtLiga(req, socket) {
+  const url = new URL(req.url, 'http://localhost');
+  const chave = req.headers['sec-websocket-key'];
+  if (url.pathname !== '/realtime/v1/websocket' || !chave || RT.recusa ||
+      !url.searchParams.get('apikey')) {
+    socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
+    return;
+  }
+  const aceite = crypto.createHash('sha1')
+    .update(chave + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
+  socket.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\n' +
+    'Connection: Upgrade\r\nSec-WebSocket-Accept: ' + aceite + '\r\n\r\n');
+
+  const cli = { socket: socket, topicos: {}, resto: Buffer.alloc(0) };
+  RT.clientes.push(cli);
+  const sai = function () { RT.clientes = RT.clientes.filter(function (x) { return x !== cli; }); };
+  socket.on('close', sai);
+  socket.on('error', sai);
+
+  socket.on('data', function (pedaco) {
+    cli.resto = Buffer.concat([cli.resto, pedaco]);
+    // Um quadro pode chegar em pedacos, e varios podem chegar juntos.
+    for (;;) {
+      const b = cli.resto;
+      if (b.length < 2) return;
+      const op = b[0] & 0x0f;
+      const mascarado = (b[1] & 0x80) !== 0;
+      let tam = b[1] & 0x7f, pos = 2;
+      if (tam === 126) { if (b.length < 4) return; tam = b.readUInt16BE(2); pos = 4; }
+      else if (tam === 127) { if (b.length < 10) return; tam = b.readUInt32BE(6); pos = 10; }
+      const total = pos + (mascarado ? 4 : 0) + tam;
+      if (b.length < total) return;
+      let dados = b.subarray(pos + (mascarado ? 4 : 0), total);
+      if (mascarado) {
+        const masc = b.subarray(pos, pos + 4);
+        dados = Buffer.from(dados);
+        for (let i = 0; i < dados.length; i++) dados[i] ^= masc[i % 4];
+      }
+      cli.resto = b.subarray(total);
+      if (op === 0x8) { try { socket.end(); } catch (e) { } sai(); return; }
+      if (op === 0x9) { try { socket.write(Buffer.from([0x8a, 0])); } catch (e) { } continue; }
+      if (op === 0x1) rtRecebe(cli, dados.toString('utf8'));
+    }
+  });
+}
+
 /* ---------------- servidor ---------------- */
 const server = http.createServer(function (req, res) {
   const url = new URL(req.url, 'http://localhost');
@@ -481,6 +601,40 @@ const server = http.createServer(function (req, res) {
     Object.keys(headers || {}).forEach(function (h) { res.setHeader(h, headers[h]); });
     res.end(JSON.stringify(data));
   };
+  // ---------- Realtime: o grito "mudou!" ----------
+  // O servidor de verdade recebe este POST e repassa a mensagem para
+  // quem estiver ouvindo o canal por WebSocket. O espelho faz igual.
+  if (url.pathname === '/realtime/v1/api/broadcast' && req.method === 'POST') {
+    let corpo = '';
+    req.on('data', function (c) { corpo += c; });
+    req.on('end', function () {
+      // Chave de teste: simula o canal recusando o aviso, para provar
+      // que uma venda NAO deixa de ser gravada por causa disso.
+      if (RT.quebrado) return responder(500, { message: 'canal fora do ar (simulado)' });
+      let dados = {};
+      try { dados = JSON.parse(corpo || '{}'); } catch (e) { }
+      (dados.messages || []).forEach(function (msg) {
+        RT.enviados.push({ topic: msg.topic, event: msg.event, payload: msg.payload });
+        rtEspalha('realtime:' + msg.topic, msg.event, msg.payload);
+      });
+      responder(202, {});
+    });
+    return;
+  }
+  // Botoes de teste do canal (so existem no espelho).
+  if (url.pathname === '/realtime/v1/_teste') {
+    const q = url.searchParams;
+    if (q.get('quebra') !== null) RT.quebrado = q.get('quebra') === '1';
+    if (q.get('recusa') !== null) RT.recusa = q.get('recusa') === '1';
+    if (q.get('mudo') !== null) RT.mudo = q.get('mudo') === '1';
+    if (q.get('derruba') === '1') rtDerrubaTodos();
+    if (q.get('limpa') === '1') RT.enviados = [];
+    return responder(200, {
+      conectados: RT.clientes.length, quebrado: RT.quebrado,
+      recusa: RT.recusa, enviados: RT.enviados
+    });
+  }
+
   // ---------- Storage (curriculos) ----------
   // O espelho guarda o arquivo em memoria so para o teste conferir que
   // ele chegou inteiro e que o link temporario e gerado.
@@ -630,5 +784,7 @@ const server = http.createServer(function (req, res) {
     return responder(405, { message: 'metodo nao suportado' });
   });
 });
+
+server.on('upgrade', function (req, socket) { rtLiga(req, socket); });
 
 server.listen(54321, function () { console.log('mock supabase em http://127.0.0.1:54321'); });

@@ -36,14 +36,23 @@
       do ar e pesa zero byte. São umas quarenta linhas de código em
       vez de 40 KB de download.
 
-   4) O RITMO DAS PERGUNTAS.
-      A TV pergunta "mudou algo?" o dia inteiro. Perguntar a cada
-      segundo seria desperdício; a cada minuto não pareceria ao
-      vivo. Então o ritmo é elástico: 4 segundos quando a casa está
-      quente, afrouxando até 30 quando nada acontece há tempo, e de
-      volta para 4 no instante em que algo muda. Aba escondida
-      pergunta de minuto em minuto. Perto de 95% das perguntas são
-      respondidas com "igual" — algumas dezenas de bytes.
+   4) A TV NÃO PERGUNTA MAIS: ELA ESCUTA.
+      Antes, a televisão perguntava "mudou algo?" de tempos em
+      tempos, e uma venda esperava a próxima pergunta — dez segundos
+      na média, trinta no pior caso. Agora ela fica ouvindo um canal
+      (WebSocket do Supabase Realtime, sem biblioteca nenhuma), e
+      quando alguém lança um valor o servidor grita "mudou!". A TV
+      ouve e busca o placar na mesma hora: meio segundo, na prática.
+
+      No canal não passa dinheiro. Só o grito. Os números continuam
+      vindo pela porta de sempre, com o código da TV.
+
+      As perguntas periódicas não morreram: viraram REDE DE
+      SEGURANÇA. Com o canal ligado, a TV confere a cada 25 segundos
+      só por garantia. Se o canal cair, ela volta a perguntar
+      sozinha, a cada 2 segundos enquanto a casa está quente — e
+      continua tentando religar o canal em segundo plano. O raiozinho
+      ao lado de "Ao vivo" mostra em qual dos dois modos ela está.
    ============================================================ */
 'use strict';
 
@@ -338,7 +347,8 @@ var MetaPlacar = (function () {
       '<div class="mt-topo">' +
         '<div class="mt-titulo">Meta <b>' + esc(d.mes_nome || '') + ' ' + esc(d.ano || '') + '</b></div>' +
         '<div class="mt-acoes">' +
-          '<span class="mt-ao-vivo" id="mt-vivo"><span class="mt-bolha"></span><span id="mt-vivo-txt">Ao vivo</span></span>' +
+          '<span class="mt-ao-vivo" id="mt-vivo"><span class="mt-bolha"></span><span id="mt-vivo-txt">Ao vivo</span>' +
+            '<span class="mt-raio" id="mt-raio" title="Canal instantâneo ligado" hidden>⚡</span></span>' +
           acoes +
         '</div>' +
       '</div>' +
@@ -431,12 +441,19 @@ var MetaPlacar = (function () {
       falhas: 0,
       passo: 0,
       timer: null,
+      perguntando: false,                // tem uma busca em andamento agora?
+      denovo: false,                     // chegou aviso no meio dela: buscar outra vez
       parado: false
     };
 
-    // O ritmo elástico. O índice sobe a cada resposta "igual" e
-    // volta a zero assim que algo muda.
-    var RITMO = [4000, 4000, 6000, 8000, 12000, 20000, 30000];
+    // O RITMO DA REDE DE SEGURANÇA.
+    //
+    // Sem o canal, é este ritmo que manda: 2 segundos quando a casa
+    // está quente, afrouxando até 10 quando nada acontece. (Antes ia
+    // de 4 a 30 — era daí que vinha a espera de dez segundos.)
+    // Com o canal ligado, basta conferir de vez em quando.
+    var RITMO = [2000, 2000, 3000, 4000, 6000, 8000, 10000];
+    var RITMO_COM_CANAL = 25000;
     var RITMO_ESCONDIDO = 60000;
 
     try { estado.som = localStorage.getItem(LS_SOM) === '1'; } catch (e) { }
@@ -562,6 +579,13 @@ var MetaPlacar = (function () {
       var txt = document.getElementById('mt-vivo-txt');
       if (el) el.classList.toggle('caiu', !estado.vivo);
       if (txt) txt.textContent = estado.vivo ? 'Ao vivo' : 'Reconectando…';
+
+      // O raio aparece quando a TV está OUVINDO o canal (atualização
+      // em meio segundo). Sem raio, ela está no modo de perguntas —
+      // funciona igual, só que com alguns segundos de espera. É o
+      // jeito de bater o olho na parede e saber em qual modo está.
+      var raio = document.getElementById('mt-raio');
+      if (raio) raio.hidden = !(estado.vivo && canal.ouvindo);
     }
 
     /* ---------------- celebração ----------------
@@ -604,14 +628,43 @@ var MetaPlacar = (function () {
       }, 5200);
     }
 
-    /* ---------------- o laço de perguntas ---------------- */
+    /* ---------------- o laço de perguntas ----------------
+
+       UMA BUSCA DE CADA VEZ, E NENHUM AVISO PERDIDO.
+
+       O aviso do canal pode chegar enquanto uma busca já está no
+       ar — e essa busca saiu ANTES da venda, então vai voltar com
+       o placar velho. Se o aviso fosse ignorado ("já estou
+       buscando"), a TV mostraria o número antigo até a próxima
+       conferência, 25 segundos depois. Por isso o aviso que chega
+       no meio levanta uma bandeira (denovo), e assim que a busca
+       atual termina sai outra, na hora. */
     async function pergunta() {
       if (estado.parado) return;
+      if (estado.perguntando) { estado.denovo = true; return; }
 
+      estado.perguntando = true;
+      try {
+        await rodada();
+      } finally {
+        estado.perguntando = false;
+        if (estado.denovo && !estado.parado) {
+          estado.denovo = false;
+          if (estado.timer) clearTimeout(estado.timer);
+          estado.timer = setTimeout(pergunta, 0);
+        }
+      }
+    }
+
+    async function rodada() {
       try {
         var d = await buscar(estado.selo);
         estado.falhas = 0;
         if (!estado.vivo) { estado.vivo = true; pintaVivo(); }
+
+        // O endereço do canal vem junto com o placar. Na primeira
+        // resposta a TV liga o ouvido; nas seguintes isto não faz nada.
+        if (d && d.canal) ligaCanal(d.canal);
 
         if (d && d.igual) {
           // Nada mudou. Afrouxa o ritmo e vai embora.
@@ -667,9 +720,180 @@ var MetaPlacar = (function () {
       var ms;
       if (falhou) ms = Math.min(30000, 2000 * Math.pow(1.6, Math.min(estado.falhas, 8)));
       else if (document.hidden) ms = RITMO_ESCONDIDO;
+      else if (canal.ouvindo) ms = RITMO_COM_CANAL;
       else ms = RITMO[estado.passo];
 
       estado.timer = setTimeout(pergunta, ms);
+    }
+
+    /* ---------------- o canal: ouvir em vez de perguntar ----------------
+
+       WebSocket nativo do navegador falando o protocolo do Supabase
+       Realtime (versão 1.0.0: JSON em quadros de texto). São três
+       mensagens e mais nada:
+
+         phx_join   "quero ouvir este canal"
+         heartbeat  "ainda estou aqui" — a cada 15 segundos, porque
+                    o servidor desliga quem fica 25 calado
+         broadcast  o grito que chega quando uma venda entra
+
+       Tudo aqui é opcional por construção: qualquer falha — canal
+       fora do ar, rede que bloqueia WebSocket, navegador de TV
+       antigo — só faz a tela continuar no modo de perguntas. Nenhum
+       caminho deste bloco consegue parar o placar. */
+    var canal = {
+      ws: null,
+      info: null,
+      ouvindo: false,        // entrou no canal e está recebendo
+      tentativas: 0,
+      religar: null,
+      batida: null,
+      semResposta: false,    // a última batida ficou sem resposta?
+      ref: 0
+    };
+
+    function ligaCanal(info) {
+      if (estado.parado || !info || !info.url || !info.canal) return;
+      if (typeof WebSocket === 'undefined') return;
+      canal.info = info;
+      if (canal.ws || canal.religar) return;       // já ligado, ligando ou na fila
+
+      var ws;
+      try {
+        ws = new WebSocket(info.url + '?apikey=' + encodeURIComponent(info.chave || '') + '&vsn=1.0.0');
+      } catch (e) { return religaDepois(); }
+      canal.ws = ws;
+
+      var topico = 'realtime:' + info.canal;
+      var manda = function (obj) {
+        try { if (ws.readyState === 1) ws.send(JSON.stringify(obj)); } catch (e) { }
+      };
+
+      ws.onopen = function () {
+        manda({
+          topic: topico, event: 'phx_join',
+          payload: { config: {
+            broadcast: { ack: false, self: false },
+            presence: { enabled: false },
+            private: false
+          } },
+          ref: String(++canal.ref), join_ref: '1'
+        });
+
+        // A BATIDA DO CORAÇÃO.
+        //
+        // O servidor desliga quem fica 25 segundos calado, então a TV
+        // diz "estou aqui" a cada 15. Mas a batida serve também ao
+        // contrário: se a RESPOSTA não voltar em 5 segundos, a
+        // conexão morreu sem avisar — acontece quando o roteador
+        // perde a internet mas o wi-fi continua ligado, e nesse caso
+        // o navegador não percebe sozinho. A TV então fecha o canal
+        // por conta própria e a rede de segurança assume.
+        canal.semResposta = false;
+        canal.batida = setInterval(function () {
+          canal.semResposta = true;
+          manda({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: String(++canal.ref) });
+          setTimeout(function () {
+            if (canal.ws === ws && canal.semResposta) { try { ws.close(); } catch (e) { } }
+          }, 5000);
+        }, 15000);
+      };
+
+      ws.onmessage = function (ev) {
+        // Quadro que não é texto só pode ser um aviso em formato
+        // binário. Na dúvida, trata como aviso: buscar à toa custa
+        // uma resposta "igual" de poucos bytes.
+        if (typeof ev.data !== 'string') return avisado();
+
+        var m;
+        try { m = JSON.parse(ev.data); } catch (e) { return; }
+
+        if (m.event === 'phx_reply') {
+          canal.semResposta = false;
+          if (m.topic === topico && m.payload) {
+            if (m.payload.status === 'ok' && !canal.ouvindo) {
+              canal.ouvindo = true;
+              canal.tentativas = 0;
+              pintaVivo();
+              // Uma venda pode ter entrado enquanto o canal ligava.
+              // Conferir agora fecha essa janela.
+              avisado();
+            } else if (m.payload.status === 'error') {
+              try { ws.close(); } catch (e) { }
+            }
+          }
+          return;
+        }
+        if (m.event === 'broadcast' && m.topic === topico) return avisado();
+        if (m.event === 'phx_error' || m.event === 'phx_close') { try { ws.close(); } catch (e) { } }
+      };
+
+      ws.onerror = function () { try { ws.close(); } catch (e) { } };
+
+      ws.onclose = function () {
+        if (canal.ws !== ws) return;               // já foi trocado por outro
+        if (canal.batida) { clearInterval(canal.batida); canal.batida = null; }
+        canal.ws = null;
+        var estava = canal.ouvindo;
+        canal.ouvindo = false;
+        pintaVivo();
+        if (estado.parado) return;
+        // Caiu: a rede de segurança assume no ritmo rápido, já.
+        if (estava) { estado.passo = 0; agenda(); }
+        religaDepois();
+      };
+    }
+
+    // Religa esperando cada vez mais: 1s, 2s, 4s… até 30. Sem o
+    // aumento, um canal fora do ar viraria tempestade de tentativas;
+    // sem o teto, uma queda longa deixaria a TV horas sem tentar.
+    function religaDepois() {
+      if (estado.parado || canal.religar) return;
+      var ms = Math.min(30000, 1000 * Math.pow(2, Math.min(canal.tentativas, 5)));
+      canal.tentativas++;
+      canal.religar = setTimeout(function () {
+        canal.religar = null;
+        ligaCanal(canal.info);
+      }, ms);
+    }
+
+    // Chegou o grito: busca agora. Se já há uma busca no ar, a
+    // bandeira "denovo" garante outra logo em seguida.
+    function avisado() {
+      if (estado.parado) return;
+      estado.passo = 0;
+      if (estado.timer) clearTimeout(estado.timer);
+      pergunta();
+    }
+
+    // O navegador avisa quando a máquina perde ou recupera a rede.
+    // Aproveitar esses dois avisos faz a TV admitir a queda em poucos
+    // segundos, em vez de esperar a próxima batida do coração.
+    function aoCair() {
+      if (estado.parado) return;
+      var ws = canal.ws;
+      if (ws) { try { ws.close(); } catch (e) { } }
+      avisado();                 // a busca vai falhar — e é isso que acende o "Reconectando…"
+    }
+    function aoVoltarRede() {
+      if (estado.parado) return;
+      canal.tentativas = 0;
+      if (canal.religar) { clearTimeout(canal.religar); canal.religar = null; }
+      ligaCanal(canal.info);
+      avisado();
+    }
+    window.addEventListener('offline', aoCair);
+    window.addEventListener('online', aoVoltarRede);
+
+    function desligaCanal() {
+      window.removeEventListener('offline', aoCair);
+      window.removeEventListener('online', aoVoltarRede);
+      if (canal.religar) { clearTimeout(canal.religar); canal.religar = null; }
+      if (canal.batida) { clearInterval(canal.batida); canal.batida = null; }
+      var ws = canal.ws;
+      canal.ws = null;
+      canal.ouvindo = false;
+      if (ws) { try { ws.onclose = null; ws.close(); } catch (e) { } }
     }
 
     // Voltar para a aba deve mostrar o número certo na hora, não no
@@ -679,6 +903,14 @@ var MetaPlacar = (function () {
       estado.passo = 0;
       if (estado.timer) clearTimeout(estado.timer);
       estado.timer = setTimeout(pergunta, 150);
+      // Aba escondida tem os relógios freados pelo navegador, e o
+      // canal pode ter caído nesse meio-tempo. Voltou: religa já,
+      // sem esperar a vez na fila.
+      if (!canal.ws && canal.info) {
+        canal.tentativas = 0;
+        if (canal.religar) { clearTimeout(canal.religar); canal.religar = null; }
+        ligaCanal(canal.info);
+      }
     }
     document.addEventListener('visibilitychange', aoVoltar);
 
@@ -706,10 +938,12 @@ var MetaPlacar = (function () {
       para: function () {
         estado.parado = true;
         if (estado.timer) clearTimeout(estado.timer);
+        desligaCanal();
         document.removeEventListener('visibilitychange', aoVoltar);
         if (opts.pop) opts.pop.classList.remove('on');
       },
-      estado: estado
+      estado: estado,
+      canal: canal
     };
 
     pergunta();

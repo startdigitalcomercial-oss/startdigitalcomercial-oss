@@ -381,6 +381,129 @@ function guarda(r) {
     alvoZero.ok === true && alvoZero.alvo_centavos === 0, alvoZero);
 
   /* ============================================================
+     O AVISO INSTANTANEO — a TV escuta em vez de perguntar
+     ============================================================ */
+  console.log('\n-- o aviso instantaneo (meio segundo em vez de dez) --');
+  const RT = 'http://127.0.0.1:54321/realtime/v1/_teste';
+  await fetch(RT + '?quebra=0&recusa=0&limpa=1');
+
+  const comCanal = await mt('mt_placar');
+  check('o placar entrega o endereco do canal',
+    comCanal.canal && /^wss?:\/\/.+\/realtime\/v1\/websocket$/.test(comCanal.canal.url || ''),
+    comCanal.canal);
+  check('o nome do canal nao e adivinhavel (vem do segredo do sistema)',
+    /^meta-[0-9a-f]{24}$/.test((comCanal.canal || {}).canal || ''), (comCanal.canal || {}).canal);
+  check('a resposta curta ("igual") tambem leva o canal',
+    !!(await mt('mt_placar', null, { selo: comCanal.selo })).canal);
+
+  // Ouve o canal exatamente como o navegador da TV vai ouvir.
+  const ouvido = new WebSocket(comCanal.canal.url + '?apikey=' + comCanal.canal.chave + '&vsn=1.0.0');
+  await new Promise(function (okk, no) { ouvido.onopen = okk; ouvido.onerror = function () { no(new Error('canal nao abriu')); }; });
+  const ouvidas = [];
+  ouvido.onmessage = function (ev) { ouvidas.push({ q: Date.now(), m: JSON.parse(ev.data) }); };
+  ouvido.send(JSON.stringify({
+    topic: 'realtime:' + comCanal.canal.canal, event: 'phx_join',
+    payload: { config: { broadcast: { ack: false, self: false }, presence: { enabled: false }, private: false } },
+    ref: '1', join_ref: '1'
+  }));
+  await new Promise(function (r) { setTimeout(r, 150); });
+  check('o canal aceita a entrada',
+    ouvidas.length === 1 && ouvidas[0].m.event === 'phx_reply' && ouvidas[0].m.payload.status === 'ok',
+    ouvidas[0] && ouvidas[0].m);
+
+  const avisosDe = function () { return ouvidas.filter(function (x) { return x.m.event === 'broadcast'; }); };
+  const espera = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+
+  const t0Aviso = Date.now();
+  const comAviso = guarda(await lanca('comercial', 'Aviso ' + SUF, 'Cliente Sigiloso SA', '7.777,77',
+    { servico: 'Servico Secreto', observacao: 'obs confidencial' }));
+  const tRespondeu = Date.now();
+  await espera(250);
+  check('lancar um valor dispara o aviso', avisosDe().length === 1, avisosDe().length);
+  const oAviso = avisosDe()[0] || { q: 0, m: { payload: {} } };
+  check('o aviso chega em menos de meio segundo depois do clique',
+    oAviso.q - t0Aviso < 500, (oAviso.q - t0Aviso) + 'ms');
+  check('o aviso sai ANTES de o lancamento terminar de responder (a TV nao espera quem lancou)',
+    comAviso.ok === true && oAviso.q > 0 && oAviso.q <= tRespondeu,
+    { aviso: oAviso.q - t0Aviso, resposta: tRespondeu - t0Aviso });
+
+  // O CANAL NAO CARREGA DINHEIRO. Esta e a conferencia que deixa a
+  // chave publica ser publica: quem escutar escondido nao descobre
+  // nada alem de "houve uma mudanca".
+  const cru = JSON.stringify(oAviso.m);
+  check('no canal NAO viaja o valor', cru.indexOf('7777') < 0 && cru.indexOf('7.777') < 0, cru);
+  check('no canal NAO viaja o nome do cliente', cru.indexOf('Sigiloso') < 0, cru);
+  check('no canal NAO viaja o responsavel', cru.indexOf('Aviso ' + SUF) < 0, cru);
+  check('no canal NAO viaja servico nem observacao',
+    cru.indexOf('Secreto') < 0 && cru.indexOf('confidencial') < 0, cru);
+  check('o aviso leva so o motivo generico e a hora',
+    JSON.stringify(Object.keys(oAviso.m.payload.payload || {}).sort()) === '["o","t"]',
+    oAviso.m.payload);
+
+  await mt('mt_salvar', { id: comAviso.lancamento.id, tipo: 'comercial',
+    responsavel: 'Aviso ' + SUF, cliente: 'Cliente Sigiloso SA', valor: '7.000' });
+  await espera(250);
+  check('corrigir um valor tambem avisa', avisosDe().length === 2, avisosDe().length);
+  await mt('mt_excluir', { id: comAviso.lancamento.id });
+  await espera(250);
+  check('apagar um valor tambem avisa', avisosDe().length === 3, avisosDe().length);
+  await mt('mt_config', { alvo: '0' });
+  await espera(250);
+  check('mudar o alvo ou o som tambem avisa (a TV precisa saber)', avisosDe().length === 4, avisosDe().length);
+
+  const antesBarrado = avisosDe().length;
+  await lanca('comercial', 'X', 'Y', '-5');
+  await espera(250);
+  check('lancamento barrado NAO avisa (nada mudou)', avisosDe().length === antesBarrado, avisosDe().length);
+  await mt('mt_placar');
+  await espera(150);
+  check('so olhar o placar NAO avisa', avisosDe().length === antesBarrado, avisosDe().length);
+
+  // SE O CANAL ESTIVER FORA DO AR, A VENDA ENTRA DO MESMO JEITO.
+  await fetch(RT + '?quebra=1');
+  const semCanal = guarda(await lanca('comercial', 'SemCanal ' + SUF, 'Cliente Sem Canal', '1.234'));
+  check('com o canal fora do ar, o lancamento e gravado normalmente',
+    semCanal.ok === true && semCanal.lancamento.valor_centavos === 123400, semCanal.error);
+  check('e o placar soma esse valor (a TV descobre pela conferencia periodica)',
+    semCanal.placar && semCanal.placar.total >= 123400, semCanal.placar && semCanal.placar.total);
+  await fetch(RT + '?quebra=0');
+  await mt('mt_excluir', { id: semCanal.lancamento.id });
+  ouvido.close();
+
+  // A CHAVE QUE VAI PARA O NAVEGADOR — conferida direto na biblioteca,
+  // trocando o ambiente, porque e o tipo de coisa que nao pode
+  // depender de olho.
+  const libCanal = require('../api/_lib/meta.js');
+  const guardaEnv = {};
+  ['SUPABASE_URL', 'SUPABASE_SECRET_KEY', 'SUPABASE_SERVICE_ROLE_KEY',
+    'SUPABASE_PUBLISHABLE_KEY', 'SUPABASE_ANON_KEY'].forEach(function (k) { guardaEnv[k] = process.env[k]; delete process.env[k]; });
+
+  process.env.SUPABASE_URL = 'https://jurryyrdwgcasvvficty.supabase.co';
+  process.env.SUPABASE_SECRET_KEY = 'sb_secret_ESTA_NUNCA_PODE_SAIR';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'eyJ.service_role.NUNCA';
+  const emProd = libCanal.canalInfo();
+  check('em producao o canal aponta para o projeto, em wss (criptografado)',
+    emProd && emProd.url === 'wss://jurryyrdwgcasvvficty.supabase.co/realtime/v1/websocket', emProd);
+  check('a chave entregue ao navegador e a PUBLICA (sb_publishable_)',
+    emProd && /^sb_publishable_/.test(emProd.chave), emProd && emProd.chave);
+  check('a chave SECRETA nunca aparece no que vai para o navegador',
+    JSON.stringify(emProd).indexOf('sb_secret') < 0 && JSON.stringify(emProd).indexOf('service_role') < 0);
+
+  process.env.SUPABASE_URL = 'https://projeto-que-nao-conheco.supabase.co';
+  check('projeto desconhecido sem chave publica = sem canal (e nao a chave secreta no lugar)',
+    libCanal.canalInfo() === null, libCanal.canalInfo());
+  process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_do_ambiente';
+  check('se o ambiente trouxer uma chave publica, ela e usada',
+    (libCanal.canalInfo() || {}).chave === 'sb_publishable_do_ambiente');
+  delete process.env.SUPABASE_URL;
+  check('sem endereco do banco = sem canal, sem erro', libCanal.canalInfo() === null);
+  check('avisar sem canal configurado devolve falso em vez de explodir',
+    (await libCanal.avisa('teste')) === false);
+  Object.keys(guardaEnv).forEach(function (k) {
+    if (guardaEnv[k] === undefined) delete process.env[k]; else process.env[k] = guardaEnv[k];
+  });
+
+  /* ============================================================
      O SOM DA VENDA
      ============================================================ */
   console.log('\n-- o som da venda --');
@@ -516,7 +639,7 @@ function guarda(r) {
   check('1.234.567,89 -> 123456789', meta.centavosDe('1.234.567,89') === 123456789);
   check('3,500.00 (jeito americano) -> 350000', meta.centavosDe('3,500.00') === 350000);
   check('espaco invisivel colado no numero nao estraga',
-    meta.centavosDe(' 3.500,00 ') === 350000);
+    meta.centavosDe('\u00a03.500,00\u00a0') === 350000);
   check('letras dao null, nao zero', meta.centavosDe('abc') === null);
   check('vazio da null, nao zero', meta.centavosDe('') === null);
   check('null continua null', meta.centavosDe(null) === null);
