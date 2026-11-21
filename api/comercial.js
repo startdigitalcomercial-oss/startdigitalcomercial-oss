@@ -28,6 +28,7 @@ const db = require('./_lib/db');
 const u = require('./_lib/util');
 const porta = require('./_lib/porta');
 const perms = require('./_lib/perms');
+const meta = require('./_lib/meta');
 
 const FUNCOES = ['sdr', 'closer'];
 const FUNCOES_NOME = { sdr: 'SDR', closer: 'Closer' };
@@ -254,8 +255,114 @@ module.exports = async function handler(req, res) {
   const params = Object.fromEntries(url.searchParams.entries());
 
   try {
+    // ---------------------------------------------- A TELEVISÃO
+    // Esta é a ÚNICA porta deste arquivo que não pede login, e é de
+    // propósito: a TV da sala não tem teclado nem pessoa para digitar
+    // senha. Ela entra com um código secreto e longo, sorteado no
+    // Gerenciador, e só consegue LER o placar.
+    //
+    // Fica aqui, antes de tudo, para deixar claro que é uma exceção
+    // consciente — e logo abaixo o código é conferido antes de
+    // qualquer acesso ao banco.
+    if (action === 'mt_tv') {
+      const codigo = String(params.tv || '');
+      const cfg = await meta.config();
+      if (!cfg.tv_codigo || !codigo || !u.safeEqual(codigo, cfg.tv_codigo)) {
+        return u.fail(res, 403, 'Esse link da TV não vale mais. Gere um novo no Gerenciador de Meta.');
+      }
+      const dados = await meta.placar(params, { selo: params.selo || '' });
+      return u.ok(res, dados);
+    }
+
     const aberta = await porta.abrir(req, res, action);
     if (!aberta) return;
+
+    // ---------------------------------------------- META EM TEMPO REAL
+    // A Meta vem antes do crachá da simulação porque não tem nada a
+    // ver com ela: quem lança valor no placar é Dono ou RH, e não
+    // precisa estar cadastrado como SDR para isso. Quem pode o quê já
+    // foi decidido na porta, pelo perms.js.
+    if (action.indexOf('mt_') === 0) {
+      // Quem entrou pela senha mestra nao e uma PESSOA, e um modo de
+      // emergencia. Sugerir "Senha mestra" como responsavel pela venda
+      // poria isso no historico e na televisao — entao, nesse caso, o
+      // campo nasce vazio e quem lanca escreve o nome de quem vendeu.
+      const euNome = (aberta.session && aberta.session.mestra)
+        ? '' : ((aberta.session && aberta.session.nome) || '');
+
+      if (action === 'mt_placar') {
+        const dados = await meta.placar(params, { selo: params.selo || '' });
+        const cfg = await meta.config();
+        return u.ok(res, Object.assign(dados, {
+          tv_codigo: cfg.tv_codigo || '',
+          pode_lancar: perms.permite(aberta.papel, 'mt_salvar'),
+          eu_nome: euNome
+        }));
+      }
+
+      if (action === 'mt_lista') {
+        const dados = await meta.historico(params);
+        const cfg = await meta.config();
+        return u.ok(res, Object.assign(dados, {
+          alvo_centavos: cfg.alvo_centavos,
+          tv_codigo: cfg.tv_codigo || '',
+          tv_criado_em: cfg.tv_criado_em || null,
+          pode_lancar: perms.permite(aberta.papel, 'mt_salvar'),
+          eu_nome: euNome,
+          tipos: meta.TIPOS, tipos_nome: meta.TIPOS_NOME
+        }));
+      }
+
+      if (action === 'mt_salvar') {
+        if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
+        const body = await u.readBody(req);
+        const r = body.id ? await meta.edita(body, aberta.session)
+                          : await meta.cria(body, aberta.session);
+        if (r.erro) return u.fail(res, r.status || 400, r.erro);
+        // Devolve o placar já somado: quem lançou vê o número novo na
+        // hora, sem esperar a próxima pergunta ao servidor.
+        const dados = await meta.placar({ mes: String(r.lancamento.created_at).slice(0, 7) }, {});
+        return u.ok(res, { lancamento: r.lancamento, placar: dados });
+      }
+
+      if (action === 'mt_excluir') {
+        if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
+        const body = await u.readBody(req);
+        const r = await meta.exclui(body.id, aberta.session);
+        if (r.erro) return u.fail(res, r.status || 400, r.erro);
+        return u.ok(res, { placar: await meta.placar(params, {}) });
+      }
+
+      if (action === 'mt_config') {
+        if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
+        const body = await u.readBody(req);
+        const patch = {};
+
+        if (body.alvo !== undefined) {
+          const c = meta.centavosDe(body.alvo);
+          if (c === null || c < 0) return u.fail(res, 400, 'Não entendi o alvo da meta. Escreva assim: 200.000,00');
+          if (c > meta.TETO_CENTAVOS) return u.fail(res, 400, 'Esse alvo passa de R$ 10 milhões. Confira os zeros.');
+          patch.alvo_centavos = c;
+        }
+        // Gerar código novo mata o link antigo na hora: é assim que se
+        // "tira o acesso da TV" sem precisar de tabela de sessões.
+        if (body.novo_codigo === true) {
+          patch.tv_codigo = meta.sorteiaCodigo();
+          patch.tv_criado_em = new Date().toISOString();
+        }
+        if (!Object.keys(patch).length) return u.fail(res, 400, 'Nada para mudar.');
+
+        const cfg = await meta.salvaConfig(patch);
+        return u.ok(res, {
+          alvo_centavos: cfg.alvo_centavos,
+          tv_codigo: cfg.tv_codigo || '',
+          tv_criado_em: cfg.tv_criado_em || null
+        });
+      }
+
+      return u.fail(res, 404, 'Acao desconhecida: ' + action);
+    }
+
     const c = await cracha(aberta);
 
     // Quem não gerencia e não é participante não tem o que fazer aqui.
