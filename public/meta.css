@@ -526,3 +526,8 @@
   line-height: 1.5;
   color: var(--label-2);
 }
+
+/* O raio do canal instantâneo: pequeno, ao lado de "Ao vivo".
+   O atributo hidden manda; esta regra só cuida do tamanho. */
+.mt-raio { font-size: .95em; line-height: 1; margin-left: -2px; }
+.mt-raio[hidden] { display: none; }
