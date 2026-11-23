@@ -46,6 +46,7 @@ const ROTAS = {
   '/portal': '/portal.html',
   '/integracao': '/portal.html',
   '/entrar': '/entrar.html',
+  '/convite': '/convite.html',
   '/criar-senha': '/criar-senha.html',
   '/criar-senha-painel': '/criar-senha-painel.html',
   '/equipe': '/equipe.html',
@@ -107,6 +108,10 @@ const server = http.createServer(async function (req, res) {
     return;
   }
 
+  // /convite/colaborador/CODIGO — na Vercel e um rewrite com parametro
+  // (vercel.json); aqui o espelho faz o mesmo, senao a pagina do
+  // convite so funcionaria em producao.
+  if (/^\/convite\/colaborador\/[A-Za-z0-9_-]+\/?$/.test(pathname)) pathname = '/convite.html';
   if (ROTAS[pathname]) pathname = ROTAS[pathname];
   if (pathname === '/') pathname = '/index.html';
 
