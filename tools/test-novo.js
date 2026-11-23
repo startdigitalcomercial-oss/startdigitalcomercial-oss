@@ -2081,31 +2081,23 @@ await fetch('http://127.0.0.1:54321/rest/v1/panel_users', { method: 'DELETE' })
   }
 
   console.log('\n5c) SEGURANCA — trava de senha e fim de sessao');
-  // a dica da senha na tela de login
+  // A tela de login NAO recebe mais senha nenhuma do servidor.
+  // Na fase de testes esta rota devolvia a senha mestra para a tela
+  // mostrar; a fase de testes acabou. A conferencia e sobre a resposta
+  // inteira, e nao sobre um campo: senha que mudasse de nome de campo
+  // continuaria vazando sem este teste perceber.
   const dica = await (await fetch(BASE + '/api/admin?action=dica_senha')).json();
-  check('dica da senha responde sem precisar de login', dica.ok === true, dica.error);
-  check('quando mostra a dica, vem a senha junto',
-    dica.mostrar === false || (dica.mostrar === true && !!dica.senha), dica);
-  if (dica.mostrar === true) {
-    check('a senha mostrada e a que realmente entra', dica.senha === SENHA_PAINEL);
-  }
-
-  // A chave liga/desliga de verdade. Testo a funcao que o servidor usa,
-  // nao uma copia dela — copia de logica em teste so serve para mentir.
+  check('a tela de login consegue perguntar o que precisa sem login', dica.ok === true, dica.error);
+  check('a resposta NAO traz campo de senha', dica.senha === undefined && dica.mostrar === undefined, Object.keys(dica));
+  check('a senha do painel nao aparece em lugar nenhum da resposta',
+    JSON.stringify(dica).indexOf(SENHA_PAINEL) < 0);
   {
     const guardado = process.env.MOSTRAR_SENHA_LOGIN;
-    delete require.cache[require.resolve('../api/_lib/util.js')];
-    const util = require('../api/_lib/util.js');
-    delete process.env.MOSTRAR_SENHA_LOGIN;
-    check('sem configurar nada, a senha aparece', util.mostrarSenhaNoLogin() === true);
-    ['false', 'FALSE', ' nao ', '0', 'off', 'no'].forEach(function (v) {
-      process.env.MOSTRAR_SENHA_LOGIN = v;
-      check('"' + v.trim() + '" esconde a senha', util.mostrarSenhaNoLogin() === false);
-    });
-    ['true', 'sim', '1'].forEach(function (v) {
-      process.env.MOSTRAR_SENHA_LOGIN = v;
-      check('"' + v + '" mantem a senha na tela', util.mostrarSenhaNoLogin() === true);
-    });
+    process.env.MOSTRAR_SENHA_LOGIN = 'true';
+    const comChave = await (await fetch(BASE + '/api/admin?action=dica_senha')).json();
+    check('nem uma variavel de ambiente antiga consegue religar isso (a funcao nao existe mais)',
+      require('../api/_lib/util.js').mostrarSenhaNoLogin === undefined &&
+      JSON.stringify(comChave).indexOf(SENHA_PAINEL) < 0);
     if (guardado === undefined) delete process.env.MOSTRAR_SENHA_LOGIN;
     else process.env.MOSTRAR_SENHA_LOGIN = guardado;
   }
