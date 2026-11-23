@@ -278,8 +278,8 @@ const DB = {
   lesson_progress: [],
   message_logs: [],
   collaborators: [
-    { id: 'cccc0001-0001-4001-8001-000000000001', token: 'colabtoken000000000001', name: 'Marina Ribeiro', nickname: 'Marina', email: 'marina@startdigital.com.br', phone: '13 99111-2233', phone_digits: '5513991112233', role_title: 'Social Media', area: 'Criacao', active: true, source: 'painel', created_at: agora(), updated_at: agora() },
-    { id: 'cccc0002-0002-4002-8002-000000000002', token: 'colabtoken000000000002', name: 'Diego Ramos', nickname: 'Diego', email: 'diego@startdigital.com.br', phone: '13 99444-5566', phone_digits: '5513994445566', role_title: 'Gestor de Trafego', area: 'Trafego', active: true, source: 'painel', created_at: agora(), updated_at: agora() }
+    { id: 'cccc0001-0001-4001-8001-000000000001', token: 'colabtoken000000000001', name: 'Marina Ribeiro', nickname: 'Marina', cpf: '52998224725', email: 'marina@startdigital.com.br', phone: '13 99111-2233', phone_digits: '5513991112233', role_title: 'Social Media', area: 'Criacao', active: true, source: 'painel', created_at: agora(), updated_at: agora() },
+    { id: 'cccc0002-0002-4002-8002-000000000002', token: 'colabtoken000000000002', name: 'Diego Ramos', nickname: 'Diego', cpf: '11144477735', email: 'diego@startdigital.com.br', phone: '13 99444-5566', phone_digits: '5513994445566', role_title: 'Gestor de Trafego', area: 'Trafego', active: true, source: 'painel', created_at: agora(), updated_at: agora() }
   ],
 
   benefit_vouchers: [
@@ -289,6 +289,7 @@ const DB = {
 
   broadcasts: [],
   panel_users: [],
+  panel_invites: [],
   audit_log: [],
 
   // MODULO COMERCIAL — simulacoes. Nascem vazias: o espelho nao
@@ -335,7 +336,8 @@ const DEFAULTS = {
   prequal_questions: function () { return { id: uuid(), position: 1, required: true, weight: 1, objective: null }; },
   prequal_sessions: function () { return { id: uuid(), channel: 'whatsapp', status: 'aguardando', current_index: 0, answers: [], score: null, recommendation: null, summary: null, job_id: null, video_em: null, respostas_ok: false, last_message_at: null, started_at: agora(), finished_at: null, error: null }; },
   prequal_messages: function () { return { id: seq('prequal_messages'), created_at: agora() }; },
-  panel_users: function () { return { id: uuid(), role: 'leitura', active: true, must_change: true, password_hash: null, password_salt: null, last_login_at: null, created_by: null, created_at: agora(), updated_at: agora() }; },
+  panel_users: function () { return { id: uuid(), role: 'leitura', active: true, must_change: true, password_hash: null, password_salt: null, last_login_at: null, created_by: null, collaborator_id: null, modulos: null, created_at: agora(), updated_at: agora() }; },
+  panel_invites: function () { return { id: uuid(), role: 'rh', modulos: null, anotacao: null, created_by: null, created_by_id: null, created_at: agora(), tentativas: 0, usado_em: null, user_id: null, collaborator_id: null, cancelado_em: null }; },
   audit_log: function () { return { id: seq('audit_log'), detail: {}, created_at: agora() }; },
   broadcasts: function () { return { id: uuid(), total: 0, sent: 0, failed: 0, detail: {}, created_at: agora() }; },
   collaborators: function () { return { id: uuid(), token: uuid().replace(/-/g, ''), active: true, source: 'formulario', work_mode: null, welcomed_at: null, notes: null, accessibility: null, accessibility_detail: null, accessibility_support: null, created_at: agora(), updated_at: agora() }; },
@@ -701,6 +703,10 @@ const server = http.createServer(function (req, res) {
         play_spins: function (r) { return r.client_token ? 'giro|' + r.client_token : null; },
         // um gestor por nome; um cliente do Financeiro em uma carteira so
         op_gestores: function (r) { return 'gestor|' + String(r.nome || '').trim().toLowerCase(); },
+        // ACESSO: um colaborador tem no maximo UM usuario (indice parcial,
+        // igual ao do banco) e o hash de um convite nunca se repete.
+        panel_users: function (r) { return r.collaborator_id ? 'colab|' + r.collaborator_id : null; },
+        panel_invites: function (r) { return 'conv|' + String(r.token_hash || ''); },
         // COMERCIAL: um usuario do painel vira UM participante ativo so.
         // Indice parcial igual ao do banco: desativado libera a vaga.
         sim_participantes: function (r) {
