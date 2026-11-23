@@ -1119,10 +1119,35 @@ async function escondeFinanceiroSeNaoPode() {
       if (bp) bp.style.display = 'none';
     }
 
-    if (!Array.isArray(r.menu) || r.menu.indexOf('financeiro') >= 0) return;
-    const grupo = document.querySelector('#abas .nav-grupo[data-grupo="financeiro"]');
-    if (grupo) grupo.style.display = 'none';
+    if (Array.isArray(r.menu) && r.menu.indexOf('financeiro') < 0) {
+      const grupo = document.querySelector('#abas .nav-grupo[data-grupo="financeiro"]');
+      if (grupo) grupo.style.display = 'none';
+    }
+
+    // MÓDULOS POR PESSOA.
+    //
+    // Quem tem a lista de módulos restrita (r.modulos é uma lista) só
+    // vê no menu o que o servidor mandou em r.menu — item por item, e
+    // o grupo inteiro some quando não sobra nenhum item nele.
+    //
+    // Isto vale SÓ para quem tem restrição. Para todo o resto (r.modulos
+    // vazio), nada aqui roda e o menu fica exatamente como sempre foi.
+    // E continua sendo gentileza: quem tranca é o servidor, pedido por
+    // pedido, mesmo que alguém force um item a aparecer.
+    MEU_ACESSO = { modulos: r.modulos || null, menu: r.menu || [], colaborador: r.colaborador || null };
+    if (Array.isArray(r.modulos)) {
+      document.querySelectorAll('#abas button[data-aba]').forEach(function (b) {
+        if (r.menu.indexOf(b.dataset.aba) < 0) b.style.display = 'none';
+      });
+      document.querySelectorAll('#abas .nav-grupo').forEach(function (g) {
+        const sobrou = Array.prototype.some.call(g.querySelectorAll('button[data-aba]'),
+          function (b) { return b.style.display !== 'none'; });
+        if (!sobrou) g.style.display = 'none';
+      });
+    }
+    return r;
   } catch (e) { /* na dúvida, deixa o botão: o servidor barra */ }
+  return null;
 }
 
 /* ============================================================
