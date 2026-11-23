@@ -8,6 +8,7 @@ const db = require('./_lib/db');
 const u = require('./_lib/util');
 const disc = require('./_lib/disc');
 const send = require('./_lib/send');
+const convites = require('./_lib/convites');
 const aurea = require('./_lib/aurea');
 const webhook = require('./webhook');
 const perms = require('./_lib/perms');
@@ -128,13 +129,25 @@ async function senhaMestraVale(ativos) {
   return !ativos.some(function (x) { return x.role === 'dono'; });
 }
 
+// Em que pé está o acesso desta pessoa, numa palavra.
+function situacaoDe(x) {
+  if (x.active === false) return 'inativo';
+  // Conta criada e a pessoa ainda não escolheu a senha dela.
+  if (x.must_change && !x.last_login_at) return 'aguardando_senha';
+  return 'ativo';
+}
+
 function usuarioLimpo(x) {
   return {
     id: x.id, name: x.name, email: x.email, role: x.role,
     role_nome: perms.NOMES[x.role] || x.role,
     active: x.active, must_change: x.must_change,
     tem_senha: !!x.password_hash,
-    last_login_at: x.last_login_at, created_at: x.created_at
+    last_login_at: x.last_login_at, created_at: x.created_at,
+    // vínculo (QUEM é) e módulos (O QUE acessa): duas coisas separadas
+    collaborator_id: x.collaborator_id || null,
+    modulos: x.role === 'dono' ? null : perms.modulosLimpos(x.modulos),
+    situacao: situacaoDe(x)
   };
 }
 
@@ -203,17 +216,32 @@ function escapaSimples(s) { return u.escapeHtml(s); }
 // usuario: se o e-mail falhar, devolve o erro e o link para o Dono
 // copiar e mandar na mao.
 async function enviaConvite(pessoa, tipo) {
-  const link = conviteLink(pessoa);
+  const link = conviteLink(pessoa) + (tipo === 'colaborador' ? '&bv=1' : '');
   const empresa = await getSetting('company', {});
   const nomeEmpresa = (empresa && empresa.name) || 'StartDigital';
   const primeiro = u.firstName(pessoa.name) || pessoa.name;
   const papelNome = perms.NOMES[pessoa.role] || pessoa.role;
 
-  const assunto = tipo === 'reset'
+  const assunto = tipo === 'colaborador'
+    ? 'Bem-vindo à Start — finalize seu acesso'
+    : tipo === 'reset'
     ? 'Crie uma senha nova para o painel da ' + nomeEmpresa
     : 'Seu acesso ao painel da ' + nomeEmpresa;
 
-  const texto = tipo === 'reset'
+  // O e-mail de quem veio pelo convite de colaborador. Sem senha
+  // dentro, de propósito: quem escolhe a senha é a pessoa, na página
+  // que o botão abre.
+  const textoColaborador =
+    'Olá, ' + primeiro + '.\n\n' +
+    'Seu acesso ao sistema da Start está sendo criado.\n\n' +
+    'Clique abaixo para definir sua senha e concluir o cadastro.\n\n' +
+    link + '\n\n' +
+    'O link vale por ' + CONVITE_HORAS + ' horas e só funciona uma vez. ' +
+    'Depois de criar a senha, é com ela e com este e-mail (' + pessoa.email + ') que você entra.\n\n' +
+    'Se você não esperava receber este convite, entre em contato com o administrador.\n\n' +
+    'Equipe ' + nomeEmpresa;
+
+  const texto = tipo === 'colaborador' ? textoColaborador : tipo === 'reset'
     ? ('Olá, ' + primeiro + '!\n\n' +
        'Pediram uma senha nova para o seu acesso ao painel da ' + nomeEmpresa + '. ' +
        'Clique no botão abaixo e escolha a senha que você quiser.\n\n' +
@@ -281,10 +309,14 @@ module.exports = async function handler(req, res) {
   const action = params.action || '';
 
   try {
-    // Mostra a senha na tela de login. Durante a fase de testes isso vem
-    // LIGADO de fabrica — nao depende de configurar nada na Vercel.
-    // Para DESLIGAR: crie a variavel MOSTRAR_SENHA_LOGIN com o valor
-    // false (ou nao, ou 0) e faca Redeploy.
+    // O que a tela de login precisa saber ANTES de alguém entrar: se
+    // ainda é o primeiro acesso e para onde aponta o link de suporte.
+    //
+    // Esta rota já devolveu a senha mestra, na fase de testes, para a
+    // tela mostrar. Isso acabou: nenhuma senha sai mais do servidor
+    // por aqui, com ou sem variável de ambiente. O nome da ação ficou
+    // o mesmo só para não quebrar quem já a chama (a tela de login e
+    // as páginas de Termos e Privacidade, que usam o link de suporte).
     if (action === 'dica_senha') {
       // "primeiro_acesso" avisa a tela de login que ainda nao existe nenhum
       // Dono cadastrado — nessa fase a entrada e so com a senha mestra, com o
@@ -307,15 +339,41 @@ module.exports = async function handler(req, res) {
         }
       } catch (e) { /* sem numero, o rodape usa o e-mail */ }
 
-      if (!u.mostrarSenhaNoLogin()) {
-        return u.ok(res, { mostrar: false, primeiro_acesso: primeiro, suporte: suporte });
+      return u.ok(res, { primeiro_acesso: primeiro, suporte: suporte });
+    }
+
+    // ------------------------------------------ CONVITE DE COLABORADOR (sem login)
+    // Três passos públicos. Quem manda aqui é o código do link, que
+    // só o Dono gera — a lógica inteira mora em _lib/convites.js.
+    if (action === 'cv_abrir' || action === 'cv_identificar' || action === 'cv_confirmar') {
+      // Quem age por aqui não tem sessão; no histórico aparece assim.
+      const anotaConvite = function (sessao, acao, alvo, detalhe) {
+        return anota(sessao || { nome: 'Pelo link de convite', email: '' }, acao, alvo, detalhe);
+      };
+      const responde = function (r) {
+        if (r.erro) return u.fail(res, r.status || 400, r.erro, r.recomecar ? { recomecar: true } : undefined);
+        delete r.convite;
+        return u.ok(res, r);
+      };
+
+      if (action === 'cv_abrir') {
+        const r = await convites.abre(String(params.c || ''));
+        if (r.erro) return u.fail(res, r.status || 400, r.erro);
+        const empresa = await getSetting('company', {});
+        return u.ok(res, { valido: true, empresa: (empresa && empresa.name) || 'StartDigital' });
       }
-      return u.ok(res, {
-        mostrar: true,
-        primeiro_acesso: primeiro,
-        suporte: suporte,
-        senha: process.env.ADMIN_PASSWORD || process.env.ADMIN_SECRET || ''
-      });
+
+      if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
+      const body = await u.readBody(req);
+
+      if (action === 'cv_identificar') {
+        return responde(await convites.identifica(String(body.c || ''), body, anotaConvite));
+      }
+      return responde(await convites.confirma(String(body.c || ''), body, {
+        anota: anotaConvite,
+        senhaTrancada: senhaTrancada,
+        enviaBoasVindas: function (pessoa) { return enviaConvite(pessoa, 'colaborador'); }
+      }));
     }
 
     // ------------------------------------------ CONVITE (sem login)
@@ -328,7 +386,16 @@ module.exports = async function handler(req, res) {
         nome: v.pessoa.name,
         primeiro_nome: u.firstName(v.pessoa.name),
         email: v.pessoa.email,
-        papel_nome: perms.NOMES[v.pessoa.role] || v.pessoa.role
+        papel_nome: perms.NOMES[v.pessoa.role] || v.pessoa.role,
+        // Para quem tem módulos restritos, "o que você vai acessar" diz
+        // mais do que o nome do nível: um colaborador do Comercial não
+        // precisa ler "RH" na tela de boas-vindas.
+        acesso: (function () {
+          if (v.pessoa.role === 'dono') return 'Acesso total';
+          const m = perms.modulosLimpos(v.pessoa.modulos);
+          return m === null ? (perms.NOMES[v.pessoa.role] || v.pessoa.role)
+            : m.map(perms.nomeDoModulo).join(', ');
+        })()
       });
     }
 
@@ -359,7 +426,7 @@ module.exports = async function handler(req, res) {
       return u.ok(res, {
         token: u.signSession(sessao),
         usuario: usuarioLimpo(pessoa || v.pessoa),
-        menu: perms.menuDoPapel(v.pessoa.role)
+        menu: perms.menuDaPessoa(v.pessoa.role, v.pessoa.modulos)
       });
     }
 
@@ -404,7 +471,7 @@ module.exports = async function handler(req, res) {
           token: u.signSession(sessao),
           expires_in_hours: SESSION_HOURS,
           usuario: usuarioLimpo(pessoa),
-          menu: perms.menuDoPapel(pessoa.role),
+          menu: perms.menuDaPessoa(pessoa.role, pessoa.modulos),
           trocar_senha: pessoa.must_change === true
         });
       }
@@ -484,6 +551,21 @@ module.exports = async function handler(req, res) {
         } catch (e) { /* modulo ainda nao migrado: segue sem */ }
       }
 
+      // QUEM É esta pessoa dentro da empresa. O vínculo é por ID: daqui
+      // em diante o sistema sabe o colaborador certo sem comparar nome
+      // nem e-mail, que são coisas que mudam.
+      const euUsuario = entrada.usuario || null;
+      const meusModulos = (euUsuario && papel !== 'dono') ? perms.modulosLimpos(euUsuario.modulos) : null;
+      let euColaborador = null;
+      if (euUsuario && euUsuario.collaborator_id) {
+        try {
+          const c = await db.selectOne('collaborators', {
+            id: 'eq.' + euUsuario.collaborator_id, select: 'id,name,nickname,area,role_title'
+          });
+          if (c) euColaborador = { id: c.id, nome: c.name, apelido: c.nickname || '', area: c.area || '', funcao: c.role_title || '' };
+        } catch (e) { /* sem o vínculo a tela segue igual */ }
+      }
+
       return u.ok(res, {
         usuario: {
           nome: session.nome || 'Senha mestra',
@@ -492,7 +574,10 @@ module.exports = async function handler(req, res) {
           papel_nome: perms.NOMES[papel] || papel,
           mestra: !!session.mestra
         },
-        menu: perms.menuDoPapel(papel),
+        menu: perms.menuDaPessoa(papel, meusModulos),
+        // null = sem restrição de módulo (vale só o nível)
+        modulos: meusModulos,
+        colaborador: euColaborador,
         comercial: {
           gerente: perms.permite(papel, 'cm_participante_salvar'),
           participante: simParticipante
@@ -1505,14 +1590,50 @@ module.exports = async function handler(req, res) {
     if (action === 'usuarios') {
       const lista = await db.select('panel_users', { order: 'name.asc', select: '*' });
       const ativos = lista.filter(function (x) { return x.active !== false; });
+      // Os colaboradores entram aqui só com o mínimo: nome e, para
+      // quem ainda não tem usuário, a opção de vincular. Nada de CPF
+      // nem de dado pessoal — esta tela é sobre acesso.
+      const colabs = await db.select('collaborators', { select: 'id,name,email,active', order: 'name.asc' });
+      const nomeDoColab = {};
+      const emailDoColab = {};
+      (colabs || []).forEach(function (c) { nomeDoColab[c.id] = c.name; emailDoColab[c.id] = c.email || ''; });
+      const comUsuario = {};
+      lista.forEach(function (x) { if (x.collaborator_id) comUsuario[x.collaborator_id] = true; });
+
       return u.ok(res, {
-        usuarios: lista.map(usuarioLimpo),
+        usuarios: lista.map(function (x) {
+          const limpo = usuarioLimpo(x);
+          limpo.colaborador_nome = x.collaborator_id ? (nomeDoColab[x.collaborator_id] || null) : null;
+          // Aviso para o Dono: o e-mail do login não é o do cadastro do
+          // colaborador. Não é erro (muita gente tem dois e-mails), mas
+          // vale uma olhada quando o acesso veio por convite.
+          limpo.email_difere = !!(x.collaborator_id && emailDoColab[x.collaborator_id] &&
+            String(emailDoColab[x.collaborator_id]).toLowerCase() !== String(x.email).toLowerCase());
+          return limpo;
+        }),
         papeis: perms.PAPEIS.map(function (p) {
           return { chave: p, nome: perms.NOMES[p], descricao: perms.DESCRICOES[p] };
         }),
+        modulos: perms.MODULOS.map(function (m) { return { chave: m.chave, nome: m.nome }; }),
+        convites: await convites.emAberto(),
+        convite_dias: convites.DIAS_DE_VALIDADE,
+        colaboradores_livres: (colabs || [])
+          .filter(function (c) { return c.active !== false && !comUsuario[c.id]; })
+          .map(function (c) { return { id: c.id, nome: c.name }; }),
         senha_mestra_vale: await senhaMestraVale(ativos),
         eu: session.email || null
       });
+    }
+
+    // ---- convite de colaborador: gerar, renovar o link, cancelar ----
+    if (action === 'cv_criar' || action === 'cv_renovar' || action === 'cv_cancelar') {
+      if (req.method !== 'POST') return u.fail(res, 405, 'Metodo nao permitido');
+      const body = await u.readBody(req);
+      const r = action === 'cv_criar' ? await convites.cria(session, body, anota)
+        : action === 'cv_renovar' ? await convites.renova(session, body.id, anota)
+        : await convites.cancela(session, body.id, anota);
+      if (r.erro) return u.fail(res, r.status || 400, r.erro);
+      return u.ok(res, r);
     }
 
     if (action === 'usuario_salvar') {
@@ -1528,6 +1649,11 @@ module.exports = async function handler(req, res) {
         const alvo = await db.selectOne('panel_users', { id: 'eq.' + body.id, select: '*' });
         if (!alvo) return u.fail(res, 404, 'Usuário não encontrado.');
 
+        // Sem "role" no pedido (por exemplo, ao salvar só os módulos),
+        // o nível fica como está.
+        const papelNovo = body.role !== undefined ? String(body.role) : alvo.role;
+        if (!perms.papelValido(papelNovo)) return u.fail(res, 400, 'Papel desconhecido.');
+
         // nao dá para tirar o ultimo Dono do ar
         if (alvo.role === 'dono' && (papelNovo !== 'dono' || body.active === false)) {
           const donos = await db.select('panel_users', { role: 'eq.dono', active: 'is.true', select: 'id' });
@@ -1537,10 +1663,69 @@ module.exports = async function handler(req, res) {
         }
         const patch = { updated_at: new Date().toISOString() };
         if (nome) patch.name = nome;
-        if (perms.papelValido(papelNovo)) patch.role = papelNovo;
+        // O nível só muda se a tela mandou um. Antes, salvar sem "role"
+        // rebaixava a pessoa para Leitura em silêncio — e agora que dá
+        // para salvar só os módulos, isso viraria armadilha.
+        if (body.role !== undefined && perms.papelValido(papelNovo)) patch.role = papelNovo;
         if (body.active !== undefined) patch.active = !!body.active;
-        const row = await db.update('panel_users', patch, { id: 'eq.' + body.id });
+
+        // ---- MÓDULOS: o que esta pessoa acessa ----
+        const nivelFinal = patch.role || alvo.role;
+        let mudouModulos = false;
+        if (body.modulos !== undefined) {
+          let novos = perms.modulosLimpos(body.modulos);
+          if (novos !== null && novos.length === 0) {
+            return u.fail(res, 400, 'Marque pelo menos um módulo — sem nenhum, a pessoa entraria e não veria nada.');
+          }
+          // Todos marcados é o mesmo que "sem restrição": guarda vazio,
+          // para a pessoa ganhar sozinha um módulo que nascer amanhã.
+          if (novos !== null && novos.length === perms.MODULO_CHAVES.length) novos = null;
+          // O Dono enxerga tudo, sempre. Restringir o Dono poderia
+          // trancar a única pessoa capaz de desfazer a restrição.
+          if (nivelFinal === 'dono') novos = null;
+          mudouModulos = JSON.stringify(novos) !== JSON.stringify(perms.modulosLimpos(alvo.modulos));
+          patch.modulos = novos;
+        } else if (nivelFinal === 'dono' && alvo.modulos) {
+          patch.modulos = null;
+        }
+
+        // ---- VÍNCULO: qual colaborador é esta pessoa ----
+        let mudouVinculo = false;
+        if (body.collaborator_id !== undefined) {
+          const novoColab = body.collaborator_id ? String(body.collaborator_id) : null;
+          if (novoColab !== (alvo.collaborator_id || null)) {
+            if (novoColab) {
+              const colab = await db.selectOne('collaborators', { id: 'eq.' + novoColab, select: 'id,name' });
+              if (!colab) return u.fail(res, 404, 'Colaborador não encontrado.');
+              const dono = await db.selectOne('panel_users', { collaborator_id: 'eq.' + novoColab, select: 'id,name' });
+              if (dono && dono.id !== alvo.id) {
+                return u.fail(res, 409, colab.name + ' já está vinculado(a) ao acesso de ' + dono.name +
+                  '. Um colaborador tem um usuário só.');
+              }
+            }
+            patch.collaborator_id = novoColab;
+            mudouVinculo = true;
+          }
+        }
+
+        let row;
+        try {
+          row = await db.update('panel_users', patch, { id: 'eq.' + body.id });
+        } catch (e) {
+          if (e.status === 409) return u.fail(res, 409, 'Este colaborador já está vinculado a outro usuário.');
+          throw e;
+        }
         await anota(session, 'usuario_alterado', alvo.email, { papel: patch.role, ativo: patch.active });
+        if (mudouModulos) {
+          await anota(session, 'permissoes_alteradas', alvo.email, {
+            antes: perms.modulosLimpos(alvo.modulos), depois: patch.modulos
+          });
+        }
+        if (mudouVinculo) {
+          await anota(session, patch.collaborator_id ? 'usuario_vinculado' : 'usuario_desvinculado', alvo.email, {
+            colaborador_antes: alvo.collaborator_id || null, colaborador: patch.collaborator_id
+          });
+        }
         return u.ok(res, { usuario: usuarioLimpo(row) });
       }
 
@@ -1553,9 +1738,17 @@ module.exports = async function handler(req, res) {
 
       // A conta nasce trancada: ninguem sabe a senha, nem eu. A pessoa
       // recebe um e-mail com o link e escolhe a dela.
+      // Módulos já na criação: assim, no primeiro login, a pessoa
+      // entra vendo só o que deve ver.
+      let modulosNovos = perms.modulosLimpos(body.modulos);
+      if (modulosNovos !== null && modulosNovos.length === 0) {
+        return u.fail(res, 400, 'Marque pelo menos um módulo — sem nenhum, a pessoa entraria e não veria nada.');
+      }
+      if (papelNovo === 'dono' || (modulosNovos && modulosNovos.length === perms.MODULO_CHAVES.length)) modulosNovos = null;
+
       const cifra = senhaTrancada();
       const novo = await db.insert('panel_users', {
-        name: nome, email: email, role: papelNovo,
+        name: nome, email: email, role: papelNovo, modulos: modulosNovos,
         password_hash: cifra.hash, password_salt: cifra.salt,
         must_change: true, active: true,
         created_by: session.email || 'senha mestra'
@@ -1582,7 +1775,11 @@ module.exports = async function handler(req, res) {
       await anota(session, 'senha_redefinida', alvo.email, {});
 
       const atualizado = Object.assign({}, alvo, { password_hash: cifra.hash, password_salt: cifra.salt });
-      const convite = await enviaConvite(atualizado, 'reset');
+      // Quem ainda não criou a primeira senha não "esqueceu" nada: recebe
+      // de novo o e-mail de boas-vindas, e não o de troca de senha.
+      const nuncaEntrou = alvo.must_change && !alvo.last_login_at;
+      const convite = await enviaConvite(atualizado,
+        nuncaEntrou ? (alvo.collaborator_id ? 'colaborador' : 'novo') : 'reset');
       await anota(session, convite.enviado ? 'convite_enviado' : 'convite_falhou', alvo.email, { erro: convite.erro });
       return u.ok(res, { nome: alvo.name, email: alvo.email, convite: convite });
     }
