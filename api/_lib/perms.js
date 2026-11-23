@@ -84,6 +84,9 @@ const ACOES = {
   // --- gestao de usuarios: so o dono ---
   usuarios: 'usuarios', usuario_salvar: 'usuarios', usuario_excluir: 'usuarios',
   usuario_senha: 'usuarios', auditoria: 'usuarios',
+  // convite de colaborador: gerar, renovar e cancelar e gestao de
+  // usuarios, entao segue a mesma tranca (so o Dono).
+  cv_criar: 'usuarios', cv_renovar: 'usuarios', cv_cancelar: 'usuarios',
   vagas: 'ver', vaga_salvar: 'mexer', vaga_excluir: 'mexer', vaga_ordem: 'mexer',
   curriculo_link: 'ver',
 
@@ -143,6 +146,153 @@ const ACOES = {
   sp_cancelar: 'financeiro_mexer', sp_conferir: 'financeiro_mexer',
   sp_config_save: 'financeiro_mexer'
 };
+
+/* ============================================================
+   MODULOS — o que cada USUARIO pode acessar
+
+   Ate aqui existia uma pergunta so: "este NIVEL pode fazer isto?".
+   Agora existem duas, e as duas precisam dizer sim:
+
+     1. o NIVEL permite a acao?        (dono, rh, avaliador, leitura)
+     2. o MODULO esta liberado para esta pessoa?
+
+   O nivel diz O QUE a pessoa pode fazer (so olhar, alterar, mexer
+   em dinheiro). O modulo diz ONDE. Um colaborador do Comercial pode
+   ter nivel para alterar e, mesmo assim, nao enxergar o Financeiro.
+
+   A lista abaixo e o espelho do menu lateral: cada modulo e um
+   grupo do menu, com as mesmas abas. Um teste confere que toda aba
+   do menu e toda acao da API pertencem a algum modulo — assim, quem
+   criar uma tela nova e esquecer de dizer de qual modulo ela e nao
+   consegue passar despercebido.
+
+   modulos = null  ->  sem restricao (vale so o nivel). E como todos
+                       os usuarios que ja existiam continuam.
+   modulos = [...]  -> so os modulos da lista.
+   Dono             -> sempre tudo. Restringir o Dono criaria o risco
+                       de ninguem mais conseguir abrir Usuarios para
+                       desfazer a restricao.
+   ============================================================ */
+const MODULOS = [
+  { chave: 'vagas', nome: 'Vagas', grupo: 'principal',
+    abas: ['dashboard', 'vagas', 'triagem', 'candidatos'] },
+  { chave: 'automacao', nome: 'Automação', grupo: 'automacao',
+    abas: ['prequalificacao', 'aurea', 'preonboarding'] },
+  { chave: 'colaboradores', nome: 'Colaboradores', grupo: 'time',
+    abas: ['colaboradores', 'avisos', 'space', 'play'] },
+  { chave: 'operacao', nome: 'Operação', grupo: 'operacao',
+    abas: ['opdash', 'opgestores', 'oponboarding', 'opagenda'] },
+  { chave: 'comercial', nome: 'Comercial', grupo: 'comercial',
+    abas: ['cmleads', 'cmagenda', 'cmatendimento', 'cmsimulacoes', 'meta', 'metagerente'] },
+  { chave: 'academy', nome: 'Start Academy', grupo: 'conteudo',
+    abas: ['conteudo', 'quiz', 'mensagens'] },
+  { chave: 'financeiro', nome: 'Financeiro', grupo: 'financeiro',
+    abas: ['findash', 'financeiro', 'finclientes', 'fingastos', 'findre'] },
+  { chave: 'rh', nome: 'RH', grupo: 'admin',
+    abas: ['usuarios', 'ajustes'] }
+];
+
+const MODULO_CHAVES = MODULOS.map(function (m) { return m.chave; });
+
+// De qual modulo e cada acao da API. Quase todas saem pelo prefixo
+// (fin_ e Financeiro, op_ e Operacao...); as do api/admin.js, que
+// nasceram antes dos prefixos, estao escritas uma a uma.
+const PREFIXOS = [
+  ['fin_', 'financeiro'], ['fc_', 'financeiro'], ['fg_', 'financeiro'],
+  ['op_', 'operacao'], ['ob_', 'operacao'], ['ag_', 'operacao'],
+  ['cm_', 'comercial'], ['mt_', 'comercial'],
+  ['sp_', 'colaboradores'], ['pl_', 'colaboradores'],
+  ['aurea', 'automacao'], ['prequal', 'automacao'],
+  ['vaga', 'vagas'], ['wa_', 'rh'], ['sms_', 'rh'],
+  ['usuario_', 'rh'], ['cv_', 'rh'],
+  ['lesson_', 'academy'], ['module_', 'academy'], ['question_', 'academy'],
+  ['quiz_', 'academy'], ['template', 'academy'], ['team', 'colaboradores'],
+  ['broadcast_', 'colaboradores']
+];
+
+const ACAO_MODULOS = {
+  // recrutamento
+  board: ['vagas'], candidate: ['vagas'], archived: ['vagas'], dashboard: ['vagas'],
+  candidates_list: ['vagas'], move: ['vagas'], update_candidate: ['vagas'],
+  delete_candidate: ['vagas'], grade_attempt: ['vagas'], curriculo_link: ['vagas'],
+  disc_admin: ['vagas'], disc_question_save: ['vagas'],
+  // usadas pela Triagem E pela Automacao: basta ter um dos dois
+  send: ['vagas', 'automacao'], preview: ['vagas', 'automacao'],
+  import_candidates: ['automacao'],
+  // time
+  aviso_imagem: ['colaboradores'],
+  // academy
+  content: ['academy'],
+  // administracao
+  usuarios: ['rh'], auditoria: ['rh'], settings: ['rh'], settings_save: ['rh'], logs: ['rh']
+};
+
+// Acoes que nao pertencem a modulo nenhum: entrar, saber quem sou,
+// sair. Estao aqui escritas para o teste distinguir "livre de
+// proposito" de "esqueceram de classificar".
+const SEM_MODULO = ['login', 'dica_senha', 'usuarios_eu', 'logout_todos',
+  'convite_info', 'convite_senha', 'cv_abrir', 'cv_identificar', 'cv_confirmar',
+  'mt_tv',
+  // Rotas que nem passam pela porta do painel: paginas do proprio
+  // colaborador (beneficio, roleta) e retornos de servicos externos.
+  'meu_space', 'sacar', 'webhook', 'play_roleta', 'play_girar', 'google_callback'];
+
+function modulosDaAcao(acao) {
+  if (SEM_MODULO.indexOf(acao) >= 0) return null;
+  if (ACAO_MODULOS[acao]) return ACAO_MODULOS[acao];
+  for (let i = 0; i < PREFIXOS.length; i++) {
+    if (String(acao).indexOf(PREFIXOS[i][0]) === 0) return [PREFIXOS[i][1]];
+  }
+  return null;
+}
+
+// Arruma o que veio da tela ou do banco: so chaves que existem, sem
+// repetir. Devolve null quando nao ha restricao.
+function modulosLimpos(lista) {
+  if (lista === null || lista === undefined) return null;
+  if (!Array.isArray(lista)) return null;
+  const vistos = {};
+  return MODULO_CHAVES.filter(function (k) {
+    if (lista.indexOf(k) < 0 || vistos[k]) return false;
+    vistos[k] = true;
+    return true;
+  });
+}
+
+// Esta pessoa (nivel + modulos) pode executar esta acao?
+function moduloPermite(papel, modulos, acao) {
+  if (papel === 'dono') return true;
+  const lista = modulosLimpos(modulos);
+  if (lista === null) return true;                 // sem restricao
+  const precisa = modulosDaAcao(acao);
+  if (!precisa) return true;                       // acao sem modulo
+  return precisa.some(function (m) { return lista.indexOf(m) >= 0; });
+}
+
+function nomeDoModulo(chave) {
+  const m = MODULOS.filter(function (x) { return x.chave === chave; })[0];
+  return m ? m.nome : chave;
+}
+
+function recadoModulo(acao) {
+  const precisa = modulosDaAcao(acao) || [];
+  return 'O seu acesso não inclui o módulo ' + nomeDoModulo(precisa[0] || '') +
+    '. Se precisar dele, fale com o administrador.';
+}
+
+// O menu de uma pessoa: o que o nivel mostra, menos o que os
+// modulos escondem.
+function menuDaPessoa(papel, modulos) {
+  const base = menuDoPapel(papel);
+  if (papel === 'dono') return base;
+  const lista = modulosLimpos(modulos);
+  if (lista === null) return base;
+  const liberadas = {};
+  MODULOS.forEach(function (m) {
+    if (lista.indexOf(m.chave) >= 0) m.abas.forEach(function (a) { liberadas[a] = true; });
+  });
+  return base.filter(function (aba) { return liberadas[aba]; });
+}
 
 function papelValido(p) { return PAPEIS.indexOf(p) >= 0; }
 
@@ -210,4 +360,8 @@ function menuDoPapel(papel) {
   return ['dashboard', 'vagas', 'triagem', 'candidatos', 'colaboradores', 'conteudo', 'quiz'];
 }
 
-module.exports = { PAPEIS, NOMES, DESCRICOES, ACOES, permite, recado, menuDoPapel, papelValido };
+module.exports = {
+  PAPEIS, NOMES, DESCRICOES, ACOES, permite, recado, menuDoPapel, papelValido,
+  MODULOS, MODULO_CHAVES, SEM_MODULO, modulosDaAcao, modulosLimpos, moduloPermite,
+  nomeDoModulo, recadoModulo, menuDaPessoa
+};
