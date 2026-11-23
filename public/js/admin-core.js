@@ -8,6 +8,9 @@ let APP_URL = '';
 let atualCand = null;
 let EU = null;                    // quem está logado (vem de usuarios_eu)
 let COMERCIAL = { gerente: false, participante: null };   // acesso ao módulo Comercial
+// O que esta pessoa acessa e quem ela é dentro da empresa (vem de usuarios_eu).
+// modulos null = sem restrição de módulo; colaborador null = acesso sem vínculo.
+let MEU_ACESSO = { modulos: null, menu: [], colaborador: null };
 let bvItens = [];
 
 function esc(s) {
@@ -74,16 +77,15 @@ function sair() {
 }
 document.getElementById('btn-sair').addEventListener('click', sair);
 
-// Enquanto durar a fase de testes, a senha aparece na tela e o campo ja vem
-// preenchido. Isso vem LIGADO de fabrica. Para desligar, e so criar a
-// variavel MOSTRAR_SENHA_LOGIN com o valor false na Vercel + Redeploy.
+// A tela de login é só e-mail, senha e Entrar. Nenhuma senha, dica ou
+// instrução interna aparece aqui: esse período acabou, e o
+// servidor nem envia mais esse tipo de coisa.
 let PRIMEIRO_ACESSO = false;
 
-(async function dicaDaSenha() {
+(async function preparaLogin() {
   try {
     const r = await (await fetch('/api/admin?action=dica_senha')).json();
     if (!r.ok) return;
-    const alvo = document.getElementById('login-erro');
 
     // O "Suporte" do rodapé aponta para o WhatsApp configurado nos
     // Ajustes. Sem número salvo, o link vira e-mail — melhor um
@@ -114,25 +116,7 @@ let PRIMEIRO_ACESSO = false;
       if (sub) sub.textContent = 'Primeiro acesso: entre com a senha do painel.';
       const senhaEl = document.getElementById('senha');
       if (senhaEl) senhaEl.focus();
-      if (alvo) {
-        alvo.insertAdjacentHTML('beforebegin',
-          '<div class="alert alert-info small" style="margin-bottom:16px">' +
-          '<strong>Ninguém foi cadastrado ainda.</strong> Por isso a entrada é só pela senha do painel. ' +
-          'Depois de entrar, vá em <strong>Usuários</strong> e crie o seu acesso de Dono — ' +
-          'a partir daí cada pessoa entra com o próprio e-mail.</div>');
-      }
     }
-
-    if (!r.mostrar || !r.senha) return;
-    const campo = document.getElementById('senha');
-    if (campo && !campo.value) campo.value = r.senha;
-    if (!alvo) return;
-    alvo.insertAdjacentHTML('beforebegin',
-      '<div class="alert alert-info small" style="margin-bottom:16px">' +
-      'Fase de testes — senha: <code>' + esc(r.senha) + '</code><br>' +
-      '<span class="muted">O campo já vem preenchido, é só clicar em Entrar. ' +
-      'Para esconder isto quando os testes acabarem: crie a variável ' +
-      '<code>MOSTRAR_SENHA_LOGIN</code> com o valor <code>false</code> na Vercel + Redeploy.</span></div>');
   } catch (e) { /* se nao der, a tela de login funciona igual */ }
 })();
 
