@@ -2,12 +2,13 @@
 // A PORTA DO PAINEL
 //
 // Toda rota de painel passa por aqui antes de fazer qualquer coisa.
-// São quatro conferências, nesta ordem:
+// São cinco conferências, nesta ordem:
 //
 //   1. o crachá (token) é de verdade?
 //   2. o crachá foi emitido antes do último "encerrar todas as sessões"?
 //   3. a pessoa ainda trabalha aqui (e com o mesmo papel)?
 //   4. este papel pode executar ESTA ação?
+//   5. o módulo desta ação está liberado para ESTA pessoa?
 //
 // Antes isto morava dentro de api/admin.js. Quando nasceu o financeiro,
 // copiar a porta para o arquivo novo seria pedir para as duas versões
@@ -40,8 +41,9 @@ async function abrir(req, res, action) {
   }
 
   const papel = session.papel || 'dono';
+  let eu = null;
   if (session.uid) {
-    const eu = await db.selectOne('panel_users', { id: 'eq.' + session.uid, select: '*' });
+    eu = await db.selectOne('panel_users', { id: 'eq.' + session.uid, select: '*' });
     if (!eu || eu.active === false) {
       u.fail(res, 401, 'O seu acesso foi desativado. Fale com o Dono do painel.');
       return null;
@@ -57,7 +59,20 @@ async function abrir(req, res, action) {
     return null;
   }
 
-  return { session: session, papel: papel };
+  // 5. o MÓDULO desta ação está liberado para esta pessoa?
+  //
+  // Esconder o item do menu é gentileza; a tranca é aqui. Quem digitar
+  // o endereço da API na mão, ou guardar um link antigo, bate nesta
+  // linha. E como a lista de módulos é lida do banco a cada pedido
+  // (junto com a conferência de "ainda trabalha aqui"), tirar um
+  // módulo de alguém vale no pedido seguinte — não na próxima vez que
+  // a pessoa fizer login.
+  if (eu && !perms.moduloPermite(papel, eu.modulos, action)) {
+    u.fail(res, 403, perms.recadoModulo(action));
+    return null;
+  }
+
+  return { session: session, papel: papel, usuario: eu };
 }
 
 module.exports = { abrir, epocaSessao };

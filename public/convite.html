@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Convite — StartDigital</title>
+<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<!-- Esta pagina e irma da tela de entrada, e a entrada e sempre
+     escura. Por isso ela nao le a preferencia de tema. -->
+<link rel="stylesheet" href="/ui.css">
+<style>
+  body { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 28px 20px; }
+  .cv-wrap { width: 100%; max-width: 420px; }
+
+  .cv-marca { display: flex; align-items: center; justify-content: center; gap: 10px;
+    margin-bottom: 20px; color: var(--label); }
+  .cv-marca img { width: 30px; height: 30px; display: block; border-radius: 8px;
+    box-shadow: 0 0 0 1px var(--hairline-strong), 0 6px 20px rgba(79,124,255,.28); }
+  .cv-marca b { font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
+
+  /* O mesmo cartao de vidro da tela de entrada. */
+  .cv-card { position: relative; background: var(--vidro);
+    -webkit-backdrop-filter: saturate(170%) blur(22px); backdrop-filter: saturate(170%) blur(22px);
+    border: 1px solid var(--hairline-strong); border-radius: 18px;
+    padding: 28px 26px 26px; box-shadow: var(--shadow-3), var(--glow); overflow: hidden; }
+  .cv-card::before { content: ''; position: absolute; top: 0; left: 14%; right: 14%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--hairline-strong), transparent); }
+  .cv-card h1 { margin: 0 0 6px; font-size: 21px; font-weight: 600; letter-spacing: -.022em; color: var(--label); }
+  .cv-card .sub { margin: 0 0 20px; font-size: 13.5px; color: var(--label-2); line-height: 1.55; }
+  .cv-card .field + .field { margin-top: 14px; }
+  .cv-card .btn-block { height: 46px; margin-top: 18px; font-size: 15.5px; font-weight: 600; }
+
+  /* os tres passos, no alto do cartao */
+  .cv-passos { display: flex; gap: 6px; margin-bottom: 20px; }
+  .cv-passos i { flex: 1; height: 3px; border-radius: 999px; background: var(--fill-3);
+    transition: background var(--t-medio); }
+  .cv-passos i.on { background: var(--accent); }
+
+  /* a pergunta "Voce e Fulano?" */
+  .cv-quem { text-align: center; padding: 18px 14px; margin: 4px 0 18px;
+    border: 1px solid var(--hairline-strong); border-radius: var(--r-card); background: var(--fill-1); }
+  .cv-quem span { display: block; font-size: 12.5px; color: var(--label-2); margin-bottom: 6px; }
+  .cv-quem strong { display: block; font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: var(--label); }
+  .cv-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .cv-duo .btn { height: 46px; font-size: 15px; font-weight: 600; }
+
+  .cv-selo { width: 56px; height: 56px; border-radius: 50%; margin: 2px auto 18px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--green-tint); color: var(--green-soft); }
+  .cv-selo.neutro { background: var(--fill-2); color: var(--label-2); }
+  .cv-selo svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round; }
+  .cv-centro { text-align: center; }
+  .cv-centro p { color: var(--label-2); line-height: 1.6; margin: 0; font-size: 14.5px; }
+  .cv-centro p + p { margin-top: 12px; }
+  .cv-centro b { color: var(--label); }
+
+  .cv-pe { text-align: center; font-size: 12px; color: var(--label-2); margin-top: 16px; line-height: 1.5; }
+
+  @media (max-width: 420px) {
+    .cv-card { padding: 24px 20px 22px; border-radius: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="orbit" aria-hidden="true">
+  <i class="orbit-luz"></i>
+  <i class="orbit-anel"></i><i class="orbit-anel"></i><i class="orbit-anel"></i>
+</div>
+
+<main class="cv-wrap">
+  <div class="cv-marca"><img src="/favicon-32.png" alt=""><b>StartDigital</b></div>
+
+  <div class="cv-card" id="cartao" aria-live="polite">
+    <p class="sub" style="margin:0">Abrindo o convite…</p>
+  </div>
+
+  <p class="cv-pe" id="pe"></p>
+</main>
+
+<script src="/js/convite.js"></script>
+</body>
+</html>

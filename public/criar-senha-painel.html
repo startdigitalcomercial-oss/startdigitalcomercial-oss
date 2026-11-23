@@ -50,7 +50,7 @@
 
       <div class="quem">
         <div><span>Você entra com este e-mail</span><strong id="email"></strong></div>
-        <div><span>Seu nível de acesso</span><strong id="papel"></strong></div>
+        <div><span>Seu acesso</span><strong id="papel"></strong></div>
       </div>
 
       <div id="aviso"></div>
@@ -166,7 +166,7 @@ document.getElementById('form').addEventListener('submit', async function (ev) {
   if (!r.ok) return erroFatal(r.error || 'Não foi possível abrir esta página.');
   document.getElementById('nome').textContent = r.primeiro_nome || r.nome;
   document.getElementById('email').textContent = r.email;
-  document.getElementById('papel').textContent = r.papel_nome;
+  document.getElementById('papel').textContent = r.acesso || r.papel_nome;
   mostrar('tela-form');
 })();
 </script>

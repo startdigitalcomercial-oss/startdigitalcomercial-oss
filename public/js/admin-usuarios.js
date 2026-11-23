@@ -1,9 +1,38 @@
 /* ============================================================
-   USUÁRIOS DO PAINEL — quem entra e o que cada um pode
+   USUÁRIOS DO PAINEL — quem entra, quem é, e o que cada um acessa
+
+   Três perguntas diferentes, e esta tela trata cada uma no seu
+   lugar para não misturar:
+
+     NÍVEL     o que a pessoa pode FAZER  (Dono, RH, Avaliador, Leitura)
+     MÓDULOS   ONDE ela pode entrar       (Vagas, Comercial, Financeiro…)
+     VÍNCULO   QUEM ela é na empresa      (qual colaborador)
+
+   E dois jeitos de alguém ganhar acesso:
+
+     Dar acesso a alguém     o caminho de sempre: nome, e-mail, nível.
+                             Serve para qualquer pessoa.
+     Convidar colaborador    um link. Quem abre informa o CPF, o
+                             sistema acha o cadastro dela entre os
+                             colaboradores e cria o usuário JÁ
+                             vinculado — sem duplicar ninguém.
    ============================================================ */
 let USUARIOS = [];
 let PAPEIS = [];
+let MODULOS_LISTA = [];          // [{chave, nome}] — vem do servidor, na ordem do menu
+let COLABS_LIVRES = [];          // colaboradores ainda sem usuário
 let PAPEL_ESCOLHIDO = 'rh';
+
+const SITUACAO = {
+  ativo: { texto: 'Ativo', classe: 'tag-verde' },
+  aguardando_senha: { texto: 'Aguardando criação de senha', classe: 'tag-ambar' },
+  inativo: { texto: 'Inativo', classe: '' }
+};
+const CONVITE_ESTADO = {
+  pendente: { texto: 'Convite pendente', classe: 'tag-azul' },
+  expirado: { texto: 'Convite expirado', classe: 'tag-vermelho' },
+  travado: { texto: 'Convite bloqueado', classe: 'tag-vermelho' }
+};
 
 // Caixa que aparece depois de criar um acesso ou reenviar o convite.
 // Se o e-mail sair, e so avisar. Se falhar, mostra o link para copiar
@@ -26,6 +55,73 @@ function caixaConvite(nome, email, c) {
     '</div>';
 }
 
+/* ---------------- módulos: caixas de marcar ----------------
+   marcados = null quer dizer "todos" (sem restrição). */
+function caixasDeModulos(prefixo, marcados, travado) {
+  return '<div class="mod-grade" id="' + prefixo + '-mods">' +
+    MODULOS_LISTA.map(function (m) {
+      const on = travado || marcados === null || marcados.indexOf(m.chave) >= 0;
+      return '<label class="mod-op' + (on ? ' on' : '') + (travado ? ' travado' : '') + '">' +
+        '<input type="checkbox" value="' + esc(m.chave) + '"' + (on ? ' checked' : '') +
+        (travado ? ' disabled' : '') + '> ' + esc(m.nome) + '</label>';
+    }).join('') + '</div>';
+}
+
+function ligaCaixasDeModulos(prefixo) {
+  const caixa = document.getElementById(prefixo + '-mods');
+  if (!caixa) return;
+  caixa.addEventListener('change', function (ev) {
+    const rotulo = ev.target.closest('.mod-op');
+    if (rotulo) rotulo.classList.toggle('on', ev.target.checked);
+  });
+}
+
+function modulosMarcados(prefixo) {
+  return Array.prototype.map.call(
+    document.querySelectorAll('#' + prefixo + '-mods input:checked'),
+    function (i) { return i.value; });
+}
+
+// As etiquetas da coluna "Permissões".
+function chipsDeModulos(x) {
+  if (x.role === 'dono') return '<span class="tag tag-roxo">Acesso total</span>';
+  if (x.modulos === null) return '<span class="tag">Todos os módulos</span>';
+  if (!x.modulos.length) return '<span class="small muted">nenhum</span>';
+  const nome = {};
+  MODULOS_LISTA.forEach(function (m) { nome[m.chave] = m.nome; });
+  return '<div class="mod-chips">' + x.modulos.map(function (k) {
+    return '<span class="tag tag-azul">' + esc(nome[k] || k) + '</span>';
+  }).join('') + '</div>';
+}
+
+function copiaTexto(texto, botao) {
+  const pronto = function () {
+    const antes = botao.textContent;
+    botao.textContent = 'Copiado!';
+    setTimeout(function () { botao.textContent = antes; }, 1600);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(texto).then(pronto).catch(function () {
+      toast('Selecione o link e copie na mão (Ctrl+C).');
+    });
+  } else {
+    toast('Selecione o link e copie na mão (Ctrl+C).');
+  }
+}
+
+// A caixa com o link de convite recém-gerado. O link só aparece
+// AGORA: o servidor guarda o hash dele, não ele. Se o Dono fechar sem
+// copiar, é só gerar outro.
+function caixaLinkConvite(link, dias) {
+  return '<div class="alert alert-ok" style="margin-top:18px">' +
+    '<strong>Convite gerado.</strong> Copie o link e envie para o colaborador (WhatsApp, e-mail, como preferir).<br>' +
+    '<span class="small">Vale por ' + dias + ' dias, funciona uma vez só e aceita no máximo 5 tentativas de CPF. ' +
+    'Por segurança, o link não fica guardado — se perder, gere outro na lista abaixo.</span>' +
+    '<div class="cv-link" id="cv-link-novo" style="margin-top:12px">' + esc(link) + '</div>' +
+    '<div class="row" style="margin-top:10px"><button class="btn btn-sm" id="cv-copiar">Copiar link</button></div>' +
+    '</div>';
+}
+
 async function carregaUsuarios() {
   const box = document.getElementById('painel-usuarios');
   box.innerHTML = '<div class="loading-page">Carregando…</div>';
@@ -35,6 +131,9 @@ async function carregaUsuarios() {
 
   USUARIOS = d.usuarios || [];
   PAPEIS = d.papeis || [];
+  MODULOS_LISTA = d.modulos || [];
+  COLABS_LIVRES = d.colaboradores_livres || [];
+  const convites = d.convites || [];
   const ativos = USUARIOS.filter(function (x) { return x.active !== false; });
 
   box.innerHTML =
@@ -48,17 +147,32 @@ async function carregaUsuarios() {
     '<div class="grid grid-3" style="margin-bottom:16px">' +
       '<div class="stat"><div class="n">' + ativos.length + '</div><div class="l">' +
         (ativos.length === 1 ? 'pessoa com acesso' : 'pessoas com acesso') + '</div></div>' +
-      '<div class="stat"><div class="n">' + ativos.filter(function (x) { return x.role === 'dono'; }).length +
-        '</div><div class="l">donos do painel</div></div>' +
-      '<div class="stat"><div class="n">' + USUARIOS.filter(function (x) { return x.active === false; }).length +
-        '</div><div class="l">desativados</div></div>' +
+      '<div class="stat"><div class="n">' + USUARIOS.filter(function (x) { return !!x.collaborator_id; }).length +
+        '</div><div class="l">vinculadas a um colaborador</div></div>' +
+      '<div class="stat"><div class="n">' + convites.filter(function (c) { return c.estado === 'pendente'; }).length +
+        '</div><div class="l">convites pendentes</div></div>' +
     '</div>' +
 
-    // ---------- novo usuário ----------
+    // ---------- convidar colaborador ----------
+    '<div class="card">' +
+      '<h2 style="margin:0 0 4px">Convidar colaborador</h2>' +
+      '<p class="sub" style="margin:0 0 18px">Para quem <strong>já está no cadastro de colaboradores</strong>. ' +
+      'Você gera um link; a pessoa abre, informa o CPF, confirma quem é e cria a própria senha. ' +
+      'O acesso nasce vinculado ao cadastro dela — sem criar colaborador repetido.</p>' +
+      '<div class="field"><label for="cv-anotacao">Para quem é este convite <span class="muted">(só uma anotação sua)</span></label>' +
+        '<input type="text" id="cv-anotacao" maxlength="120" placeholder="Bárbara, do Comercial"></div>' +
+      '<div class="field" style="margin-top:16px"><label>Acesso aos módulos</label>' +
+        '<div class="hint" style="margin-top:2px">O que essa pessoa vai enxergar já no primeiro login. Dá para mudar depois.</div>' +
+        caixasDeModulos('cv', null, false) + '</div>' +
+      '<div class="row" style="margin-top:16px"><button class="btn" id="cv-gerar">Gerar link de convite</button></div>' +
+      '<div id="cv-saida"></div>' +
+    '</div>' +
+
+    // ---------- acesso comum ----------
     '<div class="card">' +
       '<h2 style="margin:0 0 4px">Dar acesso a alguém</h2>' +
-      '<p class="sub" style="margin:0 0 18px">A pessoa recebe um e-mail com um link e cria a própria senha por lá. ' +
-      'Ninguém aqui vê essa senha — nem você.</p>' +
+      '<p class="sub" style="margin:0 0 18px">O caminho comum, para qualquer pessoa: você informa nome e e-mail, ' +
+      'ela recebe um link e cria a própria senha. Ninguém aqui vê essa senha — nem você.</p>' +
       '<div class="grid grid-2" style="gap:14px">' +
         '<div class="field"><label for="us-nome">Nome</label>' +
         '<input type="text" id="us-nome" placeholder="Maria Aparecida"></div>' +
@@ -74,33 +188,64 @@ async function carregaUsuarios() {
     // ---------- lista ----------
     '<div class="card" style="padding:0;overflow:hidden">' +
       '<div style="padding:20px 22px 4px"><h2 style="margin:0">Quem tem acesso</h2></div>' +
-      (USUARIOS.length
-        ? '<table class="tbl" style="margin:0"><thead><tr>' +
-          '<th style="padding-left:22px">Pessoa</th><th>Nível</th><th>Último acesso</th><th></th>' +
+      ((USUARIOS.length || convites.length)
+        ? '<div style="overflow-x:auto"><table class="tbl" style="margin:0;min-width:860px"><thead><tr>' +
+          '<th style="padding-left:22px">Usuário</th><th>Colaborador vinculado</th><th>E-mail</th>' +
+          '<th>Status</th><th>Permissões</th><th style="padding-right:22px;text-align:right">Ações</th>' +
           '</tr></thead><tbody>' +
-          USUARIOS.map(function (x) {
-            const eu = d.eu && x.email === d.eu;
-            return '<tr' + (x.active === false ? ' style="opacity:.5"' : '') + '>' +
-              '<td style="padding-left:22px"><strong>' + esc(x.name) + '</strong>' +
-                (eu ? ' <span class="tag tag-verde">você</span>' : '') +
-                (x.must_change ? ' <span class="tag tag-ambar">senha nova</span>' : '') +
-                '<div class="small muted">' + esc(x.email) + '</div></td>' +
-              '<td><span class="tag">' + esc(x.role_nome) + '</span></td>' +
-              '<td class="small muted">' + (x.last_login_at ? dataBr(x.last_login_at) : 'nunca entrou') + '</td>' +
-              '<td style="padding-right:22px;text-align:right;white-space:nowrap">' +
-                '<button class="btn btn-sm btn-ghost us-editar" data-id="' + esc(x.id) + '">Editar</button>' +
-              '</td></tr>';
-          }).join('') + '</tbody></table>'
+          convites.map(linhaConvite).join('') +
+          USUARIOS.map(function (x) { return linhaUsuario(x, d.eu); }).join('') +
+          '</tbody></table></div>'
         : '<p class="sub" style="padding:0 22px 22px;margin:0">Ninguém cadastrado ainda.</p>') +
     '</div>' +
 
     '<div class="card"><div class="row" style="justify-content:space-between;align-items:center">' +
       '<div><h2 style="margin:0 0 3px;font-size:15px">Histórico de quem fez o quê</h2>' +
-      '<p class="sub" style="margin:0">Cada entrada no painel e cada mudança de acesso fica registrada.</p></div>' +
+      '<p class="sub" style="margin:0">Cada entrada, cada convite e cada mudança de permissão fica registrada.</p></div>' +
       '<button class="btn btn-sm btn-ghost" id="us-auditoria">Ver histórico</button>' +
     '</div><div id="us-audit"></div></div>';
 
   ligaUsuarios(d);
+}
+
+function linhaUsuario(x, euEmail) {
+  const eu = euEmail && x.email === euEmail;
+  const sit = SITUACAO[x.situacao] || SITUACAO.ativo;
+  return '<tr data-usuario="' + esc(x.id) + '"' + (x.active === false ? ' style="opacity:.55"' : '') + '>' +
+    '<td style="padding-left:22px"><strong>' + esc(x.name) + '</strong>' +
+      (eu ? ' <span class="tag tag-verde">você</span>' : '') +
+      '<div class="small muted">' + esc(x.role_nome) +
+        ' · ' + (x.last_login_at ? 'último acesso ' + dataBr(x.last_login_at) : 'nunca entrou') + '</div></td>' +
+    '<td>' + (x.collaborator_id
+      ? esc(x.colaborador_nome || 'Colaborador removido')
+      : '<span class="small muted">sem vínculo</span>') + '</td>' +
+    '<td class="small">' + esc(x.email) +
+      (x.email_difere ? '<div class="small muted" title="O e-mail do login é diferente do e-mail no cadastro do colaborador">' +
+        'difere do cadastro</div>' : '') + '</td>' +
+    '<td><span class="tag ' + sit.classe + '">' + sit.texto + '</span></td>' +
+    '<td>' + chipsDeModulos(x) + '</td>' +
+    '<td style="padding-right:22px"><div class="us-acoes">' +
+      '<button class="btn btn-sm btn-ghost us-editar" data-id="' + esc(x.id) + '">Editar</button>' +
+    '</div></td></tr>';
+}
+
+function linhaConvite(c) {
+  const est = CONVITE_ESTADO[c.estado] || CONVITE_ESTADO.pendente;
+  const quando = c.estado === 'pendente'
+    ? 'vale até ' + dataBr(c.expira_em)
+    : c.estado === 'expirado' ? 'venceu em ' + dataBr(c.expira_em) : 'excedeu as tentativas de CPF';
+  return '<tr data-convite="' + esc(c.id) + '">' +
+    '<td style="padding-left:22px"><strong>' + esc(c.anotacao || 'Convite de colaborador') + '</strong>' +
+      '<div class="small muted">gerado por ' + esc(c.criado_por || '—') + ' em ' + dataBr(c.criado_em) + '</div></td>' +
+    '<td><span class="small muted">a confirmar pelo CPF</span></td>' +
+    '<td><span class="small muted">a informar</span></td>' +
+    '<td><span class="tag ' + est.classe + '">' + est.texto + '</span>' +
+      '<div class="small muted" style="margin-top:4px">' + esc(quando) + '</div></td>' +
+    '<td>' + chipsDeModulos({ role: 'rh', modulos: c.modulos }) + '</td>' +
+    '<td style="padding-right:22px"><div class="us-acoes">' +
+      '<button class="btn btn-sm btn-ghost cv-renovar" data-id="' + esc(c.id) + '">Gerar novo link</button>' +
+      '<button class="btn btn-sm btn-ghost cv-cancelar" data-id="' + esc(c.id) + '" style="color:var(--red-soft)">Cancelar</button>' +
+    '</div></td></tr>';
 }
 
 function ligaUsuarios(d) {
@@ -120,7 +265,68 @@ function ligaUsuarios(d) {
     });
   }
   desenhaPapeis();
+  ligaCaixasDeModulos('cv');
 
+  // ---------- gerar convite de colaborador ----------
+  const mostraLink = function (r) {
+    b('cv-saida').innerHTML = caixaLinkConvite(r.link, d.convite_dias || 7);
+    b('cv-copiar').addEventListener('click', function () { copiaTexto(r.link, b('cv-copiar')); });
+    b('cv-saida').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  // Recarrega a lista sem perder a caixa com o link recém-gerado: o
+  // link só existe naquela caixa.
+  const recarregaGuardandoLink = function (r) {
+    carregaUsuarios().then(function () {
+      const saida = document.getElementById('cv-saida');
+      if (!saida) return;
+      saida.innerHTML = caixaLinkConvite(r.link, d.convite_dias || 7);
+      const bt = document.getElementById('cv-copiar');
+      bt.addEventListener('click', function () { copiaTexto(r.link, bt); });
+      saida.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  };
+
+  b('cv-gerar').addEventListener('click', async function () {
+    const marcados = modulosMarcados('cv');
+    if (!marcados.length) return toast('Marque pelo menos um módulo.', true);
+    this.disabled = true;
+    this.innerHTML = '<span class="spinner"></span> Gerando…';
+    try {
+      const r = await api('cv_criar', {
+        body: {
+          anotacao: b('cv-anotacao').value.trim(),
+          // todos marcados = sem restrição
+          modulos: marcados.length === MODULOS_LISTA.length ? null : marcados
+        }
+      });
+      recarregaGuardandoLink(r);
+    } catch (e) {
+      b('cv-saida').innerHTML = '<div class="alert alert-erro" style="margin-top:18px">' + esc(e.message) + '</div>';
+      this.disabled = false;
+      this.textContent = 'Gerar link de convite';
+    }
+  });
+
+  document.querySelectorAll('.cv-renovar').forEach(function (bt) {
+    bt.addEventListener('click', async function () {
+      if (!confirm('Gerar um link novo para este convite?\n\nO link anterior para de funcionar na hora.')) return;
+      bt.disabled = true;
+      try { recarregaGuardandoLink(await api('cv_renovar', { body: { id: bt.dataset.id } })); }
+      catch (e) { toast(e.message, true); bt.disabled = false; }
+    });
+  });
+
+  document.querySelectorAll('.cv-cancelar').forEach(function (bt) {
+    bt.addEventListener('click', async function () {
+      if (!confirm('Cancelar este convite? O link deixa de funcionar.')) return;
+      bt.disabled = true;
+      try { await api('cv_cancelar', { body: { id: bt.dataset.id } }); toast('Convite cancelado'); carregaUsuarios(); }
+      catch (e) { toast(e.message, true); bt.disabled = false; }
+    });
+  });
+
+  // ---------- acesso comum ----------
   b('us-criar').addEventListener('click', async function () {
     const nome = b('us-nome').value.trim();
     const email = b('us-email').value.trim();
@@ -172,22 +378,52 @@ function abreUsuario(id) {
   const x = USUARIOS.filter(function (y) { return y.id === id; })[0];
   if (!x) return;
 
+  const aguardando = x.situacao === 'aguardando_senha';
+
+  // O seletor de vínculo oferece: ficar como está, soltar o vínculo,
+  // ou escolher um colaborador que AINDA não tem usuário. Quem já tem
+  // nem aparece na lista — um colaborador, um usuário.
+  const opcoesVinculo =
+    '<option value="">Sem vínculo</option>' +
+    (x.collaborator_id
+      ? '<option value="' + esc(x.collaborator_id) + '" selected>' +
+        esc(x.colaborador_nome || 'Colaborador removido') + '</option>'
+      : '') +
+    COLABS_LIVRES.map(function (c) {
+      return '<option value="' + esc(c.id) + '">' + esc(c.nome) + '</option>';
+    }).join('');
+
   document.getElementById('g-nome').textContent = x.name;
   document.getElementById('g-sub').textContent = x.email;
   document.getElementById('g-corpo').innerHTML =
     '<div class="field"><label>Nome</label><input type="text" id="ue-nome" value="' + esc(x.name) + '"></div>' +
+
     '<div class="field" style="margin-top:16px"><label>Nível de acesso</label>' +
+      '<div class="hint" style="margin-top:2px">O que a pessoa pode <strong>fazer</strong>.</div>' +
       '<div id="ue-papeis" style="margin-top:8px"></div></div>' +
-    '<div class="row row-wrap" style="gap:12px;margin-top:14px;align-items:center">' +
+
+    '<div class="field" style="margin-top:16px"><label>Acesso aos módulos</label>' +
+      '<div class="hint" style="margin-top:2px" id="ue-mods-dica"></div>' +
+      '<div id="ue-mods-caixa"></div></div>' +
+
+    '<div class="field" style="margin-top:16px"><label for="ue-colab">Colaborador vinculado</label>' +
+      '<div class="hint" style="margin-top:2px"><strong>Quem</strong> esta pessoa é no cadastro de colaboradores. ' +
+      'Não muda o que ela acessa, e não altera os dados do colaborador.</div>' +
+      '<select id="ue-colab" style="margin-top:8px">' + opcoesVinculo + '</select></div>' +
+
+    '<div class="row row-wrap" style="gap:12px;margin-top:16px;align-items:center">' +
       '<button class="btn btn-sm" id="ue-salvar">Salvar</button>' +
       '<label class="row small" style="gap:6px"><input type="checkbox" id="ue-ativo" ' +
       (x.active !== false ? 'checked' : '') + ' style="width:16px;height:16px"> tem acesso ao painel</label>' +
     '</div>' +
     '<hr class="sep">' +
-    '<h3 style="font-size:14px;margin:0 0 8px">Senha</h3>' +
-    '<p class="small muted" style="margin:0 0 12px">Manda um e-mail novo para a pessoa criar outra senha. ' +
-    'A senha atual dela para de valer na hora. Use quando alguém esquecer a senha.</p>' +
-    '<button class="btn btn-sm btn-ghost" id="ue-senha">Enviar link de senha nova</button>' +
+    '<h3 style="font-size:14px;margin:0 0 8px">' + (aguardando ? 'E-mail de acesso' : 'Senha') + '</h3>' +
+    '<p class="small muted" style="margin:0 0 12px">' + (aguardando
+      ? 'Esta pessoa ainda não criou a senha. Reenvie o e-mail com o link — o anterior deixa de valer.'
+      : 'Manda um e-mail novo para a pessoa criar outra senha. A senha atual dela para de valer na hora. ' +
+        'Use quando alguém esquecer a senha.') + '</p>' +
+    '<button class="btn btn-sm btn-ghost" id="ue-senha">' +
+      (aguardando ? 'Reenviar e-mail de acesso' : 'Enviar link de senha nova') + '</button>' +
     '<div id="ue-saida"></div>' +
     '<hr class="sep">' +
     '<button class="btn btn-sm btn-ghost" id="ue-excluir" style="color:var(--red)">Excluir este acesso</button>';
@@ -196,6 +432,23 @@ function abreUsuario(id) {
   document.getElementById('gaveta').style.display = 'flex';
 
   let papel = x.role;
+  // O que está marcado agora, guardado fora da tela: trocar o nível
+  // para Dono e voltar não pode apagar o que o administrador marcou.
+  let marcados = x.modulos;
+
+  function desenhaModulos() {
+    const dono = papel === 'dono';
+    if (!dono && document.getElementById('ue-mods')) {
+      const agora = modulosMarcados('ue');
+      marcados = agora.length === MODULOS_LISTA.length ? null : agora;
+    }
+    document.getElementById('ue-mods-dica').innerHTML = dono
+      ? 'O Dono acessa <strong>tudo</strong>, sempre — não dá para restringir.'
+      : '<strong>Onde</strong> a pessoa pode entrar. O que estiver desmarcado some do menu dela e fica bloqueado no servidor.';
+    document.getElementById('ue-mods-caixa').innerHTML = caixasDeModulos('ue', marcados, dono);
+    ligaCaixasDeModulos('ue');
+  }
+
   function desenha() {
     document.getElementById('ue-papeis').innerHTML = PAPEIS.map(function (p) {
       return '<button type="button" class="papel-op' + (papel === p.chave ? ' on' : '') + '" ' +
@@ -203,21 +456,27 @@ function abreUsuario(id) {
         '<span>' + esc(p.descricao) + '</span></button>';
     }).join('');
     document.getElementById('ue-papeis').querySelectorAll('.papel-op').forEach(function (bt) {
-      bt.addEventListener('click', function () { papel = bt.dataset.p; desenha(); });
+      bt.addEventListener('click', function () { desenhaModulos(); papel = bt.dataset.p; desenha(); desenhaModulos(); });
     });
   }
   desenha();
+  desenhaModulos();
 
   document.getElementById('ue-salvar').addEventListener('click', async function () {
+    const corpo = {
+      id: x.id,
+      name: document.getElementById('ue-nome').value,
+      role: papel,
+      active: document.getElementById('ue-ativo').checked,
+      collaborator_id: document.getElementById('ue-colab').value || ''
+    };
+    if (papel !== 'dono') {
+      const agora = modulosMarcados('ue');
+      if (!agora.length) return toast('Marque pelo menos um módulo.', true);
+      corpo.modulos = agora.length === MODULOS_LISTA.length ? null : agora;
+    }
     try {
-      await api('usuario_salvar', {
-        body: {
-          id: x.id,
-          name: document.getElementById('ue-nome').value,
-          role: papel,
-          active: document.getElementById('ue-ativo').checked
-        }
-      });
+      await api('usuario_salvar', { body: corpo });
       toast('Salvo');
       fechaGaveta();
       carregaUsuarios();
@@ -225,8 +484,11 @@ function abreUsuario(id) {
   });
 
   document.getElementById('ue-senha').addEventListener('click', async function () {
-    if (!confirm('Enviar para ' + x.email + ' um link para criar senha nova?\n\n' +
-      'A senha atual de ' + x.name + ' para de funcionar na hora.')) return;
+    const rotulo = this.textContent;
+    if (!confirm(aguardando
+      ? 'Reenviar para ' + x.email + ' o e-mail com o link de criar a senha?'
+      : 'Enviar para ' + x.email + ' um link para criar senha nova?\n\n' +
+        'A senha atual de ' + x.name + ' para de funcionar na hora.')) return;
     this.disabled = true;
     this.innerHTML = '<span class="spinner"></span> Enviando…';
     try {
@@ -234,11 +496,12 @@ function abreUsuario(id) {
       document.getElementById('ue-saida').innerHTML = caixaConvite(r.nome, r.email, r.convite);
     } catch (e) { toast(e.message, true); }
     this.disabled = false;
-    this.textContent = 'Enviar link de senha nova';
+    this.textContent = rotulo;
   });
 
   document.getElementById('ue-excluir').addEventListener('click', async function () {
-    if (!confirm('Excluir o acesso de ' + x.name + '? Ela perde o painel imediatamente.')) return;
+    if (!confirm('Excluir o acesso de ' + x.name + '? Ela perde o painel imediatamente.' +
+      (x.collaborator_id ? '\n\nO cadastro do colaborador NÃO é apagado — só o login.' : ''))) return;
     try {
       await api('usuario_excluir', { body: { id: x.id } });
       toast('Acesso excluído');

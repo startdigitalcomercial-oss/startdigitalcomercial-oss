@@ -34,17 +34,6 @@ async function readBody(req) {
   try { return JSON.parse(raw); } catch (e) { return {}; }
 }
 
-// Mostrar (ou nao) a senha na tela de login, durante a fase de testes.
-// Vem LIGADO de fabrica de proposito: nao adianta depender de alguem
-// lembrar de criar uma variavel na Vercel. Quem quiser esconder escreve
-// false (ou nao / 0 / off) em MOSTRAR_SENHA_LOGIN e faz Redeploy.
-function mostrarSenhaNoLogin() {
-  const escolha = String(process.env.MOSTRAR_SENHA_LOGIN || '').trim().toLowerCase();
-  if (!escolha) return true;
-  return !(escolha === 'false' || escolha === 'nao' || escolha === 'não' ||
-    escolha === '0' || escolha === 'off' || escolha === 'no');
-}
-
 // ---------- Tokens e assinatura ----------
 function appSecret() {
   return process.env.APP_SECRET || process.env.ADMIN_SECRET || 'start-rh-dev-secret';
@@ -232,6 +221,10 @@ const COR = {
 // O texto do botao muda conforme o destino do link.
 function rotuloBotao(url) {
   const u = String(url || '');
+  // O e-mail de boas-vindas do colaborador pede o botão "Criar minha
+  // senha". O "bv=1" no fim do link é só a marca que diz qual texto
+  // usar — a página de criar senha nem olha para ele.
+  if (u.indexOf('/criar-senha-painel') >= 0 && u.indexOf('bv=1') >= 0) return 'Criar minha senha';
   if (u.indexOf('/criar-senha-painel') >= 0) return 'Criar a minha senha do painel';
   if (u.indexOf('/criar-senha') >= 0) return 'Criar a minha senha';
   if (u.indexOf('/portal') >= 0) return 'Abrir a área de integração';
@@ -473,6 +466,5 @@ module.exports = {
   signSession, verifySession, requireAdmin, candidateToken, safeEqual,
   firstName, appUrl, setBaseFromReq, candidateLinks, renderTemplate, templateVars,
   hashPassword, checkPassword, signCandidateSession, candidateFromRequest, phoneTail,
-  escapeHtml, textToEmailHtml, normalizePhone, isEmail,
-  mostrarSenhaNoLogin
+  escapeHtml, textToEmailHtml, normalizePhone, isEmail
 };

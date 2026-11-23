@@ -77,6 +77,14 @@
       "destination": "/entrar.html"
     },
     {
+      "source": "/convite/colaborador/:codigo",
+      "destination": "/convite.html"
+    },
+    {
+      "source": "/convite",
+      "destination": "/convite.html"
+    },
+    {
       "source": "/criar-senha",
       "destination": "/criar-senha.html"
     },
