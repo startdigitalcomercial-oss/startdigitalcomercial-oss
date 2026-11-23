@@ -71,7 +71,7 @@
     cartao.innerHTML =
       passos(1) +
       '<h1>Crie o seu acesso</h1>' +
-      '<p class="sub">Você foi convidado(a) para o sistema da Start. Confirme quem você é para continuar.</p>' +
+      '<p class="sub">Este é o cadastro de acesso ao sistema da Start. Confirme quem você é para continuar.</p>' +
       '<div id="cv-erro">' + (erro ? '<div class="alert alert-erro">' + esc(erro) + '</div>' : '') + '</div>' +
       '<form id="cv-form" novalidate>' +
         '<div class="field"><label for="cv-nome">Nome completo</label>' +
@@ -133,8 +133,8 @@
     if (r.ok && r.achou) { bilhete = r.bilhete; return telaConfirma(r.nome); }
 
     // Convite que morreu no meio (expirou, travou): tela de aviso.
-    if (r._status === 410 || (r._status === 404 && /convite/i.test(r.error || ''))) {
-      return telaAviso('Convite indisponível', r.error);
+    if (r._status === 410 || (r._status === 404 && /link de cadastro/i.test(r.error || ''))) {
+      return telaAviso('Link indisponível', r.error);
     }
     bt.disabled = false;
     bt.textContent = 'Continuar';
@@ -172,13 +172,13 @@
     if (r.ok && r.encerrado) return telaAviso('Sem problema', r.mensagem);
     if (r.ok && r.criado) return telaPronto(r);
     if (r.recomecar) return telaForm(r.error);
-    if (r._status === 410 || r._status === 404) return telaAviso('Convite indisponível', r.error);
+    if (r._status === 410 || r._status === 404) return telaAviso('Link indisponível', r.error);
     telaAviso('Não foi possível concluir', r.error || 'Fale com o administrador.');
   }
 
   function telaPronto(r) {
-    // A partir daqui o link do convite já morreu. O que resta à
-    // pessoa é abrir o e-mail.
+    // O cadastro DESTA pessoa terminou; o que resta a ela é abrir o
+    // e-mail. (O link continua valendo para os próximos colegas.)
     bilhete = '';
     cartao.innerHTML =
       passos(3) +
@@ -198,10 +198,10 @@
   /* ---------------- partida ---------------- */
   (async function () {
     if (!CODIGO) {
-      return telaAviso('Convite indisponível', 'Este endereço não tem um convite. Peça o link ao administrador.');
+      return telaAviso('Link indisponível', 'Este endereço não tem um link de cadastro. Peça o link ao administrador.');
     }
     var r = await chama('cv_abrir');
-    if (!r.ok) return telaAviso('Convite indisponível', r.error || 'Este convite não vale mais.');
+    if (!r.ok) return telaAviso('Link indisponível', r.error || 'Este convite não vale mais.');
     telaForm('');
   })();
 })();
