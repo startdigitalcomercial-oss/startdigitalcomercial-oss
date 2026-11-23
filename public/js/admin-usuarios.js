@@ -12,10 +12,12 @@
 
      Dar acesso a alguém     o caminho de sempre: nome, e-mail, nível.
                              Serve para qualquer pessoa.
-     Convidar colaborador    um link. Quem abre informa o CPF, o
-                             sistema acha o cadastro dela entre os
-                             colaboradores e cria o usuário JÁ
-                             vinculado — sem duplicar ninguém.
+     Convidar colaborador    um link de cadastro, que serve para o
+                             time inteiro: cada pessoa que abre
+                             informa o próprio CPF, o sistema acha o
+                             cadastro dela entre os colaboradores e
+                             cria o usuário JÁ vinculado — sem
+                             duplicar ninguém.
    ============================================================ */
 let USUARIOS = [];
 let PAPEIS = [];
@@ -29,9 +31,10 @@ const SITUACAO = {
   inativo: { texto: 'Inativo', classe: '' }
 };
 const CONVITE_ESTADO = {
-  pendente: { texto: 'Convite pendente', classe: 'tag-azul' },
-  expirado: { texto: 'Convite expirado', classe: 'tag-vermelho' },
-  travado: { texto: 'Convite bloqueado', classe: 'tag-vermelho' }
+  ativo: { texto: 'Link ativo', classe: 'tag-azul' },
+  expirado: { texto: 'Link expirado', classe: 'tag-vermelho' },
+  // Pausa do freio de tentativas: passa sozinha em alguns minutos.
+  pausado: { texto: 'Link em pausa', classe: 'tag-ambar' }
 };
 
 // Caixa que aparece depois de criar um acesso ou reenviar o convite.
@@ -109,13 +112,14 @@ function copiaTexto(texto, botao) {
   }
 }
 
-// A caixa com o link de convite recém-gerado. O link só aparece
+// A caixa com o link de cadastro recém-gerado. O link só aparece
 // AGORA: o servidor guarda o hash dele, não ele. Se o Dono fechar sem
 // copiar, é só gerar outro.
 function caixaLinkConvite(link, dias) {
   return '<div class="alert alert-ok" style="margin-top:18px">' +
-    '<strong>Convite gerado.</strong> Copie o link e envie para o colaborador (WhatsApp, e-mail, como preferir).<br>' +
-    '<span class="small">Vale por ' + dias + ' dias, funciona uma vez só e aceita no máximo 5 tentativas de CPF. ' +
+    '<strong>Link de cadastro gerado.</strong> Copie e envie para os colaboradores — pode mandar no grupo.<br>' +
+    '<span class="small">O <strong>mesmo link serve para todos</strong>: cada pessoa informa o próprio CPF e cria o próprio acesso. ' +
+    'Vale por ' + dias + ' dias, e você pode cancelar quando quiser. ' +
     'Por segurança, o link não fica guardado — se perder, gere outro na lista abaixo.</span>' +
     '<div class="cv-link" id="cv-link-novo" style="margin-top:12px">' + esc(link) + '</div>' +
     '<div class="row" style="margin-top:10px"><button class="btn btn-sm" id="cv-copiar">Copiar link</button></div>' +
@@ -149,22 +153,24 @@ async function carregaUsuarios() {
         (ativos.length === 1 ? 'pessoa com acesso' : 'pessoas com acesso') + '</div></div>' +
       '<div class="stat"><div class="n">' + USUARIOS.filter(function (x) { return !!x.collaborator_id; }).length +
         '</div><div class="l">vinculadas a um colaborador</div></div>' +
-      '<div class="stat"><div class="n">' + convites.filter(function (c) { return c.estado === 'pendente'; }).length +
-        '</div><div class="l">convites pendentes</div></div>' +
+      '<div class="stat"><div class="n">' + convites.filter(function (c) { return c.estado !== 'expirado'; }).length +
+        '</div><div class="l">' + (convites.filter(function (c) { return c.estado !== 'expirado'; }).length === 1
+          ? 'link de cadastro ativo' : 'links de cadastro ativos') + '</div></div>' +
     '</div>' +
 
     // ---------- convidar colaborador ----------
     '<div class="card">' +
       '<h2 style="margin:0 0 4px">Convidar colaborador</h2>' +
       '<p class="sub" style="margin:0 0 18px">Para quem <strong>já está no cadastro de colaboradores</strong>. ' +
-      'Você gera um link; a pessoa abre, informa o CPF, confirma quem é e cria a própria senha. ' +
-      'O acesso nasce vinculado ao cadastro dela — sem criar colaborador repetido.</p>' +
-      '<div class="field"><label for="cv-anotacao">Para quem é este convite <span class="muted">(só uma anotação sua)</span></label>' +
-        '<input type="text" id="cv-anotacao" maxlength="120" placeholder="Bárbara, do Comercial"></div>' +
+      'Você gera <strong>um link de cadastro que serve para várias pessoas</strong>: cada uma abre, informa o próprio CPF, ' +
+      'confirma quem é e cria a própria senha. O acesso nasce vinculado ao cadastro dela — sem criar colaborador repetido.</p>' +
+      '<div class="field"><label for="cv-anotacao">Nome deste link <span class="muted">(só uma anotação sua)</span></label>' +
+        '<input type="text" id="cv-anotacao" maxlength="120" placeholder="Time Comercial"></div>' +
       '<div class="field" style="margin-top:16px"><label>Acesso aos módulos</label>' +
-        '<div class="hint" style="margin-top:2px">O que essa pessoa vai enxergar já no primeiro login. Dá para mudar depois.</div>' +
+        '<div class="hint" style="margin-top:2px">O que <strong>todos que se cadastrarem por este link</strong> vão enxergar no primeiro login. ' +
+        'Para dar acessos diferentes a grupos diferentes, gere um link para cada grupo. Dá para ajustar pessoa por pessoa depois.</div>' +
         caixasDeModulos('cv', null, false) + '</div>' +
-      '<div class="row" style="margin-top:16px"><button class="btn" id="cv-gerar">Gerar link de convite</button></div>' +
+      '<div class="row" style="margin-top:16px"><button class="btn" id="cv-gerar">Gerar link de cadastro</button></div>' +
       '<div id="cv-saida"></div>' +
     '</div>' +
 
@@ -230,15 +236,20 @@ function linhaUsuario(x, euEmail) {
 }
 
 function linhaConvite(c) {
-  const est = CONVITE_ESTADO[c.estado] || CONVITE_ESTADO.pendente;
-  const quando = c.estado === 'pendente'
-    ? 'vale até ' + dataBr(c.expira_em)
-    : c.estado === 'expirado' ? 'venceu em ' + dataBr(c.expira_em) : 'excedeu as tentativas de CPF';
+  const est = CONVITE_ESTADO[c.estado] || CONVITE_ESTADO.ativo;
+  const quando = c.estado === 'expirado' ? 'venceu em ' + dataBr(c.expira_em)
+    : c.estado === 'pausado' ? 'muitas tentativas; volta sozinho em minutos'
+    : 'vale até ' + dataBr(c.expira_em);
+  const usos = Number(c.usos) || 0;
   return '<tr data-convite="' + esc(c.id) + '">' +
-    '<td style="padding-left:22px"><strong>' + esc(c.anotacao || 'Convite de colaborador') + '</strong>' +
+    '<td style="padding-left:22px"><strong>' + esc(c.anotacao || 'Link de cadastro') + '</strong>' +
       '<div class="small muted">gerado por ' + esc(c.criado_por || '—') + ' em ' + dataBr(c.criado_em) + '</div></td>' +
-    '<td><span class="small muted">a confirmar pelo CPF</span></td>' +
-    '<td><span class="small muted">a informar</span></td>' +
+    '<td><span class="small muted">cada pessoa confirma pelo CPF</span></td>' +
+    // Quantas pessoas já entraram por este link. Elas aparecem logo
+    // abaixo, na mesma lista, cada uma com o seu colaborador.
+    '<td class="cv-usos"><strong>' + usos + '</strong> <span class="small muted">' +
+      (usos === 1 ? 'cadastro feito' : 'cadastros feitos') + '</span>' +
+      (c.ultimo_uso_em ? '<div class="small muted">último em ' + dataBr(c.ultimo_uso_em) + '</div>' : '') + '</td>' +
     '<td><span class="tag ' + est.classe + '">' + est.texto + '</span>' +
       '<div class="small muted" style="margin-top:4px">' + esc(quando) + '</div></td>' +
     '<td>' + chipsDeModulos({ role: 'rh', modulos: c.modulos }) + '</td>' +
@@ -304,13 +315,14 @@ function ligaUsuarios(d) {
     } catch (e) {
       b('cv-saida').innerHTML = '<div class="alert alert-erro" style="margin-top:18px">' + esc(e.message) + '</div>';
       this.disabled = false;
-      this.textContent = 'Gerar link de convite';
+      this.textContent = 'Gerar link de cadastro';
     }
   });
 
   document.querySelectorAll('.cv-renovar').forEach(function (bt) {
     bt.addEventListener('click', async function () {
-      if (!confirm('Gerar um link novo para este convite?\n\nO link anterior para de funcionar na hora.')) return;
+      if (!confirm('Gerar um link novo?\n\nO link anterior para de funcionar na hora — quem ainda não se cadastrou ' +
+        'vai precisar do link novo. Quem já se cadastrou não é afetado.')) return;
       bt.disabled = true;
       try { recarregaGuardandoLink(await api('cv_renovar', { body: { id: bt.dataset.id } })); }
       catch (e) { toast(e.message, true); bt.disabled = false; }
@@ -319,9 +331,10 @@ function ligaUsuarios(d) {
 
   document.querySelectorAll('.cv-cancelar').forEach(function (bt) {
     bt.addEventListener('click', async function () {
-      if (!confirm('Cancelar este convite? O link deixa de funcionar.')) return;
+      if (!confirm('Cancelar este link de cadastro?\n\nNinguém mais consegue se cadastrar por ele. ' +
+        'Quem já se cadastrou continua com o acesso.')) return;
       bt.disabled = true;
-      try { await api('cv_cancelar', { body: { id: bt.dataset.id } }); toast('Convite cancelado'); carregaUsuarios(); }
+      try { await api('cv_cancelar', { body: { id: bt.dataset.id } }); toast('Link cancelado'); carregaUsuarios(); }
       catch (e) { toast(e.message, true); bt.disabled = false; }
     });
   });

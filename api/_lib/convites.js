@@ -22,13 +22,24 @@
 //   só o hash deles. Nada de CPF, e-mail ou número sequencial na
 //   URL. Quem ler a tabela inteira não consegue montar um link.
 //
-// · O CONVITE NÃO VIRA LISTA DE FUNCIONÁRIOS. Cada link aceita no
-//   máximo cinco CPFs e depois trava. CPF errado e CPF de
-//   ex-colaborador dão exatamente a mesma resposta. O nome só
-//   aparece para quem tem um convite válido E acertou um CPF.
+// · O LINK SERVE PARA O TIME INTEIRO. O Dono gera UM link de
+//   cadastro e manda no grupo; dez, vinte, trinta colaboradores usam
+//   o mesmo. Usar o link não o gasta. Quem é "de uso único" é a
+//   PESSOA, não o link: cada colaborador só consegue criar um
+//   usuário, porque o banco recusa o segundo (índice único).
 //
-// · USO ÚNICO, COM PRAZO. Sete dias. Confirmou o cadastro, o link
-//   morre. Gerou outro para a mesma linha, o anterior morre.
+// · O LINK NÃO VIRA LISTA DE FUNCIONÁRIOS. Um link compartilhado não
+//   pode travar para sempre (um curioso trancaria o time inteiro do
+//   lado de fora), então a defesa é um FREIO: dez CPFs que não dão em
+//   nada dentro de quinze minutos e o link descansa até a janela
+//   passar. Dá para errar à vontade no dia a dia; não dá para sair
+//   testando CPF em série. CPF errado e CPF de ex-colaborador dão
+//   exatamente a mesma resposta, e o nome só aparece para quem tem o
+//   link E acertou um CPF.
+//
+// · TEM PRAZO E TEM BOTÃO DE DESLIGAR. Trinta dias. O Dono cancela
+//   quando quiser, e gerar um link novo para a mesma linha mata o
+//   anterior na hora.
 // ============================================================
 'use strict';
 
@@ -37,8 +48,11 @@ const db = require('./db');
 const u = require('./util');
 const perms = require('./perms');
 
-const DIAS_DE_VALIDADE = 7;
-const MAX_TENTATIVAS = 5;
+const DIAS_DE_VALIDADE = 30;
+// O freio: tantas buscas sem resultado dentro da janela e o link
+// descansa até ela passar.
+const MAX_FALHAS = 10;
+const JANELA_MINUTOS = 15;
 const MINUTOS_DO_BILHETE = 15;
 
 // O nível de quem entra por convite. Os MÓDULOS marcados pelo Dono é
@@ -53,7 +67,7 @@ const NIVEL_DO_CONVIDADO = 'rh';
 function cpfLimpo(v) { return String(v == null ? '' : v).replace(/\D/g, ''); }
 
 // Confere os dois dígitos verificadores. Serve para barrar erro de
-// digitação ANTES de gastar uma das cinco tentativas do convite — e
+// digitação ANTES de ele contar como tentativa no freio do link — e
 // para não ir ao banco perguntar por um número que nem CPF é.
 function cpfVale(d) {
   if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
@@ -80,21 +94,30 @@ function linkDe(codigo) {
   return u.appUrl() + '/convite/colaborador/' + codigo;
 }
 
+// Quantas buscas sem resultado este link acumulou NA JANELA ATUAL.
+// Passados os quinze minutos, a conta zera sozinha.
+function falhasNaJanela(c, agora) {
+  agora = agora || Date.now();
+  const desde = c.falhas_desde ? new Date(c.falhas_desde).getTime() : 0;
+  if (!desde || agora - desde > JANELA_MINUTOS * 60000) return { falhas: 0, desde: 0 };
+  return { falhas: Number(c.tentativas) || 0, desde: desde };
+}
+
+// "usado_em" NÃO encerra mais o link: virou só a data do último
+// cadastro feito por ele. O que encerra é cancelar ou vencer.
 function estadoDe(c, agora) {
   agora = agora || Date.now();
-  if (c.usado_em) return 'usado';
   if (c.cancelado_em) return 'cancelado';
   if (new Date(c.expira_em).getTime() < agora) return 'expirado';
-  if ((Number(c.tentativas) || 0) >= MAX_TENTATIVAS) return 'travado';
-  return 'pendente';
+  if (falhasNaJanela(c, agora).falhas >= MAX_FALHAS) return 'pausado';
+  return 'ativo';
 }
 
 const RECADO = {
-  invalido: 'Este convite não existe ou não vale mais. Peça um novo ao administrador.',
-  cancelado: 'Este convite não existe ou não vale mais. Peça um novo ao administrador.',
-  expirado: 'Este convite expirou. Peça um novo ao administrador.',
-  usado: 'Este convite já foi utilizado. Se você já criou o seu acesso, entre pela tela de login.',
-  travado: 'Este convite foi bloqueado por excesso de tentativas. Peça um novo ao administrador.'
+  invalido: 'Este link de cadastro não existe ou não vale mais. Peça um novo ao administrador.',
+  cancelado: 'Este link de cadastro não existe ou não vale mais. Peça um novo ao administrador.',
+  expirado: 'Este link de cadastro expirou. Peça um novo ao administrador.',
+  pausado: 'Muitas tentativas neste link em pouco tempo. Aguarde alguns minutos e tente de novo.'
 };
 
 const NAO_ACHEI = 'Não encontramos um colaborador correspondente a este CPF. ' +
@@ -109,7 +132,9 @@ function paraTela(c) {
     criado_por: c.created_by || '',
     criado_em: c.created_at,
     expira_em: c.expira_em,
-    tentativas: Number(c.tentativas) || 0
+    // quantas pessoas já se cadastraram por este link, e quando foi a última
+    usos: Number(c.usos) || 0,
+    ultimo_uso_em: c.usado_em || null
   };
 }
 
@@ -142,13 +167,13 @@ async function cria(sessao, body, anota) {
 // porque o hash guardado passa a ser outro.
 async function renova(sessao, id, anota) {
   const c = await db.selectOne('panel_invites', { id: 'eq.' + String(id || ''), select: '*' });
-  if (!c) return { erro: 'Convite não encontrado.', status: 404 };
-  if (c.usado_em) return { erro: 'Este convite já foi utilizado — a pessoa já tem acesso.' };
+  if (!c) return { erro: 'Link de cadastro não encontrado.', status: 404 };
   const codigo = novoCodigo();
   const row = await db.update('panel_invites', {
     token_hash: hashDe(codigo),
     expira_em: new Date(Date.now() + DIAS_DE_VALIDADE * 86400000).toISOString(),
     tentativas: 0,
+    falhas_desde: null,
     cancelado_em: null
   }, { id: 'eq.' + c.id });
   await anota(sessao, 'convite_colaborador_renovado', c.anotacao || c.id, { convite: c.id });
@@ -157,18 +182,20 @@ async function renova(sessao, id, anota) {
 
 async function cancela(sessao, id, anota) {
   const c = await db.selectOne('panel_invites', { id: 'eq.' + String(id || ''), select: '*' });
-  if (!c) return { erro: 'Convite não encontrado.', status: 404 };
-  if (c.usado_em) return { erro: 'Este convite já foi utilizado — não há o que cancelar.' };
+  if (!c) return { erro: 'Link de cadastro não encontrado.', status: 404 };
+  // Cancelar desliga o LINK. Quem já se cadastrou por ele continua
+  // com o acesso — para tirar o acesso de alguém, é na ficha da pessoa.
   await db.update('panel_invites', { cancelado_em: new Date().toISOString() }, { id: 'eq.' + c.id });
   await anota(sessao, 'convite_colaborador_cancelado', c.anotacao || c.id, { convite: c.id });
   return { ok: true };
 }
 
-// Os convites que ainda interessam ao Dono: os que não viraram
-// usuário. Os usados já aparecem na lista como o próprio usuário.
+// Os links que ainda interessam ao Dono: os que não foram cancelados.
+// Um link já usado continua na lista — ele segue valendo para o
+// próximo colaborador.
 async function emAberto() {
   const linhas = await db.select('panel_invites', {
-    usado_em: 'is.null', cancelado_em: 'is.null',
+    cancelado_em: 'is.null',
     order: 'created_at.desc', limit: '50', select: '*'
   });
   return (linhas || []).map(paraTela);
@@ -184,7 +211,9 @@ async function abre(codigo) {
   const c = await db.selectOne('panel_invites', { token_hash: 'eq.' + hashDe(codigo), select: '*' });
   if (!c) return { erro: RECADO.invalido, status: 404 };
   const estado = estadoDe(c);
-  if (estado !== 'pendente') return { erro: RECADO[estado], status: 410, estado: estado };
+  // Link pausado pelo freio ainda ABRE: a pessoa vê o formulário e é
+  // avisada só se tentar enviar antes de a janela passar.
+  if (estado === 'cancelado' || estado === 'expirado') return { erro: RECADO[estado], status: 410, estado: estado };
   return { convite: c };
 }
 
@@ -216,23 +245,31 @@ async function identifica(codigo, body, anota) {
   if (!cpfVale(cpf)) return { erro: 'Confira o CPF: esse número não é válido.', status: 400 };
   if (!u.isEmail(email)) return { erro: 'O e-mail não parece certo.', status: 400 };
 
-  // A tentativa é contada ANTES da busca. Contar depois abriria uma
-  // brecha: derrubar a conexão no meio e tentar de novo, de graça.
-  const tentativas = (Number(c.tentativas) || 0) + 1;
-  await db.update('panel_invites', { tentativas: tentativas }, { id: 'eq.' + c.id });
-  const restam = MAX_TENTATIVAS - tentativas;
-  const sufixo = restam <= 0
-    ? ' Este convite foi bloqueado por excesso de tentativas.'
-    : (restam <= 2 ? ' (Restam ' + restam + (restam === 1 ? ' tentativa' : ' tentativas') + ' neste convite.)' : '');
+  // O FREIO. Link que acumulou buscas demais sem resultado nos
+  // últimos minutos nem consulta: descansa até a janela passar.
+  const janela = falhasNaJanela(c);
+  if (janela.falhas >= MAX_FALHAS) return { erro: RECADO.pausado, status: 429 };
+
+  // Só conta o que NÃO deu em nada. Trinta colaboradores acertando o
+  // próprio CPF, um atrás do outro, não podem pausar o link — quem
+  // pausa é a sequência de CPFs que não levam a lugar nenhum.
+  const contaFalha = async function () {
+    await db.update('panel_invites', {
+      tentativas: janela.falhas + 1,
+      falhas_desde: new Date(janela.desde || Date.now()).toISOString()
+    }, { id: 'eq.' + c.id });
+  };
 
   const colab = await colaboradorPorCpf(cpf);
   if (!colab) {
+    await contaFalha();
     await anota(null, 'convite_cpf_nao_encontrado', c.anotacao || c.id, { convite: c.id });
-    return { erro: NAO_ACHEI + sufixo, status: 404 };
+    return { erro: NAO_ACHEI, status: 404 };
   }
 
   const jaTemUsuario = await db.selectOne('panel_users', { collaborator_id: 'eq.' + colab.id, select: 'id' });
   if (jaTemUsuario) {
+    await contaFalha();
     // O Dono fica sabendo: alguém com acesso tentou criar outro —
     // quase sempre é só senha esquecida, e ele pode reenviar.
     await anota(null, 'convite_colaborador_ja_tem_acesso', colab.name, { convite: c.id, colaborador: colab.id });
@@ -326,9 +363,13 @@ async function confirma(codigo, body, ctx) {
     throw e;
   }
 
-  // O convite morre aqui: uso único.
+  // O link NÃO morre aqui: ele continua valendo para o próximo
+  // colaborador. Fica anotado só que mais uma pessoa se cadastrou por
+  // ele, e quando. (Quem foi cada uma está no histórico, com o número
+  // do link — a tabela de convites não guarda uma pessoa só.)
   await db.update('panel_invites', {
-    usado_em: new Date().toISOString(), user_id: pessoa.id, collaborator_id: colab.id
+    usos: (Number(c.usos) || 0) + 1,
+    usado_em: new Date().toISOString()
   }, { id: 'eq.' + c.id });
 
   await ctx.anota(null, 'convite_colaborador_usado', b.email, {
@@ -348,7 +389,7 @@ async function confirma(codigo, body, ctx) {
 }
 
 module.exports = {
-  DIAS_DE_VALIDADE, MAX_TENTATIVAS, NIVEL_DO_CONVIDADO, RECADO, NAO_ACHEI,
+  DIAS_DE_VALIDADE, MAX_FALHAS, JANELA_MINUTOS, NIVEL_DO_CONVIDADO, RECADO, NAO_ACHEI,
   cpfLimpo, cpfVale, novoCodigo, hashDe, linkDe, estadoDe, mascaraEmail,
   cria, renova, cancela, emAberto, abre, identifica, confirma
 };

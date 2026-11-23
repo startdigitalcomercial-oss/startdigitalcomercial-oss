@@ -337,7 +337,7 @@ const DEFAULTS = {
   prequal_sessions: function () { return { id: uuid(), channel: 'whatsapp', status: 'aguardando', current_index: 0, answers: [], score: null, recommendation: null, summary: null, job_id: null, video_em: null, respostas_ok: false, last_message_at: null, started_at: agora(), finished_at: null, error: null }; },
   prequal_messages: function () { return { id: seq('prequal_messages'), created_at: agora() }; },
   panel_users: function () { return { id: uuid(), role: 'leitura', active: true, must_change: true, password_hash: null, password_salt: null, last_login_at: null, created_by: null, collaborator_id: null, modulos: null, created_at: agora(), updated_at: agora() }; },
-  panel_invites: function () { return { id: uuid(), role: 'rh', modulos: null, anotacao: null, created_by: null, created_by_id: null, created_at: agora(), tentativas: 0, usado_em: null, user_id: null, collaborator_id: null, cancelado_em: null }; },
+  panel_invites: function () { return { id: uuid(), role: 'rh', modulos: null, anotacao: null, created_by: null, created_by_id: null, created_at: agora(), tentativas: 0, falhas_desde: null, usos: 0, usado_em: null, user_id: null, collaborator_id: null, cancelado_em: null }; },
   audit_log: function () { return { id: seq('audit_log'), detail: {}, created_at: agora() }; },
   broadcasts: function () { return { id: uuid(), total: 0, sent: 0, failed: 0, detail: {}, created_at: agora() }; },
   collaborators: function () { return { id: uuid(), token: uuid().replace(/-/g, ''), active: true, source: 'formulario', work_mode: null, welcomed_at: null, notes: null, accessibility: null, accessibility_detail: null, accessibility_support: null, created_at: agora(), updated_at: agora() }; },

@@ -194,8 +194,8 @@ const linkDaSenha = (texto) => { const m = String(texto || '').match(/criar-senh
   const gravado = (await banco('panel_invites', 'GET', 'id=eq.' + c1.convite.id))[0];
   check('no banco fica o HASH do codigo, nunca o codigo',
     gravado.token_hash !== cod1 && JSON.stringify(gravado).indexOf(cod1) < 0 && /^[0-9a-f]{64}$/.test(gravado.token_hash));
-  check('o convite tem prazo de validade (7 dias)',
-    Math.abs(new Date(gravado.expira_em).getTime() - Date.now() - 7 * 86400000) < 120000, gravado.expira_em);
+  check('o link tem prazo de validade (30 dias)',
+    Math.abs(new Date(gravado.expira_em).getTime() - Date.now() - 30 * 86400000) < 120000, gravado.expira_em);
   check('o convite guarda QUEM criou e QUANDO (auditoria)', !!gravado.created_by && !!gravado.created_at);
   check('convite sem nenhum modulo e barrado',
     (await adm('cv_criar', { modulos: [] })).ok === false);
@@ -204,8 +204,8 @@ const linkDaSenha = (texto) => { const m = String(texto || '').match(/criar-senh
   check('sem login tambem nao', (await pub('cv_criar', { modulos: ['comercial'] })).ok === false);
 
   const pend = await adm('usuarios');
-  check('o convite aparece na lista como PENDENTE',
-    (pend.convites || []).some((c) => c.id === c1.convite.id && c.estado === 'pendente'), pend.convites);
+  check('o link aparece na lista como ATIVO, com zero cadastros',
+    (pend.convites || []).some((c) => c.id === c1.convite.id && c.estado === 'ativo' && c.usos === 0), pend.convites);
 
   /* ============================================================
      CASOS 1 e 2 — convidado com CPF existente, COM pontuacao
@@ -243,8 +243,9 @@ const linkDaSenha = (texto) => { const m = String(texto || '').match(/criar-senh
   check('o cadastro do colaborador nao foi alterado',
     (await banco('collaborators', 'GET', 'id=eq.' + BARBARA.id))[0].email === 'cadastro0.' + SUF + '@start.test');
   check('a lista avisa que o e-mail do login difere do cadastro', uBarbara.email_difere === true);
-  check('o convite saiu da lista de pendentes',
-    !(depois1.convites || []).some((c) => c.id === c1.convite.id));
+  check('o link CONTINUA na lista, ativo, agora contando 1 cadastro',
+    (depois1.convites || []).some((c) => c.id === c1.convite.id && c.estado === 'ativo' && c.usos === 1 && !!c.ultimo_uso_em),
+    (depois1.convites || []).filter((c) => c.id === c1.convite.id));
 
   /* ============================================================
      ITEM 39 — O E-MAIL
@@ -263,15 +264,63 @@ const linkDaSenha = (texto) => { const m = String(texto || '').match(/criar-senh
       body: JSON.stringify({ email: 'barbara.' + SUF + '@gmail.test', password: 'qualquercoisa1' }) })).json()).ok === false);
 
   /* ============================================================
-     CASO 9 — link ja utilizado
+     O MESMO LINK SERVE PARA VARIOS COLABORADORES
+
+     O pedido original tinha um "caso 9: link ja utilizado". Ele
+     foi substituido por decisao do Clovis: o link de cadastro e
+     um so para o time inteiro. Quem e de uso unico e a PESSOA.
      ============================================================ */
-  console.log('\n-- caso 9: link ja utilizado --');
-  const usado = await pub('cv_abrir', null, { c: cod1 });
-  check('o mesmo link nao abre de novo', usado.ok === false && /já foi utilizado/.test(usado.error), usado.error);
-  check('nem aceita outro CPF',
-    (await pub('cv_identificar', { c: cod1, nome: 'Renan Costa', cpf: RENAN.cpf, email: 'x.' + SUF + '@a.test' })).ok === false);
-  check('nem aceita o bilhete antigo de novo',
-    (await pub('cv_confirmar', { c: cod1, bilhete: id1.bilhete, resposta: 'sim' })).ok === false);
+  console.log('\n-- o mesmo link serve para varios colaboradores --');
+  const denovo = await pub('cv_abrir', null, { c: cod1 });
+  check('depois de um cadastro, o MESMO link abre de novo', denovo.ok === true, denovo.error);
+  check('e nao diz mais que "ja foi utilizado"', !/utilizado/.test(JSON.stringify(denovo)));
+
+  // tres colegas, um atras do outro, pelo mesmo link
+  const TURMA = [[RENAN, 'renan'], [LIA, 'lia'], [OTTO, 'otto']];
+  for (const [pessoa, apelido] of TURMA) {
+    const i = await pub('cv_identificar', { c: cod1, nome: pessoa.nome, cpf: pessoa.cpf, email: apelido + '.turma.' + SUF + '@gmail.test' });
+    const k = i.ok ? await pub('cv_confirmar', { c: cod1, bilhete: i.bilhete, resposta: 'sim' }) : { error: i.error };
+    check('pelo mesmo link: ' + apelido + ' se cadastra', i.ok === true && i.nome === pessoa.nome && k.criado === true, k.error);
+  }
+  const turma = await adm('usuarios');
+  const daTurma = TURMA.map(([pessoa]) => turma.usuarios.filter((x) => x.collaborator_id === pessoa.id)[0] || {});
+  daTurma.forEach((x) => CRIADOS.push(x.id));
+  check('cada um ganhou o PROPRIO usuario, vinculado ao PROPRIO cadastro',
+    daTurma.every((x, n) => !!x.id && x.name === TURMA[n][0].nome) && new Set(daTurma.map((x) => x.id)).size === 3,
+    daTurma.map((x) => x.name));
+  check('todos com os modulos definidos no link (so Comercial)',
+    daTurma.every((x) => JSON.stringify(x.modulos) === '["comercial"]'), daTurma.map((x) => x.modulos));
+  check('cada um recebeu o e-mail no endereco que informou',
+    daTurma.map((x) => x.email).sort().join() === ['lia', 'otto', 'renan'].map((a) => a + '.turma.' + SUF + '@gmail.test').join());
+  const linkDepois = (turma.convites || []).filter((c) => c.id === c1.convite.id)[0] || {};
+  check('o link conta 4 cadastros e continua ATIVO', linkDepois.usos === 4 && linkDepois.estado === 'ativo', linkDepois);
+  check('quatro acertos seguidos NAO acionam o freio de tentativas',
+    (await banco('panel_invites', 'GET', 'id=eq.' + c1.convite.id))[0].tentativas === 0);
+  check('colaborador nenhum foi duplicado no caminho',
+    (await banco('collaborators', 'GET', 'select=id')).length === colabsAntes);
+
+  // a PESSOA e de uso unico, mesmo com o link valendo
+  const repete = await pub('cv_identificar', { c: cod1, nome: 'Barbara Lima', cpf: BARBARA.cpf, email: 'barbara.outra.' + SUF + '@gmail.test' });
+  check('quem ja se cadastrou nao cria um segundo acesso pelo mesmo link',
+    repete.ok === false && /já possui acesso ao sistema/.test(repete.error), repete.error);
+  check('o bilhete antigo dela nao cria outro usuario',
+    (await pub('cv_confirmar', { c: cod1, bilhete: id1.bilhete, resposta: 'sim' })).criado === undefined);
+  check('continua existindo UM usuario para cada colaborador',
+    [BARBARA, RENAN, LIA, OTTO].every((p) => turma.usuarios.filter((x) => x.collaborator_id === p.id).length === 1));
+
+  // dois colegas confirmando pelo MESMO link no mesmo instante
+  const j1 = await pub('cv_identificar', { c: cod1, nome: CAIO.nome, cpf: CAIO.cpf, email: 'caio.x.' + SUF + '@a.test' });
+  const j2 = await pub('cv_identificar', { c: cod1, nome: CAIO.nome, cpf: CAIO.cpf, email: 'caio.y.' + SUF + '@a.test' });
+  const juntos = await Promise.all([
+    pub('cv_confirmar', { c: cod1, bilhete: j1.bilhete, resposta: 'sim' }),
+    pub('cv_confirmar', { c: cod1, bilhete: j2.bilhete, resposta: 'sim' })
+  ]);
+  const doCaioMesmoLink = (await adm('usuarios')).usuarios.filter((x) => x.collaborator_id === CAIO.id);
+  check('a mesma pessoa confirmando duas vezes juntas, pelo mesmo link: UM usuario so',
+    doCaioMesmoLink.length === 1 && juntos.filter((r) => r.criado === true).length === 1 && juntos.every((r) => r._status !== 500),
+    juntos.map((r) => r._status));
+  // devolve o cenario: os proximos casos precisam deles sem usuario
+  for (const x of daTurma.concat(doCaioMesmoLink)) { await adm('usuario_excluir', { id: x.id }); }
 
   /* ============================================================
      CASO 10 — criar a senha
@@ -421,17 +470,35 @@ const linkDaSenha = (texto) => { const m = String(texto || '').match(/criar-senh
   check('e-mail torto e barrado',
     (await pub('cv_identificar', { c: cod4, nome: 'Fulano Qualquer', cpf: RENAN.cpf, email: 'nao-e-email' })).ok === false);
 
-  // cinco CPFs e o link trava: sem isso, um convite seria uma
-  // maquina de perguntar "esse CPF trabalha ai?"
-  for (let i = 0; i < 3; i++) {
+  // O FREIO. Um link que serve para o time inteiro nao pode travar
+  // para sempre (um curioso trancaria todo mundo do lado de fora),
+  // mas tambem nao pode virar maquina de perguntar "esse CPF trabalha
+  // ai?". Dez buscas sem resultado em quinze minutos e ele descansa.
+  for (let i = 0; i < 8; i++) {
     await pub('cv_identificar', { c: cod4, nome: 'Fulano Qualquer', cpf: geraCpf(semente + 555000 + i * 131), email: 'f.' + SUF + '@a.test' });
   }
-  const travado = await pub('cv_abrir', null, { c: cod4 });
-  check('depois de 5 CPFs o convite TRAVA', travado.ok === false && /bloqueado por excesso de tentativas/.test(travado.error), travado.error);
-  const aindaTenta = await pub('cv_identificar', { c: cod4, nome: 'Renan Costa', cpf: RENAN.cpf, email: 'renan.' + SUF + '@a.test' });
-  check('travado, nem um CPF CERTO passa (nao adianta insistir)', aindaTenta.ok === false && aindaTenta.nome === undefined, aindaTenta.error);
-  check('o Dono ve o convite como bloqueado',
-    ((await adm('usuarios')).convites || []).some((c) => c.id === c4.convite.id && c.estado === 'travado'));
+  check('dez CPFs que nao dao em nada: o link entra em pausa',
+    (await banco('panel_invites', 'GET', 'id=eq.' + c4.convite.id))[0].tentativas === 10);
+  const pausado = await pub('cv_identificar', { c: cod4, nome: 'Renan Costa', cpf: RENAN.cpf, email: 'renan.' + SUF + '@a.test' });
+  check('em pausa, nem um CPF CERTO passa (nao adianta insistir)',
+    pausado.ok === false && pausado._status === 429 && pausado.nome === undefined && /Aguarde alguns minutos/.test(pausado.error), pausado.error);
+  check('a pausa nao revela nada: mesma resposta para CPF certo e errado',
+    (await pub('cv_identificar', { c: cod4, nome: 'Fulano Qualquer', cpf: geraCpf(semente + 31337), email: 'f.' + SUF + '@a.test' })).error === pausado.error);
+  check('tentar durante a pausa nao estica a pausa',
+    (await banco('panel_invites', 'GET', 'id=eq.' + c4.convite.id))[0].tentativas === 10);
+  check('o link pausado ainda ABRE o formulario (a pessoa nao ve uma tela de erro a toa)',
+    (await pub('cv_abrir', null, { c: cod4 })).ok === true);
+  check('o Dono ve o link como "em pausa"',
+    ((await adm('usuarios')).convites || []).some((c) => c.id === c4.convite.id && c.estado === 'pausado'));
+  // quinze minutos depois (o teste atrasa o relogio do link, em vez de esperar)
+  await banco('panel_invites', 'PATCH', 'id=eq.' + c4.convite.id, { falhas_desde: new Date(Date.now() - 16 * 60000).toISOString() });
+  check('passada a janela, o link volta SOZINHO a ficar ativo',
+    ((await adm('usuarios')).convites || []).some((c) => c.id === c4.convite.id && c.estado === 'ativo'));
+  const voltou = await pub('cv_identificar', { c: cod4, nome: 'Renan Costa', cpf: RENAN.cpf, email: 'renan.' + SUF + '@a.test' });
+  check('e o CPF certo volta a ser encontrado', voltou.ok === true && voltou.nome === RENAN.nome, voltou.error);
+  await pub('cv_identificar', { c: cod4, nome: 'Fulano Qualquer', cpf: geraCpf(semente + 777), email: 'f.' + SUF + '@a.test' });
+  check('a contagem recomeca do zero na janela nova (nao herda as dez antigas)',
+    (await banco('panel_invites', 'GET', 'id=eq.' + c4.convite.id))[0].tentativas === 1);
   check('link inventado nao abre', (await pub('cv_abrir', null, { c: 'A'.repeat(43) })).ok === false);
   check('link vazio nao abre', (await pub('cv_abrir', null, { c: '' })).ok === false);
 
@@ -542,8 +609,16 @@ const linkDaSenha = (texto) => { const m = String(texto || '').match(/criar-senh
     (await pub('cv_abrir', null, { c: codigoDe(novo8.link) })).ok === false &&
     (await pub('cv_confirmar', { c: codigoDe(novo8.link), bilhete: id8.bilhete, resposta: 'sim' })).ok === false);
   check('e a Lia segue sem usuario', !(await adm('usuarios')).usuarios.some((x) => x.collaborator_id === LIA.id));
-  check('convite ja usado nao pode ser renovado nem cancelado',
-    (await adm('cv_renovar', { id: c1.convite.id })).ok === false && (await adm('cv_cancelar', { id: c1.convite.id })).ok === false);
+  // um link que ja cadastrou gente tambem pode ser trocado ou desligado
+  const troca1 = await adm('cv_renovar', { id: c1.convite.id });
+  check('link ja usado pode ganhar um codigo novo', troca1.ok === true && codigoDe(troca1.link) !== cod1, troca1.error);
+  check('o codigo antigo morre na hora', (await pub('cv_abrir', null, { c: cod1 })).ok === false);
+  check('a contagem de cadastros do link e preservada', troca1.convite.usos >= 4, troca1.convite.usos);
+  check('e link ja usado pode ser cancelado', (await adm('cv_cancelar', { id: c1.convite.id })).ok === true);
+  check('cancelado, ninguem mais se cadastra por ele', (await pub('cv_abrir', null, { c: codigoDe(troca1.link) })).ok === false);
+  check('mas quem JA se cadastrou por ele continua com o acesso',
+    (await adm('usuarios_eu', null, null, TB)).ok === true &&
+    (await adm('usuarios')).usuarios.some((x) => x.id === uBarbara.id && x.situacao === 'ativo'));
 
   /* ============================================================
      VINCULO MANUAL (o Dono liga um acesso antigo a um colaborador)
