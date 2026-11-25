@@ -87,6 +87,8 @@ async function adm(action, body, token) {
   check('telefone guardado com DDI', meus.every((l) => l.whatsapp === '55' + fone), meus.map((l) => l.whatsapp));
   check('a origem guarda so os campos conhecidos',
     meus.every((l) => l.origem.utm_source === 'instagram' && l.origem.lixo === undefined));
+  check('cada lead diz de qual campanha veio', meus.every((l) => l.origem_nome === 'Black Week Start 2026'), meus.map((l) => l.origem_nome));
+  check('a origem guarda o botao clicado', meus.every((l) => l.origem.botao === 'EU QUERO APROVEITAR!'));
   const status = meus.map((l) => l.wa_status).sort().join(',');
   check('primeiro envio dispara o WhatsApp, o repetido nao', status === 'enviado,repetido', status);
   check('o link divulgado termina em /black-week', /\/black-week$/.test(lista.d.link || ''), lista.d.link);

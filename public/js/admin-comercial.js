@@ -1078,6 +1078,9 @@ function cmEmBreve(titulo, texto, atalho) {
 }
 
 function carregaCmLeads() {
+  // Os leads de verdade chegam pela landing page (admin-blackfriday.js).
+  // Se aquele arquivo não subiu, a aba continua com o aviso de sempre.
+  if (typeof bwCarregaLeadsComercial === 'function') return bwCarregaLeadsComercial();
   document.getElementById('painel-cmleads').innerHTML = cmEmBreve(
     'Leads comerciais',
     'Aqui vai ficar a carteira de leads de verdade do comercial. Ela ainda não existe — ' +

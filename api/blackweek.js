@@ -35,6 +35,9 @@ const send = require('./_lib/send');
 // 30/11/2026 23:59:59 em America/Sao_Paulo (UTC-3, sem horario de verao)
 const FIM = Date.UTC(2026, 11, 1, 2, 59, 59);
 
+// Como esta campanha aparece na coluna Origem de Comercial > Leads.
+const ORIGEM_NOME = 'Black Week Start 2026';
+
 const STATUS = ['novo', 'em_contato', 'fechado', 'descartado'];
 const STATUS_NOME = {
   novo: 'Novo', em_contato: 'Em contato', fechado: 'Fechado', descartado: 'Descartado'
@@ -116,6 +119,7 @@ function leadParaTela(l) {
     whatsapp: l.whatsapp,
     email: l.email,
     origem: l.origem || {},
+    origem_nome: ORIGEM_NOME,
     status: l.status || 'novo',
     status_nome: STATUS_NOME[l.status] || STATUS_NOME.novo,
     wa_status: l.wa_status || null,
