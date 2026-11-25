@@ -57,6 +57,10 @@ const ROTAS = {
   '/meta': '/meta.html',
   '/placar': '/meta.html',
   '/termos': '/termos.html',
+  '/black-week': '/black-week.html',
+  '/blackweek': '/black-week.html',
+  '/black-friday': '/black-week.html',
+  '/blackfriday': '/black-week.html',
   '/termo': '/termos.html',
   '/privacidade': '/privacidade.html',
   '/privacy': '/privacidade.html'

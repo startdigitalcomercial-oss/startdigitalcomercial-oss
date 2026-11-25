@@ -163,6 +163,7 @@ const TITULOS = {
   oponboarding: 'Onboarding', opagenda: 'Agenda',
   cmleads: 'Leads', cmagenda: 'Agenda Comercial',
   cmatendimento: 'Atendimento', cmsimulacoes: 'Simulações Comerciais',
+  cmblackfriday: 'Black Friday — Black Week Start',
   meta: 'Meta em tempo real', metagerente: 'Gerenciador de Meta'
 };
 /* ---------------------------------------------- sanfona do menu
@@ -237,6 +238,7 @@ document.getElementById('abas').addEventListener('click', function (ev) {
     cmagenda: (typeof carregaCmAgenda === 'function' ? carregaCmAgenda : null),
     cmatendimento: (typeof carregaCmAtendimento === 'function' ? carregaCmAtendimento : null),
     cmsimulacoes: (typeof carregaSimulacoes === 'function' ? carregaSimulacoes : null),
+    cmblackfriday: (typeof carregaCmBlackFriday === 'function' ? carregaCmBlackFriday : null),
     meta: (typeof carregaMeta === 'function' ? carregaMeta : null),
     metagerente: (typeof carregaMetaGerente === 'function' ? carregaMetaGerente : null)
   };

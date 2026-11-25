@@ -1097,7 +1097,7 @@ async function escondeFinanceiroSeNaoPode() {
     } else if (!COMERCIAL.gerente) {
       // Participante sem cargo de gestão só tem o que fazer em
       // Simulações. Leads, Agenda e Atendimento são do gestor.
-      ['cmleads', 'cmagenda', 'cmatendimento'].forEach(function (aba) {
+      ['cmleads', 'cmagenda', 'cmatendimento', 'cmblackfriday'].forEach(function (aba) {
         const b = document.querySelector('#abas button[data-aba="' + aba + '"]');
         if (b) b.style.display = 'none';
       });
