@@ -715,7 +715,7 @@ const linkDaSenha = (texto) => { const m = String(texto || '').match(/criar-senh
   const fs = require('fs');
   const path = require('path');
   const orfas = [];
-  for (const f of ['admin', 'financeiro', 'operacao', 'agenda', 'comercial', 'space', 'play']) {
+  for (const f of ['admin', 'financeiro', 'operacao', 'agenda', 'comercial', 'space', 'play', 'blackweek']) {
     const t = fs.readFileSync(path.join(__dirname, '..', 'api', f + '.js'), 'utf8');
     (t.match(/action === '[a-z_0-9]+'/g) || []).forEach((x) => {
       const a = x.slice(12, -1);

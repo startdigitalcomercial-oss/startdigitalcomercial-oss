@@ -136,6 +136,23 @@ Variáveis disponíveis:
 
 ---
 
+## 6.1 Campanha Black Week Start 2026
+
+| Endereço | Para quem | O que faz |
+|---|---|---|
+| `/black-week` (ou `/blackfriday`) | público | Landing page da campanha, com formulário de nome, WhatsApp e e-mail |
+| `/admin` → **Comercial → BLACK FRIDAY** | Dono e RH | Link da página, leads recebidos, mensagem automática de WhatsApp |
+
+- Cada formulário enviado vira uma linha em `bw_leads` e dispara a mensagem de WhatsApp
+  pela mesma Evolution API do resto do sistema. Sem a Evolution configurada, o lead é
+  guardado e a mensagem fica como "Enviar manualmente".
+- Antes do primeiro uso, rode `sql/2026-11-25-black-week-leads.sql` no Supabase.
+- O prazo (30/11/2026, 23h59min59s de Brasília) vale na página e no servidor.
+- Arquivos: `public/black-week.html`, `public/js/admin-blackfriday.js`, `api/blackweek.js`.
+  Teste: `node tools/test-blackweek.js`.
+
+---
+
 ## 7. Estrutura dos arquivos
 
 ```

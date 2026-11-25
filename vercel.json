@@ -121,6 +121,22 @@
       "destination": "/meta.html"
     },
     {
+      "source": "/black-week",
+      "destination": "/black-week.html"
+    },
+    {
+      "source": "/blackweek",
+      "destination": "/black-week.html"
+    },
+    {
+      "source": "/black-friday",
+      "destination": "/black-week.html"
+    },
+    {
+      "source": "/blackfriday",
+      "destination": "/black-week.html"
+    },
+    {
       "source": "/termos",
       "destination": "/termos.html"
     },
@@ -160,6 +176,9 @@
     },
     "api/agenda.js": {
       "maxDuration": 60
+    },
+    "api/blackweek.js": {
+      "maxDuration": 30
     }
   }
 }

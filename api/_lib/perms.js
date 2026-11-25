@@ -123,6 +123,10 @@ const ACOES = {
   cm_participante_salvar: 'comercial_gerir',
   cm_participante_excluir: 'comercial_gerir',
   cm_usuarios: 'comercial_gerir',
+  // Black Week Start (api/blackweek.js): leads da landing page tem
+  // nome, telefone e e-mail de gente de verdade — so quem gere o comercial.
+  cm_bw_leads: 'comercial_gerir', cm_bw_config: 'comercial_gerir',
+  cm_bw_lead_status: 'comercial_gerir', cm_bw_reenviar: 'comercial_gerir',
 
   // --- META EM TEMPO REAL ---
   // O placar entra dinheiro de verdade, entao usa a MESMA tranca do
@@ -183,7 +187,7 @@ const MODULOS = [
   { chave: 'operacao', nome: 'Operação', grupo: 'operacao',
     abas: ['opdash', 'opgestores', 'oponboarding', 'opagenda'] },
   { chave: 'comercial', nome: 'Comercial', grupo: 'comercial',
-    abas: ['cmleads', 'cmagenda', 'cmatendimento', 'cmsimulacoes', 'meta', 'metagerente'] },
+    abas: ['cmleads', 'cmagenda', 'cmatendimento', 'cmsimulacoes', 'cmblackfriday', 'meta', 'metagerente'] },
   { chave: 'academy', nome: 'Start Academy', grupo: 'conteudo',
     abas: ['conteudo', 'quiz', 'mensagens'] },
   { chave: 'financeiro', nome: 'Financeiro', grupo: 'financeiro',
@@ -235,7 +239,9 @@ const SEM_MODULO = ['login', 'dica_senha', 'usuarios_eu', 'logout_todos',
   'mt_tv',
   // Rotas que nem passam pela porta do painel: paginas do proprio
   // colaborador (beneficio, roleta) e retornos de servicos externos.
-  'meu_space', 'sacar', 'webhook', 'play_roleta', 'play_girar', 'google_callback'];
+  'meu_space', 'sacar', 'webhook', 'play_roleta', 'play_girar', 'google_callback',
+  // Landing page Black Week Start: o formulario publico (api/blackweek.js).
+  'bw_lead'];
 
 function modulosDaAcao(acao) {
   if (SEM_MODULO.indexOf(acao) >= 0) return null;
@@ -344,14 +350,14 @@ function menuDoPapel(papel) {
     return ['dashboard', 'vagas', 'triagem', 'candidatos', 'prequalificacao', 'aurea', 'preonboarding',
       'colaboradores', 'avisos', 'space', 'play', 'conteudo', 'quiz', 'mensagens',
       'opdash', 'opgestores', 'oponboarding', 'opagenda',
-      'cmleads', 'cmagenda', 'cmatendimento', 'cmsimulacoes', 'meta', 'metagerente',
+      'cmleads', 'cmagenda', 'cmatendimento', 'cmsimulacoes', 'cmblackfriday', 'meta', 'metagerente',
       'financeiro', 'finclientes', 'findash', 'fingastos', 'findre', 'ajustes', 'usuarios'];
   }
   if (papel === 'rh') {
     return ['dashboard', 'vagas', 'triagem', 'candidatos', 'prequalificacao', 'aurea', 'preonboarding',
       'colaboradores', 'avisos', 'space', 'play', 'conteudo', 'quiz', 'mensagens',
       'opdash', 'opgestores', 'oponboarding', 'opagenda',
-      'cmleads', 'cmagenda', 'cmatendimento', 'cmsimulacoes', 'meta', 'metagerente',
+      'cmleads', 'cmagenda', 'cmatendimento', 'cmsimulacoes', 'cmblackfriday', 'meta', 'metagerente',
       'financeiro', 'finclientes', 'findash', 'fingastos', 'findre', 'ajustes'];
   }
   if (papel === 'avaliador') {
