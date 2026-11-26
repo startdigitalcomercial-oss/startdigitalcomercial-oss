@@ -105,6 +105,41 @@ async function adm(action, body, token) {
   check('reenviar dispara a mensagem', re.http === 200 && re.d.envio.status === 'enviado', re.d);
   await adm('cm_bw_config', antes);              // devolve a config como estava
 
+  // ---------------------------------------------------------------
+  // GOOGLE TAG MANAGER — a tag fica nas landing pages (Black Week e
+  // Vagas) e em nenhum outro lugar. Pixel direto na pagina: nenhum
+  // (ele e ligado DENTRO do GTM; nos dois lugares contaria em dobro).
+  // ---------------------------------------------------------------
+  console.log('\n-- a tag do Google Tag Manager --');
+  const GTM = 'GTM-5C52WC2G';
+  const vezes = (texto, pedaco) => texto.split(pedaco).length - 1;
+  for (const rota of ['/black-week', '/black-friday', '/vagas', '/trabalhe-conosco']) {
+    const pagina = await (await fetch(BASE + rota)).text();
+    const cabeca = pagina.slice(0, pagina.indexOf('</head>'));
+    check(rota + ': a tag do GTM esta no <head>, com o ID da Start, uma vez so',
+      vezes(cabeca, '<script async src="https://www.googletagmanager.com/gtm.js?id=' + GTM + '"></script>') === 1 &&
+      vezes(pagina, 'googletagmanager.com/gtm.js') === 1);
+    check(rota + ': o dataLayer e criado e a tag e iniciada, uma vez so',
+      vezes(cabeca, 'window.dataLayer = window.dataLayer || [];') === 1 &&
+      vezes(cabeca, 'function gtag(){dataLayer.push(arguments);}') === 1 &&
+      vezes(cabeca, "gtag('js', new Date());") === 1);
+    check(rota + ': a tag fica no alto do <head> (antes de fontes, estilos e do resto)',
+      cabeca.indexOf('googletagmanager.com/gtm.js') > cabeca.indexOf('<meta charset') &&
+      cabeca.indexOf('googletagmanager.com/gtm.js') < cabeca.indexOf('<title>') &&
+      cabeca.indexOf('googletagmanager.com/gtm.js') < cabeca.indexOf('<link'));
+    check(rota + ': nao ha pixel da Meta direto na pagina (ele mora dentro do GTM)',
+      pagina.indexOf('fbq(') < 0 && pagina.indexOf('fbevents') < 0 && pagina.indexOf('facebook.com/tr') < 0);
+  }
+  const bw = await (await fetch(BASE + '/black-week')).text();
+  check('Black Week: o lead so e avisado ao GTM depois de o servidor confirmar',
+    bw.indexOf('if (!r.ok) throw') > 0 && bw.indexOf('if (!r.ok) throw') < bw.indexOf("evento('bws_lead')"));
+  check('Black Week: o aviso ao GTM leva so o nome do evento (nenhum dado da pessoa)',
+    bw.indexOf("window.dataLayer.push({ event: nome })") > 0);
+  for (const outra of ['/admin', '/convite', '/meta', '/vaga', '/portal', '/termos', '/privacidade']) {
+    const t = await (await fetch(BASE + outra)).text();
+    check('a tag NAO vazou para ' + outra, t.indexOf('googletagmanager') < 0 && t.indexOf(GTM) < 0);
+  }
+
   console.log('\n-- limpando --');
   const SB = process.env.SUPABASE_URL || 'http://127.0.0.1:54321';
   if (/127\.0\.0\.1|localhost/.test(SB)) {

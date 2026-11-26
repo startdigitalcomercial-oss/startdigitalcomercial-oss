@@ -370,7 +370,7 @@ const linkDaSenha = (texto) => { const m = String(texto || '').match(/criar-senh
      ============================================================ */
   console.log('\n-- casos 11 e 12: so Comercial, e a tentativa pela URL --');
   check('o menu dela so tem o Comercial',
-    JSON.stringify(euB.menu) === '["cmleads","cmagenda","cmatendimento","cmsimulacoes","meta","metagerente"]', euB.menu);
+    JSON.stringify(euB.menu) === '["cmleads","cmagenda","cmatendimento","cmsimulacoes","cmblackfriday","meta","metagerente"]', euB.menu);
   check('ela entra no Comercial (Simulacoes)', (await chama('comercial', 'cm_participantes', null, null, TB)).ok === true);
   check('ela entra no Comercial (Meta)', (await chama('comercial', 'mt_placar', null, null, TB)).ok === true);
 
