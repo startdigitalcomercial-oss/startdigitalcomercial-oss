@@ -38,10 +38,22 @@ function bwEnvioTag(l) {
   return '<span class="tag">—</span>';
 }
 
-function bwOrigem(o) {
+// A coluna Origem: de qual campanha o lead veio e, embaixo, o canal
+// (anúncio, rede social) e o botão da página em que a pessoa clicou.
+function bwCanal(o) {
   o = o || {};
-  const partes = [o.utm_source, o.utm_campaign].filter(Boolean);
-  return partes.length ? esc(partes.join(' · ')) : '<span class="muted">direto</span>';
+  const partes = [o.utm_source, o.utm_medium, o.utm_campaign].filter(Boolean);
+  if (partes.length) return partes.join(' · ');
+  if (o.referrer) {
+    try { return 'Veio de ' + new URL(o.referrer).hostname.replace(/^www\./, ''); } catch (e) { }
+  }
+  return 'Acesso direto';
+}
+function bwOrigem(l) {
+  const o = l.origem || {};
+  return '<span class="tag tag-roxo">' + esc(l.origem_nome || 'Landing page') + '</span>' +
+    '<div class="small muted" style="margin-top:4px">' + esc(bwCanal(o)) + '</div>' +
+    (o.botao ? '<div class="small muted" title="Botão em que a pessoa clicou">Botão: ' + esc(o.botao) + '</div>' : '');
 }
 
 function bwKpi(rotulo, valor, classe) {
@@ -50,20 +62,16 @@ function bwKpi(rotulo, valor, classe) {
     '<div class="num">' + valor + '</div></div>';
 }
 
-function bwDesenha() {
-  const r = BW;
-  const el = document.getElementById('painel-cmblackfriday');
-  if (!el || !r) return;
-  const cfg = r.config || {};
-
-  const linhas = r.leads.map(function (l) {
+// A tabela de leads. Serve às duas telas: BLACK FRIDAY e Comercial > Leads.
+function bwTabela(r, lista) {
+  const linhas = lista.map(function (l) {
     const podeReenviar = l.wa_status === 'erro' || l.wa_status === 'pendente_manual' || l.wa_status === 'desligado';
     return '<tr>' +
       '<td class="small" style="white-space:nowrap">' + esc(dataBr(l.created_at)) + '</td>' +
       '<td><strong>' + esc(l.nome) + '</strong></td>' +
       '<td style="white-space:nowrap"><a href="https://wa.me/' + esc(l.whatsapp) + '" target="_blank" rel="noopener">' + esc(bwFone(l.whatsapp)) + '</a></td>' +
       '<td class="small">' + esc(l.email) + '</td>' +
-      '<td class="small">' + bwOrigem(l.origem) + '</td>' +
+      '<td style="min-width:190px">' + bwOrigem(l) + '</td>' +
       '<td>' + bwEnvioTag(l) +
         (podeReenviar ? ' <button type="button" class="btn btn-sm btn-ghost bw-reenviar" data-id="' + esc(l.id) + '">Enviar agora</button>' : '') + '</td>' +
       '<td><select class="bw-status" data-id="' + esc(l.id) + '" aria-label="Situação de ' + esc(l.nome) + '" style="min-width:132px">' +
@@ -72,6 +80,41 @@ function bwDesenha() {
         }).join('') + '</select></td>' +
       '</tr>';
   }).join('');
+
+  return '<div class="card" style="padding:0;overflow:hidden"><div style="overflow-x:auto">' +
+    '<table class="tbl" style="min-width:980px"><thead><tr>' +
+    '<th>Quando</th><th>Nome</th><th>WhatsApp</th><th>E-mail</th><th>Origem</th><th>Mensagem</th><th>Situação</th>' +
+    '</tr></thead><tbody>' + linhas + '</tbody></table></div></div>';
+}
+
+// Liga os controles de cada linha (situação e "Enviar agora").
+function bwLigaTabela(el, recarregar) {
+  el.querySelectorAll('.bw-status').forEach(function (sel) {
+    sel.addEventListener('change', async function () {
+      try {
+        const s = await bwApi('cm_bw_lead_status', { id: sel.dataset.id, status: sel.value });
+        BW.leads = BW.leads.map(function (l) { return l.id === s.lead.id ? s.lead : l; });
+        toast('Situação atualizada');
+      } catch (e) { toast(e.message, true); recarregar(); }
+    });
+  });
+  el.querySelectorAll('.bw-reenviar').forEach(function (b) {
+    b.addEventListener('click', async function () {
+      b.disabled = true;
+      try {
+        const s = await bwApi('cm_bw_reenviar', { id: b.dataset.id });
+        toast(s.envio.status === 'enviado' ? 'Mensagem enviada' : ('Não foi enviada: ' + (s.envio.error || s.envio.status)), s.envio.status !== 'enviado');
+        recarregar();
+      } catch (e) { toast(e.message, true); b.disabled = false; }
+    });
+  });
+}
+
+function bwDesenha() {
+  const r = BW;
+  const el = document.getElementById('painel-cmblackfriday');
+  if (!el || !r) return;
+  const cfg = r.config || {};
 
   el.innerHTML =
     (r.aberta ? '' :
@@ -125,10 +168,7 @@ function bwDesenha() {
       '</div>' +
     '</div>' +
     (r.leads.length
-      ? '<div class="card" style="padding:0;overflow:hidden"><div style="overflow-x:auto">' +
-          '<table class="tbl" style="min-width:920px"><thead><tr>' +
-          '<th>Quando</th><th>Nome</th><th>WhatsApp</th><th>E-mail</th><th>Origem</th><th>Mensagem</th><th>Situação</th>' +
-          '</tr></thead><tbody>' + linhas + '</tbody></table></div></div>'
+      ? bwTabela(r, r.leads)
       : '<div class="card" style="text-align:center;padding:44px 24px">' +
           '<div style="font-weight:600;margin-bottom:6px">Nenhum lead ainda</div>' +
           '<div class="small muted">Quando alguém preencher o formulário da página, aparece aqui.</div></div>');
@@ -160,25 +200,7 @@ function bwDesenha() {
   const csv = document.getElementById('bw-csv');
   if (csv) csv.addEventListener('click', bwBaixaCsv);
 
-  el.querySelectorAll('.bw-status').forEach(function (sel) {
-    sel.addEventListener('change', async function () {
-      try {
-        const s = await bwApi('cm_bw_lead_status', { id: sel.dataset.id, status: sel.value });
-        BW.leads = BW.leads.map(function (l) { return l.id === s.lead.id ? s.lead : l; });
-        toast('Situação atualizada');
-      } catch (e) { toast(e.message, true); carregaCmBlackFriday(); }
-    });
-  });
-  el.querySelectorAll('.bw-reenviar').forEach(function (b) {
-    b.addEventListener('click', async function () {
-      b.disabled = true;
-      try {
-        const s = await bwApi('cm_bw_reenviar', { id: b.dataset.id });
-        toast(s.envio.status === 'enviado' ? 'Mensagem enviada' : ('Não foi enviada: ' + (s.envio.error || s.envio.status)), s.envio.status !== 'enviado');
-        carregaCmBlackFriday();
-      } catch (e) { toast(e.message, true); b.disabled = false; }
-    });
-  });
+  bwLigaTabela(el, carregaCmBlackFriday);
 }
 
 function bwBaixaCsv() {
@@ -190,11 +212,11 @@ function bwBaixaCsv() {
     if (/^[=+\-@\t\r]/.test(t)) t = "'" + t;
     return '"' + t.replace(/"/g, '""') + '"';
   };
-  const linhas = [['Data', 'Nome', 'WhatsApp', 'E-mail', 'Origem', 'Campanha', 'Botão', 'Mensagem', 'Situação']];
+  const linhas = [['Data', 'Nome', 'WhatsApp', 'E-mail', 'Origem', 'Canal', 'Botão', 'Mensagem', 'Situação']];
   BW.leads.forEach(function (l) {
     const o = l.origem || {};
-    linhas.push([dataBr(l.created_at), l.nome, l.whatsapp, l.email, o.utm_source || '', o.utm_campaign || '',
-      o.botao || '', l.wa_status || '', l.status_nome]);
+    linhas.push([dataBr(l.created_at), l.nome, l.whatsapp, l.email, l.origem_nome || '', bwCanal(o),
+      o.botao || '', l.wa_status || '', (BW.status_nome || {})[l.status] || l.status]);
   });
   const texto = '﻿' + linhas.map(function (ln) { return ln.map(cel).join(';'); }).join('\r\n');
   const a = document.createElement('a');
@@ -211,6 +233,92 @@ async function carregaCmBlackFriday() {
   try {
     BW = await bwApi('cm_bw_leads');
     bwDesenha();
+  } catch (e) {
+    el.innerHTML = '<div class="alert alert-erro">' + esc(e.message) + '</div>';
+  }
+}
+
+/* ============================================================
+   COMERCIAL > LEADS
+
+   A carteira de leads de verdade. Hoje quem alimenta é a landing
+   page da Black Week Start; a coluna Origem diz de onde cada um
+   veio. Os leads de Simulações continuam fora: são treino e moram
+   em outra tabela.
+   ============================================================ */
+let BW_FILTRO = { busca: '', status: '' };
+
+function bwLeadsFiltrados() {
+  const q = BW_FILTRO.busca.trim().toLowerCase();
+  return BW.leads.filter(function (l) {
+    if (BW_FILTRO.status && l.status !== BW_FILTRO.status) return false;
+    if (!q) return true;
+    return [l.nome, l.email, l.whatsapp, bwFone(l.whatsapp), l.origem_nome, bwCanal(l.origem)]
+      .join(' ').toLowerCase().indexOf(q) >= 0;
+  });
+}
+
+function bwDesenhaListaComercial() {
+  const caixa = document.getElementById('cml-lista');
+  if (!caixa) return;
+  const lista = bwLeadsFiltrados();
+  caixa.innerHTML = lista.length
+    ? bwTabela(BW, lista)
+    : '<div class="card" style="text-align:center;padding:44px 24px">' +
+        '<div style="font-weight:600;margin-bottom:6px">' + (BW.leads.length ? 'Nenhum lead com esse filtro' : 'Nenhum lead ainda') + '</div>' +
+        '<div class="small muted">' + (BW.leads.length ? 'Limpe a busca ou escolha outra situação.'
+          : 'Quando alguém preencher o formulário da landing page, aparece aqui.') + '</div></div>';
+  bwLigaTabela(caixa, bwCarregaLeadsComercial);
+}
+
+function bwDesenhaLeadsComercial() {
+  const el = document.getElementById('painel-cmleads');
+  if (!el || !BW) return;
+  const r = BW;
+  const por = function (s) { return r.leads.filter(function (l) { return l.status === s; }).length; };
+  el.innerHTML =
+    '<div class="op-kpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">' +
+      bwKpi('Leads no total', r.totais.total) +
+      bwKpi('Leads hoje', r.totais.hoje) +
+      bwKpi('Novos', por('novo')) +
+      bwKpi('Em contato', por('em_contato')) +
+      bwKpi('Fechados', por('fechado'), 'bom') +
+    '</div>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">' +
+      '<input type="search" id="cml-busca" placeholder="Buscar por nome, WhatsApp, e-mail ou origem" aria-label="Buscar lead" value="' + esc(BW_FILTRO.busca) + '" style="flex:1 1 260px;min-width:0;width:auto">' +
+      '<select id="cml-status" aria-label="Filtrar por situação" style="flex:0 0 200px;width:200px">' +
+        '<option value="">Todas as situações</option>' +
+        r.status.map(function (s) {
+          return '<option value="' + s + '"' + (s === BW_FILTRO.status ? ' selected' : '') + '>' + esc(r.status_nome[s]) + '</option>';
+        }).join('') + '</select>' +
+      '<button type="button" class="btn btn-sm btn-ghost" id="cml-atualizar">Atualizar</button>' +
+      (r.leads.length ? '<button type="button" class="btn btn-sm btn-ghost" id="cml-csv">Baixar planilha (CSV)</button>' : '') +
+    '</div>' +
+    '<div id="cml-lista"></div>' +
+    '<p class="small muted" style="margin-top:14px">Origem atual: landing page <strong>Black Week Start 2026</strong>. ' +
+      'A mensagem automática e o link da página ficam em ' +
+      '<a href="#" id="cml-ir-bf">Comercial → BLACK FRIDAY</a>. Os leads de Simulações são de treino e não entram aqui.</p>';
+
+  document.getElementById('cml-busca').addEventListener('input', function () { BW_FILTRO.busca = this.value; bwDesenhaListaComercial(); });
+  document.getElementById('cml-status').addEventListener('change', function () { BW_FILTRO.status = this.value; bwDesenhaListaComercial(); });
+  document.getElementById('cml-atualizar').addEventListener('click', bwCarregaLeadsComercial);
+  const csv = document.getElementById('cml-csv');
+  if (csv) csv.addEventListener('click', bwBaixaCsv);
+  document.getElementById('cml-ir-bf').addEventListener('click', function (ev) {
+    ev.preventDefault();
+    const b = document.querySelector('#abas button[data-aba="cmblackfriday"]');
+    if (b) b.click();
+  });
+  bwDesenhaListaComercial();
+}
+
+async function bwCarregaLeadsComercial() {
+  const el = document.getElementById('painel-cmleads');
+  if (!el) return;
+  if (!BW) el.innerHTML = '<div class="card" style="text-align:center;padding:44px 24px"><span class="spinner"></span></div>';
+  try {
+    BW = await bwApi('cm_bw_leads');
+    bwDesenhaLeadsComercial();
   } catch (e) {
     el.innerHTML = '<div class="alert alert-erro">' + esc(e.message) + '</div>';
   }
